@@ -49,6 +49,8 @@ class MyAppState extends ChangeNotifier {
 }
 
 class MyHomePage extends StatefulWidget {
+  const MyHomePage({super.key});
+
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
@@ -66,7 +68,7 @@ class _MyHomePageState extends State<MyHomePage> {
         page = HomePage();
         break;
       case 1:
-        page = FavoritesPage();
+        page = TakeImagePage();
         break;
       default:
         throw UnimplementedError('No widget for $selectedIndex');
@@ -144,6 +146,8 @@ class _MyHomePageState extends State<MyHomePage> {
 }
 
 class HomePage extends StatelessWidget {
+  const HomePage({super.key});
+
   @override
   Widget build(BuildContext context) {
     var appState = context.watch<MyAppState>();
@@ -165,11 +169,13 @@ class HomePage extends StatelessWidget {
   }
 }
 
-class FavoritesPage extends StatelessWidget {
+class TakeImagePage extends StatelessWidget {
+  const TakeImagePage({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Center(
-      child: Text("Favorites Page"),
+      child: Text("Take Image Page"),
     );
   }
 }
