@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
+import 'package:camera/camera.dart';
 
 void main() {
   runApp(MyApp());
@@ -161,8 +164,20 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text("Homepage"),
+    return Scaffold(
+      body: Stack(
+        children: [
+          FlutterMap(
+            options: MapOptions(initialCenter: LatLng(56.177839, 10.216839)),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.app',
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
