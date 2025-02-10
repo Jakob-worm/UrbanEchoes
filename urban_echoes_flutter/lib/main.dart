@@ -35,7 +35,7 @@ class MyAppState extends ChangeNotifier {
   Future<void> fetchBackendMessage() async {
     try {
       final response = await http.get(Uri.parse(
-          "https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net"));
+          "urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net"));
       if (response.statusCode == 200) {
         backendMessage = response.body;
       } else {
@@ -70,6 +70,9 @@ class _MyHomePageState extends State<MyHomePage> {
       case 1:
         page = TakeImagePage();
         break;
+      case 2:
+        page = BackEndTest();
+        break;
       default:
         throw UnimplementedError('No widget for $selectedIndex');
     }
@@ -97,9 +100,13 @@ class _MyHomePageState extends State<MyHomePage> {
                         label: 'Home',
                       ),
                       BottomNavigationBarItem(
-                        icon: Icon(Icons.favorite),
-                        label: 'Favorites',
+                        icon: Icon(Icons.camera),
+                        label: 'Take image page',
                       ),
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.abc),
+                        label: 'Backend Test',
+                      )
                     ],
                     currentIndex: selectedIndex,
                     onTap: (value) {
@@ -126,6 +133,10 @@ class _MyHomePageState extends State<MyHomePage> {
                         icon: Icon(Icons.camera),
                         label: Text('camera'),
                       ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.abc),
+                        label: Text('Backend Test'),
+                      )
                     ],
                     selectedIndex: selectedIndex,
                     onDestinationSelected: (value) {
@@ -150,6 +161,28 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    return Center(
+      child: Text("Homepage"),
+    );
+  }
+}
+
+class TakeImagePage extends StatelessWidget {
+  const TakeImagePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Text("Take Image Page"),
+    );
+  }
+}
+
+class BackEndTest extends StatelessWidget {
+  const BackEndTest({super.key});
+
+  @override
+  Widget build(BuildContext context) {
     var appState = context.watch<MyAppState>();
 
     return Center(
@@ -165,17 +198,6 @@ class HomePage extends StatelessWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-class TakeImagePage extends StatelessWidget {
-  const TakeImagePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text("Take Image Page"),
     );
   }
 }
