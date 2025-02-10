@@ -164,6 +164,34 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Define a list of CircleMarker objects
+    final List<CircleMarker> circles = [
+      CircleMarker(
+        point: LatLng(56.177839, 10.216839), // First circle center
+        radius: 50,
+        useRadiusInMeter: true,
+        color: Colors.red.withOpacity(0.3),
+        borderColor: Colors.red.withOpacity(0.7),
+        borderStrokeWidth: 2,
+      ),
+      CircleMarker(
+        point: LatLng(56.179839, 10.218839), // Second circle center
+        radius: 100,
+        useRadiusInMeter: true,
+        color: Colors.blue.withOpacity(0.3),
+        borderColor: Colors.blue.withOpacity(0.7),
+        borderStrokeWidth: 2,
+      ),
+      CircleMarker(
+        point: LatLng(56.180839, 10.220839), // Third circle center
+        radius: 150,
+        useRadiusInMeter: true,
+        color: Colors.green.withOpacity(0.3),
+        borderColor: Colors.green.withOpacity(0.7),
+        borderStrokeWidth: 2,
+      ),
+    ];
+
     return Scaffold(
       body: Stack(
         children: [
@@ -173,6 +201,9 @@ class HomePage extends StatelessWidget {
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.example.app',
+              ),
+              CircleLayer(
+                circles: circles, // Pass the list of circles here
               ),
             ],
           ),
