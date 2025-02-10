@@ -163,8 +163,20 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Text("Homepage"),
+    return Scaffold(
+      body: Stack(
+        children: [
+          FlutterMap(
+            options: MapOptions(initialCenter: LatLng(56.177839, 10.216839)),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.app',
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
