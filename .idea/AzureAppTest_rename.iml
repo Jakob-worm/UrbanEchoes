@@ -6,6 +6,9 @@
       <excludeFolder url="file://$MODULE_DIR$/urban_echoes/.dart_tool" />
       <excludeFolder url="file://$MODULE_DIR$/urban_echoes/.pub" />
       <excludeFolder url="file://$MODULE_DIR$/urban_echoes/build" />
+      <excludeFolder url="file://$MODULE_DIR$/urban_echoes_flutter/.dart_tool" />
+      <excludeFolder url="file://$MODULE_DIR$/urban_echoes_flutter/.pub" />
+      <excludeFolder url="file://$MODULE_DIR$/urban_echoes_flutter/build" />
     </content>
     <orderEntry type="jdk" jdkName="Python 3.11" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />

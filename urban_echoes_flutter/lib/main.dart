@@ -10,7 +10,7 @@ class MyApp extends StatelessWidget {
 
   Future<String> fetchBackendMessage() async {
     final response = await http.get(Uri.parse(
-        "https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net"));
+        "urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net"));
     if (response.statusCode == 200) {
       return response.body;
     } else {
