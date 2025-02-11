@@ -170,24 +170,25 @@ class HomePage extends StatelessWidget {
         point: LatLng(56.177839, 10.216839), // First circle center
         radius: 50,
         useRadiusInMeter: true,
-        color: Colors.red.withOpacity(0.3),
-        borderColor: Colors.red.withOpacity(0.7),
+        color: Colors.red
+            .withAlpha((0.3 * 255).toInt()), // Convert opacity to 0-255 scale
+        borderColor: Colors.red.withAlpha((0.7 * 255).toInt()),
         borderStrokeWidth: 2,
       ),
       CircleMarker(
         point: LatLng(56.179839, 10.218839), // Second circle center
         radius: 100,
         useRadiusInMeter: true,
-        color: Colors.blue.withOpacity(0.3),
-        borderColor: Colors.blue.withOpacity(0.7),
+        color: Colors.blue.withAlpha((0.3 * 255).toInt()),
+        borderColor: Colors.blue.withAlpha((0.7 * 255).toInt()),
         borderStrokeWidth: 2,
       ),
       CircleMarker(
         point: LatLng(56.180839, 10.220839), // Third circle center
         radius: 150,
         useRadiusInMeter: true,
-        color: Colors.green.withOpacity(0.3),
-        borderColor: Colors.green.withOpacity(0.7),
+        color: Colors.green.withAlpha((0.3 * 255).toInt()),
+        borderColor: Colors.green.withAlpha((0.7 * 255).toInt()),
         borderStrokeWidth: 2,
       ),
     ];
