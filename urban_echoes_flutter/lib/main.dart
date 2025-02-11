@@ -177,15 +177,16 @@ class HomePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Home Page'),
+        centerTitle: true,
+        title: const Text('Urban Echoes'),
       ),
       body: Center(
         child: Column(
           mainAxisAlignment:
               MainAxisAlignment.center, // Centers content vertically
           children: [
-            const Text('Hello, World!'),
-            const SizedBox(height: 20),
+            BigCard(text: 'Make observation'),
+            BigCard(text: 'Profile'),
             ElevatedButton(
               onPressed: () {
                 print('Click!');
@@ -284,6 +285,48 @@ class BackEndTest extends StatelessWidget {
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class BigCard extends StatelessWidget {
+  final String text; // Declare the text parameter
+
+  const BigCard({
+    super.key,
+    required this.text, // Use this.text to assign the value
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    var theme = Theme.of(context);
+    var style = theme.textTheme.displayMedium!.copyWith(
+      color: theme.colorScheme.onPrimary,
+    );
+
+    return ElevatedButton(
+      onPressed: () {
+        print('Make observation clicked');
+      },
+      child: Card(
+        color: theme.colorScheme.primary,
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: AnimatedSize(
+            duration: Duration(milliseconds: 200),
+            child: MergeSemantics(
+              child: Wrap(
+                children: [
+                  Text(
+                    text, // Use the text variable here
+                    style: style.copyWith(fontWeight: FontWeight.w200),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
