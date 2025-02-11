@@ -16,11 +16,14 @@ class BigCard extends StatelessWidget {
     var style = theme.textTheme.displayMedium!.copyWith(
       color: theme.colorScheme.onPrimary,
     );
+    var screenWidth = MediaQuery.of(context).size.width;
 
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Container(
-        width: 500, // Set the width to make it square
+        width: screenWidth -
+            (screenWidth *
+                0.30), // Set the width to take up the entire screen width
         height: 200, // Set the height to make it square
         decoration: BoxDecoration(
           color: theme.colorScheme.primary,
