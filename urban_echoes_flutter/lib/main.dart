@@ -76,6 +76,9 @@ class _MyHomePageState extends State<MyHomePage> {
       case 2:
         page = BackEndTest();
         break;
+      case 3:
+        page = MapPage();
+        break;
       default:
         throw UnimplementedError('No widget for $selectedIndex');
     }
@@ -109,7 +112,11 @@ class _MyHomePageState extends State<MyHomePage> {
                       BottomNavigationBarItem(
                         icon: Icon(Icons.abc),
                         label: 'Backend Test',
-                      )
+                      ),
+                      BottomNavigationBarItem(
+                        icon: Icon(Icons.map),
+                        label: 'Map',
+                      ),
                     ],
                     currentIndex: selectedIndex,
                     onTap: (value) {
@@ -139,6 +146,10 @@ class _MyHomePageState extends State<MyHomePage> {
                       NavigationRailDestination(
                         icon: Icon(Icons.abc),
                         label: Text('Backend Test'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.map),
+                        label: Text('Map'),
                       )
                     ],
                     selectedIndex: selectedIndex,
@@ -161,6 +172,16 @@ class _MyHomePageState extends State<MyHomePage> {
 
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // TODO: implement build
+    throw UnimplementedError();
+  }
+}
+
+class MapPage extends StatelessWidget {
+  const MapPage({super.key});
 
   @override
   Widget build(BuildContext context) {
