@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import 'package:camera/camera.dart';
+import 'package:urban_echoes/pages/backend_test.dart';
+import 'package:urban_echoes/pages/map_page.dart';
+
+import 'wigdets/big_card.dart';
 
 void main() {
   runApp(MyApp());
@@ -200,61 +202,6 @@ class HomePage extends StatelessWidget {
   }
 }
 
-class MapPage extends StatelessWidget {
-  const MapPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // Define a list of CircleMarker objects
-    final List<CircleMarker> circles = [
-      CircleMarker(
-        point: LatLng(56.177839, 10.216839), // First circle center
-        radius: 50,
-        useRadiusInMeter: true,
-        color: Colors.red
-            .withAlpha((0.3 * 255).toInt()), // Convert opacity to 0-255 scale
-        borderColor: Colors.red.withAlpha((0.7 * 255).toInt()),
-        borderStrokeWidth: 2,
-      ),
-      CircleMarker(
-        point: LatLng(56.179839, 10.218839), // Second circle center
-        radius: 100,
-        useRadiusInMeter: true,
-        color: Colors.blue.withAlpha((0.3 * 255).toInt()),
-        borderColor: Colors.blue.withAlpha((0.7 * 255).toInt()),
-        borderStrokeWidth: 2,
-      ),
-      CircleMarker(
-        point: LatLng(56.180839, 10.220839), // Third circle center
-        radius: 150,
-        useRadiusInMeter: true,
-        color: Colors.green.withAlpha((0.3 * 255).toInt()),
-        borderColor: Colors.green.withAlpha((0.7 * 255).toInt()),
-        borderStrokeWidth: 2,
-      ),
-    ];
-
-    return Scaffold(
-      body: Stack(
-        children: [
-          FlutterMap(
-            options: MapOptions(initialCenter: LatLng(56.177839, 10.216839)),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.example.app',
-              ),
-              CircleLayer(
-                circles: circles, // Pass the list of circles here
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class TakeImagePage extends StatelessWidget {
   const TakeImagePage({super.key});
 
@@ -262,72 +209,6 @@ class TakeImagePage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Text("Take Image Page"),
-    );
-  }
-}
-
-class BackEndTest extends StatelessWidget {
-  const BackEndTest({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    var appState = context.watch<MyAppState>();
-
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text("Backend Response:"),
-          SizedBox(height: 10),
-          Text(
-            appState.backendMessage,
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class BigCard extends StatelessWidget {
-  final String text; // Declare the text parameter
-
-  const BigCard({
-    super.key,
-    required this.text, // Use this.text to assign the value
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    var theme = Theme.of(context);
-    var style = theme.textTheme.displayMedium!.copyWith(
-      color: theme.colorScheme.onPrimary,
-    );
-
-    return ElevatedButton(
-      onPressed: () {
-        print('Make observation clicked');
-      },
-      child: Card(
-        color: theme.colorScheme.primary,
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: AnimatedSize(
-            duration: Duration(milliseconds: 200),
-            child: MergeSemantics(
-              child: Wrap(
-                children: [
-                  Text(
-                    text, // Use the text variable here
-                    style: style.copyWith(fontWeight: FontWeight.w200),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }
