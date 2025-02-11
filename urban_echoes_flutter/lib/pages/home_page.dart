@@ -16,8 +16,14 @@ class HomePage extends StatelessWidget {
           mainAxisAlignment:
               MainAxisAlignment.center, // Centers content vertically
           children: [
-            BigCard(text: 'Make observation'),
-            BigCard(text: 'Profile'),
+            BigCard(
+              text: 'Make observation',
+              onPressed: () => print('Make observation pressed'),
+            ),
+            BigCard(
+              text: 'Profile',
+              onPressed: () => print('Profile pressed'),
+            ),
             ElevatedButton(
               onPressed: () {
                 print('Click!');

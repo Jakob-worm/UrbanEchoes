@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
-import 'package:camera/camera.dart';
 import 'package:urban_echoes/pages/backend_test.dart';
 import 'package:urban_echoes/pages/home_page.dart';
 import 'package:urban_echoes/pages/map_page.dart';
