@@ -175,8 +175,27 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // TODO: implement build
-    throw UnimplementedError();
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('My Home Page'),
+      ),
+      body: Center(
+        child: Column(
+          mainAxisAlignment:
+              MainAxisAlignment.center, // Centers content vertically
+          children: [
+            const Text('Hello, World!'),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: () {
+                print('Click!');
+              },
+              child: const Text('A button'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
