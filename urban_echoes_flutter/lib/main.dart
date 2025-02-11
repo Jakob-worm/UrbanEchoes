@@ -3,9 +3,9 @@ import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:camera/camera.dart';
 import 'package:urban_echoes/pages/backend_test.dart';
+import 'package:urban_echoes/pages/home_page.dart';
 import 'package:urban_echoes/pages/map_page.dart';
-
-import 'wigdets/big_card.dart';
+import 'package:urban_echoes/pages/take_image_page.dart';
 
 void main() {
   runApp(MyApp());
@@ -168,47 +168,6 @@ class _MyHomePageState extends State<MyHomePage> {
           }
         },
       ),
-    );
-  }
-}
-
-class HomePage extends StatelessWidget {
-  const HomePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        title: const Text('Urban Echoes'),
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment:
-              MainAxisAlignment.center, // Centers content vertically
-          children: [
-            BigCard(text: 'Make observation'),
-            BigCard(text: 'Profile'),
-            ElevatedButton(
-              onPressed: () {
-                print('Click!');
-              },
-              child: const Text('A button'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class TakeImagePage extends StatelessWidget {
-  const TakeImagePage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text("Take Image Page"),
     );
   }
 }
