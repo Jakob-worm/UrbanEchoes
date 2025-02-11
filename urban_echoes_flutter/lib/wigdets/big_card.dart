@@ -19,6 +19,7 @@ class BigCard extends StatelessWidget {
       color: theme.colorScheme.onPrimary,
     );
     var screenWidth = MediaQuery.of(context).size.width;
+    var screenHeight = MediaQuery.of(context).size.height;
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -26,7 +27,10 @@ class BigCard extends StatelessWidget {
         width: screenWidth -
             (screenWidth *
                 0.30), // Set the width to take up the entire screen width
-        height: 200, // Set the height to make it square
+        height: imageUrl != null
+            ? screenHeight * 0.60
+            : screenHeight *
+                0.20, // Set the height to 70% of the screen height if imageUrl is provided, otherwise 200
         decoration: BoxDecoration(
           color: theme.colorScheme.primary,
           borderRadius: BorderRadius.circular(8), // Optional: rounded corners

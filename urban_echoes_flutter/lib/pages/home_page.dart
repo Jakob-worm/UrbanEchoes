@@ -38,12 +38,6 @@ class HomePage extends StatelessWidget {
               text: 'Profile',
               onPressed: () => print('Profile pressed'),
             ),
-            ElevatedButton(
-              onPressed: () {
-                print('Click!');
-              },
-              child: const Text('A button'),
-            ),
           ],
         ),
       ),
