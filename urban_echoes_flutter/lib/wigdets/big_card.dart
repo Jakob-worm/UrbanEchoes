@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 class BigCard extends StatelessWidget {
   final String text; // Declare the text parameter
   final VoidCallback onPressed; // Declare the onPressed parameter
+  final String? imageUrl; // Declare the optional imageUrl parameter
 
   const BigCard({
     super.key,
     required this.text, // Use this.text to assign the value
     required this.onPressed, // Use this.onPressed to assign the value
+    this.imageUrl, // Use this.imageUrl to assign the value
   });
 
   @override
@@ -28,12 +30,19 @@ class BigCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: theme.colorScheme.primary,
           borderRadius: BorderRadius.circular(8), // Optional: rounded corners
+          image: imageUrl != null
+              ? DecorationImage(
+                  image:
+                      AssetImage(imageUrl!), // Use AssetImage for local assets
+                  fit: BoxFit.cover,
+                )
+              : null,
         ),
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
             foregroundColor: theme.colorScheme.onPrimary,
-            backgroundColor: theme.colorScheme
-                .primary, // Use the theme's onPrimary color for text and icons
+            backgroundColor:
+                Colors.transparent, // Make the button background transparent
             shape: RoundedRectangleBorder(
               borderRadius:
                   BorderRadius.circular(8), // Optional: rounded corners
