@@ -61,24 +61,29 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   var selectedIndex = 0;
+  Widget page = HomePage();
+
+  void setPage(Widget page) {
+    setState(() {
+      this.page = page;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     var colorScheme = Theme.of(context).colorScheme;
-
-    Widget page;
     switch (selectedIndex) {
       case 0:
-        page = HomePage();
+        setPage(HomePage());
         break;
       case 1:
-        page = TakeImagePage();
+        setPage(TakeImagePage());
         break;
       case 2:
-        page = BackEndTest();
+        setPage(BackEndTest());
         break;
       case 3:
-        page = MapPage();
+        setPage(MapPage());
         break;
       default:
         throw UnimplementedError('No widget for $selectedIndex');
