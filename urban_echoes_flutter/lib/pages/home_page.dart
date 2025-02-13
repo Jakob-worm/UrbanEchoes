@@ -1,24 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:urban_echoes/page_state_maneger.dart';
 import 'package:urban_echoes/wigdets/big_card.dart';
 import 'dart:math';
 
 class HomePage extends StatelessWidget {
   // List of image paths
   final List<String> images = [
-    '/images/dresden-7122254_1920.jpg',
-    '/images/kingfisher-6562537_1920.jpg',
-    '/images/song-sparrow-7942522_1920.jpg',
+    'assets/images/dresden-7122254_1920.jpg',
+    'assets/images/kingfisher-6562537_1920.jpg',
+    'assets/images/song-sparrow-7942522_1920.jpg',
     // Add more image paths as needed
   ];
 
   // Generate a random index
   final random = Random();
+  String get randomImage => images[random.nextInt(images.length)];
 
   HomePage({super.key});
-  String get randomImage => images[random.nextInt(images.length)];
 
   @override
   Widget build(BuildContext context) {
+    var pageStateManager = Provider.of<PageStateManager>(context);
+
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
@@ -31,7 +35,8 @@ class HomePage extends StatelessWidget {
           children: [
             BigCard(
               text: 'Make observation',
-              onPressed: () => print('Make observation pressed'),
+              onPressed: () => pageStateManager
+                  .setPage(1), // Navigate to the "Make observation" page
               imageUrl: randomImage, // Use the random image
             ),
             BigCard(
