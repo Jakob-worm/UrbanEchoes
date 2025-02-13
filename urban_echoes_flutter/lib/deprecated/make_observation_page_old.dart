@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:urban_echoes/wigdets/big_custom_button.dart';
+import 'package:urban_echoes/deprecated/searchbarOld.dart' as custom;
 import 'package:urban_echoes/wigdets/dropdown_numbers.dart';
-import 'package:urban_echoes/wigdets/searchbar_alternative_version.dart';
 
-class MakeObservationPageAlt extends StatefulWidget {
-  const MakeObservationPageAlt({super.key});
+class MakeObservationPageOld extends StatefulWidget {
+  const MakeObservationPageOld({super.key});
 
   @override
-  _MakeObservationPageAltState createState() => _MakeObservationPageAltState();
+  _MakeObservationPageOldState createState() => _MakeObservationPageOldState();
 }
 
-class _MakeObservationPageAltState extends State<MakeObservationPageAlt> {
+class _MakeObservationPageOldState extends State<MakeObservationPageOld> {
   final TextEditingController _searchController = TextEditingController();
   int _selectedNumber = 1;
   final List<String> _suggestions = [
@@ -54,7 +54,7 @@ class _MakeObservationPageAltState extends State<MakeObservationPageAlt> {
                 children: [
                   Expanded(
                     flex: 9, // Adjust the flex value to control the proportion
-                    child: SearchbarAlternative(
+                    child: custom.SearchBarOld(
                       controller: _searchController,
                       onChanged: (value) => print('Search value: $value'),
                       suggestions: _suggestions,
@@ -79,6 +79,10 @@ class _MakeObservationPageAltState extends State<MakeObservationPageAlt> {
             BigCustomButton(
               text: 'Submit',
               onPressed: _handleSubmit,
+            ),
+            BigCustomButton(
+              text: 'I am unsure about what I saw/heard',
+              onPressed: () => print('Unsure pressed'),
             ),
           ],
         ),

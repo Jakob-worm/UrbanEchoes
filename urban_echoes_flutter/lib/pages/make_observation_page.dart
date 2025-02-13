@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:urban_echoes/wigdets/big_custom_button.dart';
-import 'package:urban_echoes/wigdets/searchbar.dart' as custom;
 import 'package:urban_echoes/wigdets/dropdown_numbers.dart';
+import 'package:urban_echoes/wigdets/searchbar.dart';
 
 class MakeObservationPage extends StatefulWidget {
   const MakeObservationPage({super.key});
@@ -54,7 +54,7 @@ class _MakeObservationPageState extends State<MakeObservationPage> {
                 children: [
                   Expanded(
                     flex: 9, // Adjust the flex value to control the proportion
-                    child: custom.SearchBar(
+                    child: Searchbar(
                       controller: _searchController,
                       onChanged: (value) => print('Search value: $value'),
                       suggestions: _suggestions,
@@ -79,10 +79,6 @@ class _MakeObservationPageState extends State<MakeObservationPage> {
             BigCustomButton(
               text: 'Submit',
               onPressed: _handleSubmit,
-            ),
-            BigCustomButton(
-              text: 'I am unsure about what I saw/heard',
-              onPressed: () => print('Unsure pressed'),
             ),
           ],
         ),
