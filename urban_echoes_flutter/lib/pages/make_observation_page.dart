@@ -28,7 +28,7 @@ class _MakeObservationPageState extends State<MakeObservationPage> {
 
   void _handleSubmit() {
     final searchValue = _searchController.text;
-    if (searchValue.isNotEmpty && _selectedNumber != null) {
+    if (searchValue.isNotEmpty) {
       print('$searchValue + ${_selectedNumber.toString()} has been recorded');
     } else {
       print('Please fill in both the search bar and select a number.');
