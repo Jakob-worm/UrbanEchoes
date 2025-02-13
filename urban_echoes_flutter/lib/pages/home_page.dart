@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:urban_echoes/page_state_maneger.dart';
 import 'package:urban_echoes/wigdets/big_card.dart';
 import 'dart:math';
+
+import '../state manegers/button_page_state_maneger.dart';
 
 class HomePage extends StatelessWidget {
   // List of image paths
@@ -21,7 +22,7 @@ class HomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var pageStateManager = Provider.of<PageStateManager>(context);
+    var buttonPageStateManeger = Provider.of<ButtonPageStateManeger>(context);
 
     return Scaffold(
       appBar: AppBar(
@@ -35,8 +36,8 @@ class HomePage extends StatelessWidget {
           children: [
             BigCard(
               text: 'Make observation',
-              onPressed: () => pageStateManager
-                  .setPage(1), // Navigate to the "Make observation" page
+              onPressed: () => buttonPageStateManeger.setPage(ButtonPages
+                  .observation), // Navigate to the "Make observation" page
               imageUrl: randomImage, // Use the random image
             ),
             BigCard(

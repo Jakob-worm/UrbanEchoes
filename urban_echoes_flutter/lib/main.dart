@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:urban_echoes/page_state_maneger.dart';
-
-import 'app_state_maneger.dart';
+import 'package:urban_echoes/state%20manegers/app_state_maneger.dart';
+import 'package:urban_echoes/state%20manegers/button_page_state_maneger.dart';
+import 'package:urban_echoes/state%20manegers/railnav_page_state_maneger.dart';
 
 void main() {
   runApp(MyApp());
@@ -15,7 +15,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (context) => PageStateManager()),
+        ChangeNotifierProvider(create: (context) => RailNavPageStateManager()),
+        ChangeNotifierProvider(create: (context) => ButtonPageStateManeger()),
         ChangeNotifierProvider(create: (context) => MyAppState()),
       ],
       child: MaterialApp(
@@ -34,15 +35,19 @@ class MyHomePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    var pageStateManager = Provider.of<PageStateManager>(context);
+    var railNavPageStateManager = Provider.of<RailNavPageStateManager>(context);
+    var buttonPageStateManeger = Provider.of<ButtonPageStateManeger>(context);
 
     return Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
+          if (buttonPageStateManeger.currentPage != null) {
+            return buttonPageStateManeger.currentPage!;
+          }
           if (constraints.maxWidth < 450) {
             return Column(
               children: [
-                Expanded(child: pageStateManager.currentPage),
+                Expanded(child: railNavPageStateManager.currentPage),
                 SafeArea(
                   child: BottomNavigationBar(
                     items: [
@@ -63,8 +68,10 @@ class MyHomePage extends StatelessWidget {
                         label: 'Map',
                       ),
                     ],
-                    currentIndex: pageStateManager.selectedIndex,
-                    onTap: pageStateManager.setPage,
+                    currentIndex: PageType.values
+                        .indexOf(railNavPageStateManager.selectedPage),
+                    onTap: (index) =>
+                        railNavPageStateManager.setPage(PageType.values[index]),
                   ),
                 ),
               ],
@@ -93,11 +100,13 @@ class MyHomePage extends StatelessWidget {
                         label: Text('Map'),
                       ),
                     ],
-                    selectedIndex: pageStateManager.selectedIndex,
-                    onDestinationSelected: pageStateManager.setPage,
+                    selectedIndex: PageType.values
+                        .indexOf(railNavPageStateManager.selectedPage),
+                    onDestinationSelected: (index) =>
+                        railNavPageStateManager.setPage(PageType.values[index]),
                   ),
                 ),
-                Expanded(child: pageStateManager.currentPage),
+                Expanded(child: railNavPageStateManager.currentPage),
               ],
             );
           }

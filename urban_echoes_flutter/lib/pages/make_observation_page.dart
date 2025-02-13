@@ -29,5 +29,4 @@ class MakeObservationPage extends StatelessWidget {
       ),
     );
   }
-
 }
