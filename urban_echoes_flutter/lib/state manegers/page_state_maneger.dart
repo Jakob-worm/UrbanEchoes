@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:urban_echoes/pages/backend_test.dart';
 import 'package:urban_echoes/pages/home_page.dart';
 import 'package:urban_echoes/pages/make_observation_page.dart';
+import 'package:urban_echoes/pages/make_observation_pageAltSerachbar.dart';
 import 'package:urban_echoes/pages/map_page.dart';
 import 'package:urban_echoes/pages/take_image_page.dart';
 
@@ -15,6 +16,7 @@ enum NavRailPageType {
 
 enum ButtonPageType {
   observation,
+  observationAlt,
   // Add more pages as needed
 }
 
@@ -32,6 +34,7 @@ class PageStateManager extends ChangeNotifier {
 
   final Map<ButtonPageType, Widget> buttonPages = {
     ButtonPageType.observation: MakeObservationPage(),
+    ButtonPageType.observationAlt: MakeObservationPageAlt(),
     // Add more pages as needed
   };
 

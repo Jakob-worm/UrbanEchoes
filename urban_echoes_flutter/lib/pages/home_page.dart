@@ -50,7 +50,8 @@ class HomePage extends StatelessWidget {
             ),
             BigCustomButton(
               text: 'Profile',
-              onPressed: () => print('Profile pressed'),
+              onPressed: () =>
+                  handleButtonPress(context, ButtonPageType.observationAlt),
             ),
           ],
         ),

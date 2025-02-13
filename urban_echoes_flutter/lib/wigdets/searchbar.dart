@@ -61,7 +61,7 @@ class SearchBar extends StatelessWidget {
             return Align(
               alignment: Alignment.topLeft,
               child: Material(
-                child: Container(
+                child: SizedBox(
                   width: MediaQuery.of(context).size.width * 0.7,
                   child: ListView.builder(
                     padding: EdgeInsets.all(8.0),

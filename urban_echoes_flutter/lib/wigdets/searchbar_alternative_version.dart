@@ -1,96 +1,78 @@
 import 'package:flutter/material.dart';
 
-class SeachbarAlternative extends StatelessWidget {
-  const SeachbarAlternative({super.key});
+class SearchbarAlternative extends StatefulWidget {
+  final TextEditingController controller;
+  final ValueChanged<String> onChanged;
+  final List<String> suggestions;
+
+  const SearchbarAlternative({
+    super.key,
+    required this.controller,
+    required this.onChanged,
+    required this.suggestions,
+  });
+
+  @override
+  _SearchbarAlternativeState createState() => _SearchbarAlternativeState();
+}
+
+class _SearchbarAlternativeState extends State<SearchbarAlternative> {
+  List<String> _filteredSuggestions = [];
+
+  void _updateSuggestions(String query) {
+    setState(() {
+      _filteredSuggestions = widget.suggestions
+          .where((term) => term.toLowerCase().contains(query.toLowerCase()))
+          .toList();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Search Bar'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.search),
-            onPressed: () {
-              showSearch(context: context, delegate: CustomSerachDelegate());
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: TextField(
+            controller: widget.controller,
+            onChanged: (value) {
+              widget.onChanged(value);
+              _updateSuggestions(value);
             },
-          )
-        ],
-      ),
-    );
-  }
-}
-
-class CustomSerachDelegate extends SearchDelegate {
-  List<String> seachterms = [
-    'bird',
-    'tree',
-    'flower',
-    'river',
-    'mountain',
-    'animal',
-    'insect',
-    'fish',
-    'cloud',
-    'rain',
-  ];
-
-  @override
-  List<Widget> buildActions(BuildContext context) {
-    return [
-      IconButton(
-          onPressed: () {
-            query = '';
-          },
-          icon: Icon(Icons.clear))
-    ];
-  }
-
-  @override
-  Widget buildLeading(BuildContext context) {
-    return IconButton(
-      onPressed: () {
-        close(context, null);
-      },
-      icon: Icon(Icons.arrow_back),
-    );
-  }
-
-  @override
-  Widget buildResults(BuildContext context) {
-    List<String> matchQuery = [];
-    for (var term in seachterms) {
-      if (term.toLowerCase().contains(query.toLowerCase())) {
-        matchQuery.add(term);
-      }
-    }
-    return ListView.builder(
-      itemCount: matchQuery.length,
-      itemBuilder: (context, index) {
-        var result = matchQuery[index];
-        return ListTile(
-          title: Text(result),
-        );
-      },
-    );
-  }
-
-  @override
-  Widget buildSuggestions(BuildContext context) {
-    List<String> matchQuery = [];
-    for (var term in seachterms) {
-      if (term.toLowerCase().contains(query.toLowerCase())) {
-        matchQuery.add(term);
-      }
-    }
-    return ListView.builder(
-      itemCount: matchQuery.length,
-      itemBuilder: (context, index) {
-        var result = matchQuery[index];
-        return ListTile(
-          title: Text(result),
-        );
-      },
+            decoration: InputDecoration(
+              hintText: 'Search...',
+              prefixIcon: Icon(Icons.search),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.0),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Colors.grey[200],
+            ),
+          ),
+        ),
+        if (_filteredSuggestions.isNotEmpty)
+          Container(
+            height: 200, // Set a fixed height for the suggestions
+            child: ListView.builder(
+              itemCount: _filteredSuggestions.length,
+              itemBuilder: (context, index) {
+                final result = _filteredSuggestions[index];
+                return ListTile(
+                  title: Text(result),
+                  onTap: () {
+                    widget.controller.text = result;
+                    widget.onChanged(result);
+                    setState(() {
+                      _filteredSuggestions.clear();
+                    });
+                  },
+                );
+              },
+            ),
+          ),
+      ],
     );
   }
 }
