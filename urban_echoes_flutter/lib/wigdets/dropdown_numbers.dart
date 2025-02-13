@@ -1,14 +1,24 @@
 import 'package:flutter/material.dart';
 
 class DropdownNumbers extends StatefulWidget {
-  const DropdownNumbers({super.key});
+  final int initialValue;
+  final ValueChanged<int> onChanged;
+
+  const DropdownNumbers(
+      {super.key, required this.initialValue, required this.onChanged});
 
   @override
   _DropdownNumbersState createState() => _DropdownNumbersState();
 }
 
 class _DropdownNumbersState extends State<DropdownNumbers> {
-  int? _selectedNumber;
+  late int _selectedNumber;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedNumber = widget.initialValue;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,8 +32,9 @@ class _DropdownNumbersState extends State<DropdownNumbers> {
       }),
       onChanged: (value) {
         setState(() {
-          _selectedNumber = value;
+          _selectedNumber = value!;
         });
+        widget.onChanged(value!);
       },
     );
   }

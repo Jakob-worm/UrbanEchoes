@@ -3,8 +3,25 @@ import 'package:urban_echoes/wigdets/big_custom_button.dart';
 import 'package:urban_echoes/wigdets/searchbar.dart' as custom;
 import 'package:urban_echoes/wigdets/dropdown_numbers.dart';
 
-class MakeObservationPage extends StatelessWidget {
+class MakeObservationPage extends StatefulWidget {
   const MakeObservationPage({super.key});
+
+  @override
+  _MakeObservationPageState createState() => _MakeObservationPageState();
+}
+
+class _MakeObservationPageState extends State<MakeObservationPage> {
+  final TextEditingController _searchController = TextEditingController();
+  int _selectedNumber = 1;
+
+  void _handleSubmit() {
+    final searchValue = _searchController.text;
+    if (searchValue.isNotEmpty) {
+      print('$searchValue + ${_selectedNumber.toString()} has been recorded');
+    } else {
+      print('Please fill in both the search bar and select a number.');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,14 +43,23 @@ class MakeObservationPage extends StatelessWidget {
                   Expanded(
                     flex: 9, // Adjust the flex value to control the proportion
                     child: custom.SearchBar(
-                      controller: TextEditingController(),
-                      onChanged: (value) => print('Search value: $value'),
+                      controller: _searchController,
+                      onChanged: (value) {
+                        // Handle the change
+                      },
                     ),
                   ),
                   SizedBox(width: 16), // Add some space between the widgets
                   Expanded(
                     flex: 1, // Adjust the flex value to control the proportion
-                    child: DropdownNumbers(),
+                    child: DropdownNumbers(
+                      initialValue: _selectedNumber,
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedNumber = value;
+                        });
+                      },
+                    ),
                   ),
                 ],
               ),
@@ -41,7 +67,7 @@ class MakeObservationPage extends StatelessWidget {
             SizedBox(height: 16), // Add some space between the rows
             BigCustomButton(
               text: 'Submit',
-              onPressed: () => print('Submit pressed'),
+              onPressed: _handleSubmit,
             ),
             BigCustomButton(
               text: 'I am unsure about what I saw/heard',
