@@ -13,10 +13,22 @@ class MakeObservationPage extends StatefulWidget {
 class _MakeObservationPageState extends State<MakeObservationPage> {
   final TextEditingController _searchController = TextEditingController();
   int _selectedNumber = 1;
+  final List<String> _suggestions = [
+    'bird',
+    'tree',
+    'flower',
+    'river',
+    'mountain',
+    'animal',
+    'insect',
+    'fish',
+    'cloud',
+    'rain',
+  ];
 
   void _handleSubmit() {
     final searchValue = _searchController.text;
-    if (searchValue.isNotEmpty) {
+    if (searchValue.isNotEmpty && _selectedNumber != null) {
       print('$searchValue + ${_selectedNumber.toString()} has been recorded');
     } else {
       print('Please fill in both the search bar and select a number.');
@@ -44,9 +56,8 @@ class _MakeObservationPageState extends State<MakeObservationPage> {
                     flex: 9, // Adjust the flex value to control the proportion
                     child: custom.SearchBar(
                       controller: _searchController,
-                      onChanged: (value) {
-                        // Handle the change
-                      },
+                      onChanged: (value) => print('Search value: $value'),
+                      suggestions: _suggestions,
                     ),
                   ),
                   SizedBox(width: 16), // Add some space between the widgets
