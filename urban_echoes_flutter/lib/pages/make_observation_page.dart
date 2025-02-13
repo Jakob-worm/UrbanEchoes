@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:urban_echoes/wigdets/big_custom_button.dart';
+import 'package:urban_echoes/wigdets/searchbar.dart' as custom;
 import 'package:urban_echoes/wigdets/dropdown_numbers.dart';
 
 class MakeObservationPage extends StatelessWidget {
@@ -17,19 +18,26 @@ class MakeObservationPage extends StatelessWidget {
           mainAxisAlignment:
               MainAxisAlignment.center, // Centers content vertically
           children: [
-            SearchBar(
-              controller: TextEditingController(),
-              onChanged: (value) => print('Search value: $value'),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                custom.SearchBar(
+                  controller: TextEditingController(),
+                  onChanged: (value) => print('Search value: $value'),
+                ),
+                SizedBox(width: 16), // Add some space between the widgets
+                DropdownNumbers(),
+              ],
             ),
-            SizedBox(width: 16), // Add some space between the widgets
-            DropdownNumbers(),
+            SizedBox(height: 16), // Add some space between the rows
             BigCustomButton(
               text: 'Submit',
               onPressed: () => print('Submit pressed'),
             ),
             BigCustomButton(
-                text: 'I am unsure aboubt what i saw/heard',
-                onPressed: () => print('Unsure pressed')),
+              text: 'I am unsure about what I saw/heard',
+              onPressed: () => print('Unsure pressed'),
+            ),
           ],
         ),
       ),
