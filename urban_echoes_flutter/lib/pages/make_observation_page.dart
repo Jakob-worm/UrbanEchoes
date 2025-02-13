@@ -18,16 +18,25 @@ class MakeObservationPage extends StatelessWidget {
           mainAxisAlignment:
               MainAxisAlignment.center, // Centers content vertically
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                custom.SearchBar(
-                  controller: TextEditingController(),
-                  onChanged: (value) => print('Search value: $value'),
-                ),
-                SizedBox(width: 16), // Add some space between the widgets
-                DropdownNumbers(),
-              ],
+            FractionallySizedBox(
+              widthFactor:
+                  0.85, // Set the total width to 85% of the screen width
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 9, // Adjust the flex value to control the proportion
+                    child: custom.SearchBar(
+                      controller: TextEditingController(),
+                      onChanged: (value) => print('Search value: $value'),
+                    ),
+                  ),
+                  SizedBox(width: 16), // Add some space between the widgets
+                  Expanded(
+                    flex: 1, // Adjust the flex value to control the proportion
+                    child: DropdownNumbers(),
+                  ),
+                ],
+              ),
             ),
             SizedBox(height: 16), // Add some space between the rows
             BigCustomButton(
