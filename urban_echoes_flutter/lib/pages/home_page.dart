@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
-import 'package:urban_echoes/wigdets/big_card.dart';
+import 'package:urban_echoes/wigdets/big_custom_button.dart';
 import 'dart:math';
 
 class HomePage extends StatelessWidget {
@@ -40,7 +40,7 @@ class HomePage extends StatelessWidget {
           mainAxisAlignment:
               MainAxisAlignment.center, // Centers content vertically
           children: [
-            BigCard(
+            BigCustomButton(
               text: 'Make observation',
               onPressed: () => handleButtonPress(
                   context,
@@ -48,7 +48,7 @@ class HomePage extends StatelessWidget {
                       .observation), // Navigate to the "Make observation" page
               imageUrl: getRandomImage(), // Use the random image
             ),
-            BigCard(
+            BigCustomButton(
               text: 'Profile',
               onPressed: () => print('Profile pressed'),
             ),

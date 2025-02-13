@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
-class BigCard extends StatelessWidget {
+class BigCustomButton extends StatelessWidget {
   final String text; // Declare the text parameter
   final VoidCallback onPressed; // Declare the onPressed parameter
   final String? imageUrl; // Declare the optional imageUrl parameter
 
-  const BigCard({
+  const BigCustomButton({
     super.key,
     required this.text, // Use this.text to assign the value
     required this.onPressed, // Use this.onPressed to assign the value

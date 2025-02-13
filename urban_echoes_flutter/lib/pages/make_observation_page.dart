@@ -16,15 +16,15 @@ class MakeObservationPage extends StatelessWidget {
           mainAxisAlignment:
               MainAxisAlignment.center, // Centers content vertically
           children: [
-            BigCard(
+            BigCustomButton(
               text: 'Write text',
               onPressed: () => print('Write text pressed'),
             ),
-            BigCard(
+            BigCustomButton(
               text: 'Take image',
               onPressed: () => print('Take image pressed'),
             ),
-            BigCard(
+            BigCustomButton(
               text: 'Record sound',
               onPressed: () => print('Record sound pressed'),
             ),
