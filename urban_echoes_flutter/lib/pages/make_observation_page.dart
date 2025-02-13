@@ -16,9 +16,9 @@ class MakeObservationPage extends StatelessWidget {
           mainAxisAlignment:
               MainAxisAlignment.center, // Centers content vertically
           children: [
-            BigCustomButton(
-              text: 'Write text',
-              onPressed: () => print('Write text pressed'),
+            SearchBar(
+              controller: TextEditingController(),
+              onChanged: (value) => print('Search value: $value'),
             ),
             BigCustomButton(
               text: 'Take image',
