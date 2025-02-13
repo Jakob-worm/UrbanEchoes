@@ -21,13 +21,12 @@ class MakeObservationPage extends StatelessWidget {
               onChanged: (value) => print('Search value: $value'),
             ),
             BigCustomButton(
-              text: 'Take image',
-              onPressed: () => print('Take image pressed'),
+              text: 'Submit',
+              onPressed: () => print('Submit pressed'),
             ),
             BigCustomButton(
-              text: 'Record sound',
-              onPressed: () => print('Record sound pressed'),
-            ),
+                text: 'I am unsure aboubt what i saw/heard',
+                onPressed: () => print('Unsure pressed')),
           ],
         ),
       ),
