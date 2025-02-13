@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:urban_echoes/state%20manegers/railnav_page_state_maneger.dart';
+import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 
 class CustomNavigationRail extends StatelessWidget {
   const CustomNavigationRail({super.key});
 
   @override
   Widget build(BuildContext context) {
-    var railNavPageStateManager = Provider.of<RailNavPageStateManager>(context);
+    var pageStateManager = Provider.of<PageStateManager>(context);
 
     return NavigationRail(
       extended: MediaQuery.of(context).size.width >= 600,
@@ -30,9 +30,9 @@ class CustomNavigationRail extends StatelessWidget {
         ),
       ],
       selectedIndex:
-          PageType.values.indexOf(railNavPageStateManager.selectedPage),
+          NavRailPageType.values.indexOf(pageStateManager.selectedNavRailPage),
       onDestinationSelected: (index) =>
-          railNavPageStateManager.setPage(PageType.values[index]),
+          pageStateManager.setNavRailPage(NavRailPageType.values[index]),
     );
   }
 }

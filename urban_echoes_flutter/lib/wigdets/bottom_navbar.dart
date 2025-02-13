@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:urban_echoes/state%20manegers/railnav_page_state_maneger.dart';
+import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 
 class CustomBottomNavigationBar extends StatelessWidget {
   const CustomBottomNavigationBar({super.key});
 
   @override
   Widget build(BuildContext context) {
-    var railNavPageStateManager = Provider.of<RailNavPageStateManager>(context);
+    var pageStateManager = Provider.of<PageStateManager>(context);
 
     return BottomNavigationBar(
       items: [
@@ -29,8 +29,9 @@ class CustomBottomNavigationBar extends StatelessWidget {
         ),
       ],
       currentIndex:
-          PageType.values.indexOf(railNavPageStateManager.selectedPage),
-      onTap: (index) => railNavPageStateManager.setPage(PageType.values[index]),
+          NavRailPageType.values.indexOf(pageStateManager.selectedNavRailPage),
+      onTap: (index) =>
+          pageStateManager.setNavRailPage(NavRailPageType.values[index]),
     );
   }
 }
