@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:urban_echoes/wigdets/big_custom_button.dart';
+import 'package:urban_echoes/wigdets/dropdown_numbers.dart';
 
 class MakeObservationPage extends StatelessWidget {
   const MakeObservationPage({super.key});
@@ -20,6 +21,8 @@ class MakeObservationPage extends StatelessWidget {
               controller: TextEditingController(),
               onChanged: (value) => print('Search value: $value'),
             ),
+            SizedBox(width: 16), // Add some space between the widgets
+            DropdownNumbers(),
             BigCustomButton(
               text: 'Submit',
               onPressed: () => print('Submit pressed'),
