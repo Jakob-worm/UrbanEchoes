@@ -9,6 +9,11 @@ class IntroScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IntroductionScreen(
+      showSkipButton: true,
+      skip: const Text("Skip"),
+      showNextButton: false,
+      back: const Icon(Icons.arrow_back),
+      done: const Text("Done"),
       pages: [
         PageViewModel(
           title: "Welcome",
@@ -26,8 +31,6 @@ class IntroScreen extends StatelessWidget {
           image: Center(child: Icon(Icons.start, size: 100)),
         ),
       ],
-      showNextButton: false,
-      done: const Text("Done"),
       onDone: onDone,
     );
   }
