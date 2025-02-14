@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:urban_echoes/deprecated/searchbar_old.dart';
 import 'package:urban_echoes/wigdets/big_custom_button.dart';
-import 'package:urban_echoes/deprecated/searchbarOld.dart' as custom;
 import 'package:urban_echoes/wigdets/dropdown_numbers.dart';
 
 class MakeObservationPageOld extends StatefulWidget {
@@ -54,7 +54,7 @@ class _MakeObservationPageOldState extends State<MakeObservationPageOld> {
                 children: [
                   Expanded(
                     flex: 9, // Adjust the flex value to control the proportion
-                    child: custom.SearchBarOld(
+                    child: SearchBarOld(
                       controller: _searchController,
                       onChanged: (value) => print('Search value: $value'),
                       suggestions: _suggestions,
