@@ -49,7 +49,7 @@ class _MakeObservationPageState extends State<MakeObservationPage> {
           children: [
             FractionallySizedBox(
               widthFactor:
-                  0.85, // Set the total width to 85% of the screen width
+                  0.80, // Set the total width to 85% of the screen width
               child: Row(
                 children: [
                   Expanded(
