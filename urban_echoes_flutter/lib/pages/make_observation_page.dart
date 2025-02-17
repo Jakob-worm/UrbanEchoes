@@ -7,10 +7,10 @@ class MakeObservationPage extends StatefulWidget {
   const MakeObservationPage({super.key});
 
   @override
-  _MakeObservationPageState createState() => _MakeObservationPageState();
+  MakeObservationPageState createState() => MakeObservationPageState();
 }
 
-class _MakeObservationPageState extends State<MakeObservationPage> {
+class MakeObservationPageState extends State<MakeObservationPage> {
   final TextEditingController _searchController = TextEditingController();
   int _selectedNumber = 1;
   final List<String> _suggestions = [
@@ -79,6 +79,8 @@ class _MakeObservationPageState extends State<MakeObservationPage> {
             BigCustomButton(
               text: 'Submit',
               onPressed: _handleSubmit,
+              width: 200,
+              height: 50,
             ),
           ],
         ),

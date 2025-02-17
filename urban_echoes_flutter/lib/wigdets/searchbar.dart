@@ -53,7 +53,7 @@ class _SearchbarState extends State<Searchbar> {
           ),
         ),
         if (_filteredSuggestions.isNotEmpty)
-          Container(
+          SizedBox(
             height: 200, // Set a fixed height for the suggestions
             child: ListView.builder(
               itemCount: _filteredSuggestions.length,

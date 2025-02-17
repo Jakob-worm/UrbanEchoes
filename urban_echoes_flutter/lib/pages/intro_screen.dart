@@ -4,7 +4,7 @@ import 'package:introduction_screen/introduction_screen.dart';
 class IntroScreen extends StatelessWidget {
   final VoidCallback onDone;
 
-  IntroScreen({required this.onDone});
+  const IntroScreen({super.key, required this.onDone});
 
   @override
   Widget build(BuildContext context) {

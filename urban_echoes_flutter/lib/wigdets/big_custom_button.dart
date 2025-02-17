@@ -4,13 +4,16 @@ class BigCustomButton extends StatelessWidget {
   final String text; // Declare the text parameter
   final VoidCallback onPressed; // Declare the onPressed parameter
   final String? imageUrl; // Declare the optional imageUrl parameter
+  final double? width; // Declare the optional width parameter ()
+  final double? height; // Declare the optional height parameter ()
 
-  const BigCustomButton({
-    super.key,
-    required this.text, // Use this.text to assign the value
-    required this.onPressed, // Use this.onPressed to assign the value
-    this.imageUrl, // Use this.imageUrl to assign the value
-  });
+  const BigCustomButton(
+      {super.key,
+      required this.text, // Use this.text to assign the value
+      required this.onPressed, // Use this.onPressed to assign the value
+      this.imageUrl, // Use this.imageUrl to assign the value
+      this.width, // Use this.width to assign the value}
+      this.height}); // Use this.height to assign the value
 
   @override
   Widget build(BuildContext context) {
@@ -24,13 +27,14 @@ class BigCustomButton extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Container(
-        width: screenWidth -
-            (screenWidth *
-                0.30), // Set the width to take up the entire screen width
-        height: imageUrl != null
-            ? screenHeight * 0.60
-            : screenHeight *
-                0.20, // Set the height to 70% of the screen height if imageUrl is provided, otherwise 200
+        width: width ??
+            screenWidth -
+                (screenWidth * 0.30), // Use the provided width or default value
+        height: height ??
+            (imageUrl != null
+                ? screenHeight * 0.60
+                : screenHeight *
+                    0.20), // Use the provided height or default value
         decoration: BoxDecoration(
           color: theme.colorScheme.primary,
           borderRadius: BorderRadius.circular(8), // Optional: rounded corners
