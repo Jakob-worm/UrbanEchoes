@@ -14,6 +14,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
   final TextEditingController _searchController = TextEditingController();
   int _selectedNumber = 1;
   bool _isValidInput = false;
+  String _validSearchText = '';
   final List<String> _suggestions = [
     'bird',
     'tree',
@@ -39,7 +40,18 @@ class MakeObservationPageState extends State<MakeObservationPage> {
   void _handleValidInput(bool isValid) {
     setState(() {
       _isValidInput = isValid;
+      if (isValid) {
+        _validSearchText = _searchController.text;
+      } else {
+        _validSearchText = '';
+      }
     });
+  }
+
+  String _pluralize(String text) {
+    if (text.isEmpty) return text;
+    if (text.endsWith('s')) return text; // Already plural
+    return text + 's';
   }
 
   @override
@@ -72,7 +84,20 @@ class MakeObservationPageState extends State<MakeObservationPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text('Select number observed: '),
+                  RichText(
+                    text: TextSpan(
+                      text: 'Select amount of ',
+                      style: DefaultTextStyle.of(context).style,
+                      children: <TextSpan>[
+                        TextSpan(
+                          text: _pluralize(_validSearchText),
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        TextSpan(text: ' observed:'),
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: 16),
                   DropdownNumbers(
                     initialValue: _selectedNumber,
                     onChanged: (value) {
