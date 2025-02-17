@@ -60,7 +60,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: const Text('Make observation'),
+        title: const Text('Lav observation'),
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -88,7 +88,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
                   children: [
                     RichText(
                       text: TextSpan(
-                        text: 'Select amount of ',
+                        text: 'Vælg mængde af ',
                         style: DefaultTextStyle.of(context)
                             .style
                             .copyWith(fontSize: 20),
@@ -101,7 +101,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
                                 fontSize: 20),
                           ),
                           TextSpan(
-                            text: ' observed:',
+                            text: ' observered:',
                             style: TextStyle(fontSize: 20),
                           ),
                         ],
@@ -122,9 +122,9 @@ class MakeObservationPageState extends State<MakeObservationPage> {
               ],
               if (_isValidInput && _selectedNumber != null)
                 BigCustomButton(
-                  text: 'Submit',
+                  text: 'Indsend observation',
                   onPressed: _handleSubmit,
-                  width: 200,
+                  width: 500,
                   height: 50,
                 ),
             ],

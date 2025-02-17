@@ -42,7 +42,7 @@ class SearchbarState extends State<Searchbar> {
               _updateSuggestions(value);
             },
             decoration: InputDecoration(
-              hintText: 'Search...',
+              hintText: 'Søg...',
               prefixIcon: Icon(Icons.search),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8.0),

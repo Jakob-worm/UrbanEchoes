@@ -41,7 +41,7 @@ class HomePage extends StatelessWidget {
               MainAxisAlignment.center, // Centers content vertically
           children: [
             BigCustomButton(
-              text: 'Make observation',
+              text: 'Lav Observation',
               onPressed: () => handleButtonPress(
                   context,
                   ButtonPageType
@@ -49,7 +49,7 @@ class HomePage extends StatelessWidget {
               imageUrl: getRandomImage(), // Use the random image
             ),
             BigCustomButton(
-              text: 'Profile',
+              text: 'Profil',
               onPressed: () =>
                   handleButtonPress(context, ButtonPageType.profile),
             ),
