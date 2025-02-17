@@ -5,7 +5,6 @@ from dotenv import load_dotenv
 
 load_dotenv()  # Load environment variables from .env file
 
-
 app = FastAPI()
 
 EBIRD_API_URL = "https://api.ebird.org/v2/ref/taxonomy/ebird"
@@ -18,6 +17,9 @@ if not EBIRD_API_KEY:
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL is missing! Set it in Azure.")
 
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
 
 
 @app.get("/birds")
