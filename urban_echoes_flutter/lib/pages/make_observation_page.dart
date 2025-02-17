@@ -13,6 +13,7 @@ class MakeObservationPage extends StatefulWidget {
 class MakeObservationPageState extends State<MakeObservationPage> {
   final TextEditingController _searchController = TextEditingController();
   int _selectedNumber = 1;
+  bool _isValidInput = false;
   final List<String> _suggestions = [
     'bird',
     'tree',
@@ -35,6 +36,12 @@ class MakeObservationPageState extends State<MakeObservationPage> {
     }
   }
 
+  void _handleValidInput(bool isValid) {
+    setState(() {
+      _isValidInput = isValid;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -54,8 +61,9 @@ class MakeObservationPageState extends State<MakeObservationPage> {
                   children: [
                     Searchbar(
                       controller: _searchController,
-                      onChanged: (value) => print('Search value: $value'),
+                      onChanged: (value) {},
                       suggestions: _suggestions,
+                      onValidInput: _handleValidInput,
                     ),
                     SizedBox(height: 16),
                   ],
@@ -75,7 +83,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
                   ),
                   BigCustomButton(
                     text: 'Submit',
-                    onPressed: _handleSubmit,
+                    onPressed: _isValidInput ? _handleSubmit : () {},
                     width: 200,
                     height: 50,
                   ),

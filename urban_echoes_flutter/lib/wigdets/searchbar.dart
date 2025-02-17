@@ -4,12 +4,14 @@ class Searchbar extends StatefulWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
   final List<String> suggestions;
+  final ValueChanged<bool> onValidInput;
 
   const Searchbar({
     super.key,
     required this.controller,
     required this.onChanged,
     required this.suggestions,
+    required this.onValidInput,
   });
 
   @override
@@ -24,6 +26,7 @@ class _SearchbarState extends State<Searchbar> {
       _filteredSuggestions = widget.suggestions
           .where((term) => term.toLowerCase().contains(query.toLowerCase()))
           .toList();
+      widget.onValidInput(_filteredSuggestions.contains(query));
     });
   }
 
@@ -74,6 +77,7 @@ class _SearchbarState extends State<Searchbar> {
                         onTap: () {
                           widget.controller.text = result;
                           widget.onChanged(result);
+                          widget.onValidInput(true);
                           setState(() {
                             _filteredSuggestions.clear();
                           });
