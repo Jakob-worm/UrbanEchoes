@@ -15,6 +15,7 @@ enum NavRailPageType {
 
 enum ButtonPageType {
   observation,
+  profile,
   // Add more pages as needed
 }
 
@@ -32,6 +33,7 @@ class PageStateManager extends ChangeNotifier {
 
   final Map<ButtonPageType, Widget> buttonPages = {
     ButtonPageType.observation: MakeObservationPage(),
+    ButtonPageType.profile: Placeholder(),
     // Add more pages as needed
   };
 

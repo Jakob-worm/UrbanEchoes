@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:urban_echoes/pages/nav_bars_page.dart';
+import 'package:urban_echoes/pages/intro_screen.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
+import 'package:provider/provider.dart';
 
 void main() {
   runApp(MyApp());
@@ -19,8 +21,53 @@ class MyApp extends StatelessWidget {
         theme: ThemeData(
           primarySwatch: Colors.blue,
         ),
-        home: NavBarsPage(),
+        home: InitialScreen(),
       ),
     );
+  }
+}
+
+class InitialScreen extends StatefulWidget {
+  const InitialScreen({super.key});
+
+  @override
+  InitialScreenState createState() => InitialScreenState();
+}
+
+class InitialScreenState extends State<InitialScreen> {
+  bool _isFirstTime = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFirstTime();
+  }
+
+  Future<void> _checkFirstTime() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    bool isFirstTime = prefs.getBool('isFirstTime') ?? true;
+
+    if (isFirstTime) {
+      await prefs.setBool('isFirstTime', false);
+    }
+
+    setState(() {
+      _isFirstTime = isFirstTime;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isFirstTime) {
+      return IntroScreen(
+        onDone: () {
+          setState(() {
+            _isFirstTime = false;
+          });
+        },
+      );
+    } else {
+      return NavBarsPage();
+    }
   }
 }
