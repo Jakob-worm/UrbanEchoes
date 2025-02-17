@@ -51,7 +51,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
   String _pluralize(String text) {
     if (text.isEmpty) return text;
     if (text.endsWith('s')) return text; // Already plural
-    return text + 's';
+    return '${text}s';
   }
 
   @override

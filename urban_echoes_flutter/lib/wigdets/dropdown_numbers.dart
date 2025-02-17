@@ -11,10 +11,10 @@ class DropdownNumbers extends StatefulWidget {
   });
 
   @override
-  _DropdownNumbersState createState() => _DropdownNumbersState();
+  DropdownNumbersState createState() => DropdownNumbersState();
 }
 
-class _DropdownNumbersState extends State<DropdownNumbers> {
+class DropdownNumbersState extends State<DropdownNumbers> {
   int? _selectedNumber;
 
   @override

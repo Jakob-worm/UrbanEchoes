@@ -15,10 +15,10 @@ class Searchbar extends StatefulWidget {
   });
 
   @override
-  _SearchbarState createState() => _SearchbarState();
+  SearchbarState createState() => SearchbarState();
 }
 
-class _SearchbarState extends State<Searchbar> {
+class SearchbarState extends State<Searchbar> {
   List<String> _filteredSuggestions = [];
 
   void _updateSuggestions(String query) {
