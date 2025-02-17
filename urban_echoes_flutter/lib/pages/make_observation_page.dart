@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:urban_echoes/wigdets/big_custom_button.dart';
 import 'package:urban_echoes/wigdets/dropdown_numbers.dart';
 import 'package:urban_echoes/wigdets/searchbar.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 class MakeObservationPage extends StatefulWidget {
   const MakeObservationPage({super.key});
@@ -10,23 +12,41 @@ class MakeObservationPage extends StatefulWidget {
   MakeObservationPageState createState() => MakeObservationPageState();
 }
 
+Future<List<String>> fetchBirdSuggestions() async {
+  final response = await http
+      .get(Uri.parse('https://your-fastapi-app.azurewebsites.net/birds'));
+
+  if (response.statusCode == 200) {
+    final Map<String, dynamic> data = json.decode(response.body);
+    return List<String>.from(data['birds']);
+  } else {
+    throw Exception('Failed to load bird names');
+  }
+}
+
 class MakeObservationPageState extends State<MakeObservationPage> {
   final TextEditingController _searchController = TextEditingController();
   int? _selectedNumber;
   bool _isValidInput = false;
   String _validSearchText = '';
-  final List<String> _suggestions = [
-    'bird',
-    'tree',
-    'flower',
-    'river',
-    'mountain',
-    'animal',
-    'insect',
-    'fish',
-    'cloud',
-    'rain',
-  ];
+  List<String> _suggestions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSuggestions();
+  }
+
+  void _fetchSuggestions() async {
+    try {
+      final suggestions = await fetchBirdSuggestions();
+      setState(() {
+        _suggestions = suggestions;
+      });
+    } catch (e) {
+      print('Failed to fetch suggestions: $e');
+    }
+  }
 
   void _handleSubmit() {
     final searchValue = _searchController.text;
