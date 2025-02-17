@@ -89,15 +89,21 @@ class MakeObservationPageState extends State<MakeObservationPage> {
                     RichText(
                       text: TextSpan(
                         text: 'Select amount of ',
-                        style: DefaultTextStyle.of(context).style,
+                        style: DefaultTextStyle.of(context)
+                            .style
+                            .copyWith(fontSize: 20),
                         children: <TextSpan>[
                           TextSpan(
                             text: _pluralize(_validSearchText),
                             style: TextStyle(
                                 fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.primary),
+                                color: theme.colorScheme.primary,
+                                fontSize: 20),
                           ),
-                          TextSpan(text: ' observed:'),
+                          TextSpan(
+                            text: ' observed:',
+                            style: TextStyle(fontSize: 20),
+                          ),
                         ],
                       ),
                     ),
