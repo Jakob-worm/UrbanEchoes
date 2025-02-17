@@ -30,7 +30,7 @@ class _SearchbarState extends State<Searchbar> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 150, // Ensure enough space for dropdown
+      height: 250, // Ensure enough space for dropdown
       child: Stack(
         children: [
           TextField(
