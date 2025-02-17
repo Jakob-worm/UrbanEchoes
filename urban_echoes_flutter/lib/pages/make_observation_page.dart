@@ -56,7 +56,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               FractionallySizedBox(
-                widthFactor: 0.85,
+                widthFactor: 0.5,
                 child: Column(
                   children: [
                     Searchbar(
