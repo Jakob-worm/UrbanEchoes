@@ -13,8 +13,8 @@ class MakeObservationPage extends StatefulWidget {
 }
 
 Future<List<String>> fetchBirdSuggestions() async {
-  final response = await http
-      .get(Uri.parse('https://your-fastapi-app.azurewebsites.net/birds'));
+  final response = await http.get(Uri.parse(
+      'http://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/birds'));
 
   if (response.statusCode == 200) {
     final Map<String, dynamic> data = json.decode(response.body);
