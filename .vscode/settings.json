@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "D:/Uni/10 semester/UrbanEchoes/urban_echoes_flutter/windows/flutter"
+    "cmake.sourceDirectory": "D:/Uni/10 semester/UrbanEchoes/urban_echoes_flutter/windows/flutter",
+    "appService.defaultWebAppToDeploy": "None"
 }

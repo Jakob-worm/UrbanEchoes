@@ -3,9 +3,17 @@ To run the app in debug:
     CD urban_echoes_flutter
     flutter run
 
+# Venv Use it to create acurate requirements.txt
+venv\Scripts\activate
+pip freeze > requirements.txt
+
 # Test
 To start FastAPI app locally: uvicorn main:app --reload
 To test the /birds Endpoint: curl http://127.0.0.1:8000/birds
+
+# When debugging on chrome
+flutter run -d chrome --web-browser-flag "--disable-web-security"
+
 
 # Deploy and test Azure
 ## one time
@@ -17,7 +25,7 @@ Login: az login
 Deploy: az webapp up --name UrbanEchoes-fastapi-backend --resource-group urbanEchoes-fastapi-backend-north-eu --location northeurope
 Verify deployment: az webapp show --name UrbanEchoes-fastapi-backend --resource-group urbanEchoes-fastapi-backend-north-eu
 
-https://UrbanEchoes-fastapi-backend.azurewebsites.net/birds
+https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/birds
 
 
 

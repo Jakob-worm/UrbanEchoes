@@ -14,11 +14,13 @@ class MakeObservationPage extends StatefulWidget {
 
 Future<List<String>> fetchBirdSuggestions() async {
   final response = await http.get(Uri.parse(
-      'http://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/birds'));
+      'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/birds'));
 
   if (response.statusCode == 200) {
-    final Map<String, dynamic> data = json.decode(response.body);
-    return List<String>.from(data['birds']);
+    final Map<String, dynamic> data =
+        json.decode(utf8.decode(response.bodyBytes));
+    final List<dynamic> birds = data['birds'];
+    return birds.map((bird) => bird['danishName'] as String).toList();
   } else {
     throw Exception('Failed to load bird names');
   }
@@ -70,8 +72,8 @@ class MakeObservationPageState extends State<MakeObservationPage> {
 
   String _pluralize(String text) {
     if (text.isEmpty) return text;
-    if (text.endsWith('s')) return text; // Already plural
-    return '${text}s';
+    if (text.endsWith('r')) return text; // Already plural
+    return '${text}r';
   }
 
   @override
@@ -121,7 +123,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
                                 fontSize: 20),
                           ),
                           TextSpan(
-                            text: ' observered:',
+                            text: ' set:',
                             style: TextStyle(fontSize: 20),
                           ),
                         ],
