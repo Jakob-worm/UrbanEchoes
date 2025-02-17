@@ -12,7 +12,7 @@ class MakeObservationPage extends StatefulWidget {
 
 class MakeObservationPageState extends State<MakeObservationPage> {
   final TextEditingController _searchController = TextEditingController();
-  int _selectedNumber = 1;
+  int? _selectedNumber;
   bool _isValidInput = false;
   String _validSearchText = '';
   final List<String> _suggestions = [
@@ -81,39 +81,43 @@ class MakeObservationPageState extends State<MakeObservationPage> {
                   ],
                 ),
               ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  RichText(
-                    text: TextSpan(
-                      text: 'Select amount of ',
-                      style: DefaultTextStyle.of(context).style,
-                      children: <TextSpan>[
-                        TextSpan(
-                          text: _pluralize(_validSearchText),
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        TextSpan(text: ' observed:'),
-                      ],
+              if (_isValidInput) ...[
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    RichText(
+                      text: TextSpan(
+                        text: 'Select amount of ',
+                        style: DefaultTextStyle.of(context).style,
+                        children: <TextSpan>[
+                          TextSpan(
+                            text: _pluralize(_validSearchText),
+                            style: TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          TextSpan(text: ' observed:'),
+                        ],
+                      ),
                     ),
-                  ),
-                  SizedBox(width: 16),
-                  DropdownNumbers(
-                    initialValue: _selectedNumber,
-                    onChanged: (value) {
-                      setState(() {
-                        _selectedNumber = value;
-                      });
-                    },
-                  ),
-                  BigCustomButton(
-                    text: 'Submit',
-                    onPressed: _isValidInput ? _handleSubmit : null,
-                    width: 200,
-                    height: 50,
-                  ),
-                ],
-              ),
+                    SizedBox(width: 16),
+                    DropdownNumbers(
+                      initialValue: _selectedNumber,
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedNumber = value;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                SizedBox(height: 16),
+              ],
+              if (_isValidInput && _selectedNumber != null)
+                BigCustomButton(
+                  text: 'Submit',
+                  onPressed: _handleSubmit,
+                  width: 200,
+                  height: 50,
+                ),
             ],
           ),
         ),
