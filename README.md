@@ -17,7 +17,7 @@ Login: az login
 Deploy: az webapp up --name UrbanEchoes-fastapi-backend --resource-group urbanEchoes-fastapi-backend-north-eu --location northeurope
 Verify deployment: az webapp show --name UrbanEchoes-fastapi-backend --resource-group urbanEchoes-fastapi-backend-north-eu
 
-https://UrbanEchoes-fastapi-backend.azurewebsites.net/birds
+https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/birds
 
 
 
