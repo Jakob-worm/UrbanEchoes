@@ -18,11 +18,11 @@ class NavigationItems extends StatelessWidget {
     final items = [
       NavigationRailDestination(
         icon: Icon(Icons.home),
-        label: Text('Home'),
+        label: Text('Hjem'),
       ),
       NavigationRailDestination(
         icon: Icon(Icons.camera),
-        label: Text('Take image page'),
+        label: Text('tag billde side'),
       ),
       NavigationRailDestination(
         icon: Icon(Icons.abc),
@@ -30,7 +30,7 @@ class NavigationItems extends StatelessWidget {
       ),
       NavigationRailDestination(
         icon: Icon(Icons.map),
-        label: Text('Map'),
+        label: Text('Kort'),
       ),
     ];
 

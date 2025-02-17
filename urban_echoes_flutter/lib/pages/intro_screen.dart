@@ -13,10 +13,10 @@ class IntroScreen extends StatelessWidget {
       skip: const Text("Skip"),
       showNextButton: false,
       back: const Icon(Icons.arrow_back),
-      done: const Text("Done"),
+      done: const Text("Færdig"),
       pages: [
         PageViewModel(
-          title: "Welcome",
+          title: "Velkommen",
           body: "This is the first page of the introduction.",
           image: Center(child: Icon(Icons.info, size: 100)),
         ),

@@ -27,11 +27,11 @@ class DropdownNumbersState extends State<DropdownNumbers> {
   Widget build(BuildContext context) {
     return DropdownButton<int?>(
       value: _selectedNumber,
-      hint: Text('Select amount'),
+      hint: Text('Vælg antal'),
       items: [
         DropdownMenuItem<int?>(
           value: null,
-          child: Text('Select amount'),
+          child: Text('Vælg antal'),
         ),
         ...List.generate(10, (index) {
           return DropdownMenuItem<int?>(
