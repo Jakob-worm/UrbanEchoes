@@ -30,7 +30,6 @@ class _SearchbarState extends State<Searchbar> {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
           padding: const EdgeInsets.all(8.0),
@@ -53,8 +52,19 @@ class _SearchbarState extends State<Searchbar> {
           ),
         ),
         if (_filteredSuggestions.isNotEmpty)
-          SizedBox(
+          Container(
             height: 200, // Set a fixed height for the suggestions
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8.0),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black26,
+                  blurRadius: 4.0,
+                  offset: Offset(0, 2),
+                ),
+              ],
+            ),
             child: ListView.builder(
               itemCount: _filteredSuggestions.length,
               itemBuilder: (context, index) {
