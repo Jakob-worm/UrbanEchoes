@@ -83,7 +83,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
                   ),
                   BigCustomButton(
                     text: 'Submit',
-                    onPressed: _isValidInput ? _handleSubmit : () {},
+                    onPressed: _isValidInput ? _handleSubmit : null,
                     width: 200,
                     height: 50,
                   ),

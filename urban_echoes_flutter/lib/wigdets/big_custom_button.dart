@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
 
 class BigCustomButton extends StatelessWidget {
-  final String text; // Declare the text parameter
-  final VoidCallback onPressed; // Declare the onPressed parameter
-  final String? imageUrl; // Declare the optional imageUrl parameter
-  final double? width; // Declare the optional width parameter ()
-  final double? height; // Declare the optional height parameter ()
+  final String text;
+  final VoidCallback? onPressed;
+  final String? imageUrl;
+  final double? width;
+  final double? height;
 
-  const BigCustomButton(
-      {super.key,
-      required this.text, // Use this.text to assign the value
-      required this.onPressed, // Use this.onPressed to assign the value
-      this.imageUrl, // Use this.imageUrl to assign the value
-      this.width, // Use this.width to assign the value}
-      this.height}); // Use this.height to assign the value
+  const BigCustomButton({
+    super.key,
+    required this.text,
+    required this.onPressed,
+    this.imageUrl,
+    this.width,
+    this.height,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -27,21 +28,15 @@ class BigCustomButton extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(20),
       child: Container(
-        width: width ??
-            screenWidth -
-                (screenWidth * 0.30), // Use the provided width or default value
+        width: width ?? screenWidth - (screenWidth * 0.30),
         height: height ??
-            (imageUrl != null
-                ? screenHeight * 0.60
-                : screenHeight *
-                    0.20), // Use the provided height or default value
+            (imageUrl != null ? screenHeight * 0.60 : screenHeight * 0.20),
         decoration: BoxDecoration(
-          color: theme.colorScheme.primary,
-          borderRadius: BorderRadius.circular(8), // Optional: rounded corners
+          color: onPressed != null ? theme.colorScheme.primary : Colors.grey,
+          borderRadius: BorderRadius.circular(8),
           image: imageUrl != null
               ? DecorationImage(
-                  image:
-                      AssetImage(imageUrl!), // Use AssetImage for local assets
+                  image: AssetImage(imageUrl!),
                   fit: BoxFit.cover,
                 )
               : null,
@@ -49,19 +44,17 @@ class BigCustomButton extends StatelessWidget {
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
             foregroundColor: theme.colorScheme.onPrimary,
-            backgroundColor:
-                Colors.transparent, // Make the button background transparent
+            backgroundColor: Colors.transparent,
             shape: RoundedRectangleBorder(
-              borderRadius:
-                  BorderRadius.circular(8), // Optional: rounded corners
+              borderRadius: BorderRadius.circular(8),
             ),
           ),
-          onPressed: onPressed, // Use the onPressed parameter
+          onPressed: onPressed,
           child: Center(
             child: Text(
               text,
               style: style,
-              textAlign: TextAlign.center, // Center the text
+              textAlign: TextAlign.center,
             ),
           ),
         ),
