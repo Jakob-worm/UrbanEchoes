@@ -14,11 +14,12 @@ class MakeObservationPage extends StatefulWidget {
 
 Future<List<String>> fetchBirdSuggestions() async {
   final response = await http.get(Uri.parse(
-      'http://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/birds'));
+      'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/birds'));
 
   if (response.statusCode == 200) {
     final Map<String, dynamic> data = json.decode(response.body);
-    return List<String>.from(data['birds']);
+    final List<dynamic> birds = data['birds'];
+    return birds.map((bird) => bird['danishName'] as String).toList();
   } else {
     throw Exception('Failed to load bird names');
   }

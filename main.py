@@ -2,10 +2,19 @@
 import requests
 import os
 from dotenv import load_dotenv
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv()
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins, or specify your Flutter app's URL
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 
 EBIRD_API_URL = "https://api.ebird.org/v2/data/obs/geo/recent"
 EBIRD_TAXONOMY_URL = "https://api.ebird.org/v2/ref/taxonomy/ebird"
@@ -18,8 +27,8 @@ if not EBIRD_API_KEY:
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL is missing! Set it in Azure.")
 
-LAT = 56.2639
-LON = 9.5018
+LAT = 56.2639 # Copenhagen coordinates TODO change to your location
+LON = 9.5018 # Copenhagen coordinates  TODO change to your location
 
 async def get_danish_taxonomy():
     """Fetch the eBird taxonomy with Danish names."""
