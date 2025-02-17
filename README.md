@@ -14,7 +14,8 @@ az --version
 
 ## Every time
 az login
-az webapp up --runtime PYTHON:3.9 --name your-fastapi-app --resource-group your-resource-group
+az webapp up --runtime PYTHON:3.9 --name UrbanEchoes-fastapi-backend --resource-group urbanEchoes-fastapi-backend-north-eu
+
 
 Test: curl https://your-fastapi-app.azurewebsites.net/birds
 Or open https://your-fastapi-app.azurewebsites.net/docs in a browser.
