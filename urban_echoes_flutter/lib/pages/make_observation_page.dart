@@ -43,62 +43,46 @@ class MakeObservationPageState extends State<MakeObservationPage> {
         title: const Text('Make observation'),
       ),
       body: Center(
-        child: Column(
-          mainAxisAlignment:
-              MainAxisAlignment.center, // Centers content vertically
-          children: [
-            FractionallySizedBox(
-              widthFactor:
-                  0.85, // Set the total width to 85% of the screen width
-              child: Stack(
+        child: SingleChildScrollView(
+          // Prevents overflow
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              FractionallySizedBox(
+                widthFactor: 0.85,
+                child: Column(
+                  children: [
+                    Searchbar(
+                      controller: _searchController,
+                      onChanged: (value) => print('Search value: $value'),
+                      suggestions: _suggestions,
+                    ),
+                    SizedBox(height: 16),
+                  ],
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Expanded(
-                            flex:
-                                9, // Adjust the flex value to control the proportion
-                            child: Searchbar(
-                              controller: _searchController,
-                              onChanged: (value) =>
-                                  print('Search value: $value'),
-                              suggestions: _suggestions,
-                            ),
-                          ),
-                          SizedBox(
-                              width: 16), // Add some space between the widgets
-                        ],
-                      ),
-                    ],
+                  Text('Select number observed: '),
+                  DropdownNumbers(
+                    initialValue: _selectedNumber,
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedNumber = value;
+                      });
+                    },
+                  ),
+                  BigCustomButton(
+                    text: 'Submit',
+                    onPressed: _handleSubmit,
+                    width: 200,
+                    height: 50,
                   ),
                 ],
               ),
-            ),
-            SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('Select number observed: '),
-                DropdownNumbers(
-                  initialValue: _selectedNumber,
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedNumber = value;
-                    });
-                  },
-                ),
-                BigCustomButton(
-                  text: 'Submit',
-                  onPressed: _handleSubmit,
-                  width: 200,
-                  height: 50,
-                ),
-                SizedBox(width: 16),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

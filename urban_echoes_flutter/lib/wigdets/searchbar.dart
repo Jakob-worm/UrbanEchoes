@@ -29,11 +29,11 @@ class _SearchbarState extends State<Searchbar> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: TextField(
+    return SizedBox(
+      height: 150, // Ensure enough space for dropdown
+      child: Stack(
+        children: [
+          TextField(
             controller: widget.controller,
             onChanged: (value) {
               widget.onChanged(value);
@@ -50,39 +50,42 @@ class _SearchbarState extends State<Searchbar> {
               fillColor: Colors.grey[200],
             ),
           ),
-        ),
-        if (_filteredSuggestions.isNotEmpty)
-          Container(
-            height: 200, // Set a fixed height for the suggestions
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8.0),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black26,
-                  blurRadius: 4.0,
-                  offset: Offset(0, 2),
+          if (_filteredSuggestions.isNotEmpty)
+            Positioned(
+              left: 0,
+              right: 0,
+              top: 50, // Position it below the search bar
+              child: Material(
+                elevation: 4, // Ensure visibility above other elements
+                borderRadius: BorderRadius.circular(8.0),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8.0),
+                  ),
+                  constraints: BoxConstraints(maxHeight: 200), // Limit height
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: _filteredSuggestions.length,
+                    itemBuilder: (context, index) {
+                      final result = _filteredSuggestions[index];
+                      return ListTile(
+                        title: Text(result),
+                        onTap: () {
+                          widget.controller.text = result;
+                          widget.onChanged(result);
+                          setState(() {
+                            _filteredSuggestions.clear();
+                          });
+                        },
+                      );
+                    },
+                  ),
                 ),
-              ],
+              ),
             ),
-            child: ListView.builder(
-              itemCount: _filteredSuggestions.length,
-              itemBuilder: (context, index) {
-                final result = _filteredSuggestions[index];
-                return ListTile(
-                  title: Text(result),
-                  onTap: () {
-                    widget.controller.text = result;
-                    widget.onChanged(result);
-                    setState(() {
-                      _filteredSuggestions.clear();
-                    });
-                  },
-                );
-              },
-            ),
-          ),
-      ],
+        ],
+      ),
     );
   }
 }
