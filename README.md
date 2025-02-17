@@ -3,6 +3,10 @@ To run the app in debug:
     CD urban_echoes_flutter
     flutter run
 
+# Venv Use it to create acurate requirements.txt
+venv\Scripts\activate
+pip freeze > requirements.txt
+
 # Test
 To start FastAPI app locally: uvicorn main:app --reload
 To test the /birds Endpoint: curl http://127.0.0.1:8000/birds
