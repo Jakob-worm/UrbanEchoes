@@ -56,6 +56,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
 
   @override
   Widget build(BuildContext context) {
+    var theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
@@ -92,7 +93,9 @@ class MakeObservationPageState extends State<MakeObservationPage> {
                         children: <TextSpan>[
                           TextSpan(
                             text: _pluralize(_validSearchText),
-                            style: TextStyle(fontWeight: FontWeight.bold),
+                            style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: theme.colorScheme.primary),
                           ),
                           TextSpan(text: ' observed:'),
                         ],
@@ -109,7 +112,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
                     ),
                   ],
                 ),
-                SizedBox(height: 16),
+                SizedBox(width: 16),
               ],
               if (_isValidInput && _selectedNumber != null)
                 BigCustomButton(
