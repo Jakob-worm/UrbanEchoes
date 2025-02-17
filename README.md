@@ -13,12 +13,16 @@ Invoke-WebRequest -Uri https://aka.ms/installazurecliwindows -OutFile AzureCLI.m
 az --version
 
 ## Every time
-az login
-az webapp up --runtime PYTHON:3.9 --name UrbanEchoes-fastapi-backend --resource-group urbanEchoes-fastapi-backend-north-eu
+Login: az login
+Deploy: az webapp up --name UrbanEchoes-fastapi-backend --resource-group urbanEchoes-fastapi-backend-north-eu --location northeurope
+Verify deployment: az webapp show --name UrbanEchoes-fastapi-backend --resource-group urbanEchoes-fastapi-backend-north-eu
+
+https://UrbanEchoes-fastapi-backend.azurewebsites.net/birds
 
 
-Test: curl https://your-fastapi-app.azurewebsites.net/birds
-Or open https://your-fastapi-app.azurewebsites.net/docs in a browser.
+
+Test: curl https://UrbanEchoes-fastapi-backend.azurewebsites.net/birds
+Or open https://UrbanEchoes-fastapi-backend.azurewebsites.net/birds in a browser.
 
 
 # For Home Pc
