@@ -42,48 +42,66 @@ class MakeObservationPageState extends State<MakeObservationPage> {
         centerTitle: true,
         title: const Text('Make observation'),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment:
-              MainAxisAlignment.center, // Centers content vertically
-          children: [
-            FractionallySizedBox(
-              widthFactor:
-                  0.80, // Set the total width to 85% of the screen width
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 9, // Adjust the flex value to control the proportion
-                    child: Searchbar(
-                      controller: _searchController,
-                      onChanged: (value) => print('Search value: $value'),
-                      suggestions: _suggestions,
-                    ),
+      body: Stack(
+        children: [
+          Center(
+            child: Column(
+              mainAxisAlignment:
+                  MainAxisAlignment.center, // Centers content vertically
+              children: [
+                FractionallySizedBox(
+                  widthFactor:
+                      0.85, // Set the total width to 85% of the screen width
+                  child: Stack(
+                    children: [
+                      Column(
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Expanded(
+                                flex:
+                                    9, // Adjust the flex value to control the proportion
+                                child: Searchbar(
+                                  controller: _searchController,
+                                  onChanged: (value) =>
+                                      print('Search value: $value'),
+                                  suggestions: _suggestions,
+                                ),
+                              ),
+                              SizedBox(
+                                  width:
+                                      16), // Add some space between the widgets
+                              Expanded(
+                                flex:
+                                    1, // Adjust the flex value to control the proportion
+                                child: DropdownNumbers(
+                                  initialValue: _selectedNumber,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _selectedNumber = value;
+                                    });
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  SizedBox(width: 16), // Add some space between the widgets
-                  Expanded(
-                    flex: 1, // Adjust the flex value to control the proportion
-                    child: DropdownNumbers(
-                      initialValue: _selectedNumber,
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedNumber = value;
-                        });
-                      },
-                    ),
-                  ),
-                ],
-              ),
+                ),
+                SizedBox(height: 16), // Add some space between the rows
+                BigCustomButton(
+                  text: 'Submit',
+                  onPressed: _handleSubmit,
+                  width: 200,
+                  height: 50,
+                ),
+              ],
             ),
-            SizedBox(height: 16), // Add some space between the rows
-            BigCustomButton(
-              text: 'Submit',
-              onPressed: _handleSubmit,
-              width: 200,
-              height: 50,
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
