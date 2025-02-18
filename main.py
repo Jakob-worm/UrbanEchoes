@@ -99,15 +99,13 @@ async def get_bird_list():
         for bird in bird_data:
             species_code = bird.get("speciesCode")
             scientific_name = bird.get("sciName")
-            bird_sound = await get_bird_sound(scientific_name)  # Get sound URL
 
             bird_info = {
                 "danishName": danish_names.get(species_code, bird.get("comName")),
                 "scientificName": scientific_name,
                 "observationDate": bird.get("obsDt"),
                 "location": bird.get("locName"),
-                "speciesCode": species_code,
-                "soundUrl": bird_sound  # Include sound URL
+                "speciesCode": species_code
             }
             birds.append(bird_info)
 

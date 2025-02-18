@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:urban_echoes/wigdets/big_custom_button.dart';
 import 'package:urban_echoes/wigdets/dropdown_numbers.dart';
 import 'package:urban_echoes/wigdets/searchbar.dart';
@@ -28,9 +29,14 @@ class MakeObservationPageState extends State<MakeObservationPage> {
     _fetchSuggestions();
   }
 
-  Future<List<Map<String, String>>> fetchBirdSuggestions() async {
-    final response = await http.get(Uri.parse(
-        'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/birds'));
+  Future<List<Map<String, String>>> fetchBirdSuggestions(
+      BuildContext context) async {
+    final bool debugMode = Provider.of<bool>(context, listen: false);
+    final String baseUrl = debugMode
+        ? 'http://127.0.0.1:8000' // Local backend
+        : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net'; // Azure backend
+
+    final response = await http.get(Uri.parse('$baseUrl/birds'));
 
     if (response.statusCode == 200) {
       final Map<String, dynamic> data =
@@ -49,7 +55,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
 
   void _fetchSuggestions() async {
     try {
-      final suggestions = await fetchBirdSuggestions();
+      final suggestions = await fetchBirdSuggestions(context);
       setState(() {
         _suggestions = suggestions.map((bird) => bird['danishName']!).toList();
         _birdData = suggestions; // Store the full bird data
@@ -60,9 +66,14 @@ class MakeObservationPageState extends State<MakeObservationPage> {
   }
 
   Future<void> _playBirdSound(String birdName) async {
+    final bool debugMode = Provider.of<bool>(context, listen: false);
+    final String baseUrl = debugMode
+        ? 'http://127.0.0.1:8000' // Local backend
+        : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net'; // Azure backend
+
     try {
-      final response = await http.get(Uri.parse(
-          'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/birdsound?scientific_name=$birdName'));
+      final response = await http
+          .get(Uri.parse('$baseUrl/birdsound?scientific_name=$birdName'));
 
       if (response.statusCode == 200) {
         final String soundUrl = json.decode(response.body);

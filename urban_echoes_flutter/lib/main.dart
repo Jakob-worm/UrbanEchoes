@@ -6,16 +6,21 @@ import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 import 'package:provider/provider.dart';
 
 void main() {
-  runApp(MyApp());
+  const bool debugMode = true; // Set to false for Azure deployment
+  runApp(MyApp(debugMode: debugMode));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final bool debugMode;
+  const MyApp({super.key, required this.debugMode});
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (context) => PageStateManager(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (context) => PageStateManager()),
+        Provider<bool>(create: (context) => debugMode),
+      ],
       child: MaterialApp(
         title: 'Urban Echoes',
         theme: ThemeData(
