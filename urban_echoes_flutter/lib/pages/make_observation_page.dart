@@ -77,10 +77,13 @@ class MakeObservationPageState extends State<MakeObservationPage> {
           .get(Uri.parse('$baseUrl/birdsound?scientific_name=$birdName'));
 
       if (response.statusCode == 200) {
-        final String soundUrl = response.body.replaceAll("", '');
+        final String soundUrl = json.decode(response.body);
+        print(soundUrl);
         if (soundUrl.isNotEmpty) {
+          // Remove extra quotes from the URL
+          final formattedUrl = soundUrl.replaceAll('"', '');
           // Download the file
-          final file = await downloadFile(soundUrl, '$birdName.mp3');
+          final file = await downloadFile(formattedUrl, '$birdName.mp3');
           print("after download file: ${file.path}");
           await _audioPlayer.play(UrlSource(file.path));
           print('Playing sound for $birdName');

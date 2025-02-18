@@ -4,7 +4,18 @@ import 'package:http/http.dart' as http;
 
 Future<File> downloadFile(String url, String fileName) async {
   try {
-    final response = await http.get(Uri.parse(url));
+    final response = await http.get(
+      headers: {
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.3',
+        'Referer': 'https://www.xeno-canto.org/', // Set referer to Xeno-Canto
+        'Accept': '*/*',
+      },
+      Uri.parse(url),
+    );
+    print('Response status code: ${response.statusCode}');
+    print(
+        'Response body: ${response.body}'); // Print the response body for debugging
     if (response.statusCode == 200) {
       final directory = await getTemporaryDirectory();
       final file = File('${directory.path}/$fileName');
