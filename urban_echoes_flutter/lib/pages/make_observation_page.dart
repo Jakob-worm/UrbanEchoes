@@ -16,13 +16,13 @@ class MakeObservationPage extends StatefulWidget {
 }
 
 class MakeObservationPageState extends State<MakeObservationPage> {
+  final AudioPlayer _audioPlayer = AudioPlayer(); // Declare AudioPlayer
+  List<Map<String, String>> _birdData = [];
+  bool _isValidInput = false;
   final TextEditingController _searchController = TextEditingController();
   int? _selectedNumber;
-  bool _isValidInput = false;
-  String _validSearchText = '';
   List<String> _suggestions = [];
-  List<Map<String, String>> _birdData = [];
-  final AudioPlayer _audioPlayer = AudioPlayer(); // Declare AudioPlayer
+  String _validSearchText = '';
 
   @override
   void initState() {
@@ -66,37 +66,9 @@ class MakeObservationPageState extends State<MakeObservationPage> {
     }
   }
 
-  Future<void> _playBirdSound(String birdName) async {
-    final bool debugMode = Provider.of<bool>(context, listen: false);
-    final String baseUrl = debugMode
-        ? 'http://127.0.0.1:8000' // Local backend
-        : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net'; // Azure backend
-
-    try {
-      final response = await http
-          .get(Uri.parse('$baseUrl/birdsound?scientific_name=$birdName'));
-
-      if (response.statusCode == 200) {
-        final String soundUrl = json.decode(response.body);
-        print('Sound URL: $soundUrl');
-        if (soundUrl.isNotEmpty) {
-          // Remove extra quotes from the URL
-          final formattedUrl = soundUrl.replaceAll('"', '');
-          // Download the file
-          final file = await downloadFile(formattedUrl, '$birdName.mp3');
-          print("after download file: ${file.path}");
-          await _audioPlayer.play(UrlSource(file.path));
-          print('Playing sound for $birdName');
-        } else {
-          print('No sound available for $birdName');
-        }
-      } else {
-        print('Failed to fetch bird sound: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error playing sound: $e');
-    }
-  }
+ Future<void> _playBirdSound(String scientificName) async {
+  await playBirdSound(scientificName, _audioPlayer);
+}
 
   void _handleSubmit() async {
     final searchValue = _searchController.text;
