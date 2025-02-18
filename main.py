@@ -72,7 +72,7 @@ def get_bird_sound(scientific_name: str):
 
     # Pick a random high-quality recording
     selected = random.choice(high_quality)
-    sound_url = f"https://www.xeno-canto.org/{selected['id']}/download"
+    sound_url = f"https://www.xeno-canto.org/{selected['id']}"
 
     return sound_url
     
