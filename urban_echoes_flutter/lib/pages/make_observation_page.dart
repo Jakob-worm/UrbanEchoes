@@ -78,7 +78,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
 
       if (response.statusCode == 200) {
         final String soundUrl = json.decode(response.body);
-        print(soundUrl);
+        print('Sound URL: $soundUrl');
         if (soundUrl.isNotEmpty) {
           // Remove extra quotes from the URL
           final formattedUrl = soundUrl.replaceAll('"', '');
