@@ -4,6 +4,7 @@ import 'package:urban_echoes/wigdets/dropdown_numbers.dart';
 import 'package:urban_echoes/wigdets/searchbar.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:audioplayers/audioplayers.dart';
 
 class MakeObservationPage extends StatefulWidget {
   const MakeObservationPage({super.key});
@@ -12,26 +13,14 @@ class MakeObservationPage extends StatefulWidget {
   MakeObservationPageState createState() => MakeObservationPageState();
 }
 
-Future<List<String>> fetchBirdSuggestions() async {
-  final response = await http.get(Uri.parse(
-      'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/birds'));
-
-  if (response.statusCode == 200) {
-    final Map<String, dynamic> data =
-        json.decode(utf8.decode(response.bodyBytes));
-    final List<dynamic> birds = data['birds'];
-    return birds.map((bird) => bird['danishName'] as String).toList();
-  } else {
-    throw Exception('Failed to load bird names');
-  }
-}
-
 class MakeObservationPageState extends State<MakeObservationPage> {
   final TextEditingController _searchController = TextEditingController();
   int? _selectedNumber;
   bool _isValidInput = false;
   String _validSearchText = '';
   List<String> _suggestions = [];
+  List<Map<String, String>> _birdData = [];
+  final AudioPlayer _audioPlayer = AudioPlayer(); // Declare AudioPlayer
 
   @override
   void initState() {
@@ -39,21 +28,74 @@ class MakeObservationPageState extends State<MakeObservationPage> {
     _fetchSuggestions();
   }
 
+  Future<List<Map<String, String>>> fetchBirdSuggestions() async {
+    final response = await http.get(Uri.parse(
+        'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/birds'));
+
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data =
+          json.decode(utf8.decode(response.bodyBytes));
+      final List<dynamic> birds = data['birds'];
+      return birds
+          .map((bird) => {
+                'danishName': bird['danishName'] as String,
+                'scientificName': bird['scientificName'] as String,
+              })
+          .toList();
+    } else {
+      throw Exception('Failed to load bird names');
+    }
+  }
+
   void _fetchSuggestions() async {
     try {
       final suggestions = await fetchBirdSuggestions();
       setState(() {
-        _suggestions = suggestions;
+        _suggestions = suggestions.map((bird) => bird['danishName']!).toList();
+        _birdData = suggestions; // Store the full bird data
       });
     } catch (e) {
       print('Failed to fetch suggestions: $e');
     }
   }
 
-  void _handleSubmit() {
+  Future<void> _playBirdSound(String birdName) async {
+    try {
+      final response = await http.get(Uri.parse(
+          'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/birdsound?scientific_name=$birdName'));
+
+      if (response.statusCode == 200) {
+        final String soundUrl = json.decode(response.body);
+        if (soundUrl.isNotEmpty) {
+          await _audioPlayer.play(UrlSource(soundUrl));
+        } else {
+          print('No sound available for $birdName');
+        }
+      } else {
+        print('Failed to fetch bird sound');
+      }
+    } catch (e) {
+      print('Error playing sound: $e');
+    }
+  }
+
+  void _handleSubmit() async {
     final searchValue = _searchController.text;
-    if (searchValue.isNotEmpty) {
-      print('$searchValue + ${_selectedNumber.toString()} has been recorded');
+    if (searchValue.isNotEmpty && _selectedNumber != null) {
+      print('$searchValue + $_selectedNumber has been recorded');
+
+      // Find the scientific name for the selected Danish name
+      final selectedBird = _birdData.firstWhere(
+        (bird) => bird['danishName'] == searchValue,
+        orElse: () => {'scientificName': ''},
+      );
+
+      if (selectedBird['scientificName']!.isNotEmpty) {
+        await _playBirdSound(selectedBird[
+            'scientificName']!); // Play sound using scientific name
+      } else {
+        print('Scientific name not found for $searchValue');
+      }
     } else {
       print('Please fill in both the search bar and select a number.');
     }
@@ -86,7 +128,6 @@ class MakeObservationPageState extends State<MakeObservationPage> {
       ),
       body: Center(
         child: SingleChildScrollView(
-          // Prevents overflow
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

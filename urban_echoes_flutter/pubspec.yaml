@@ -44,6 +44,7 @@ dependencies:
   path: ^1.9.0
   introduction_screen: ^3.1.16
   shared_preferences: ^2.0.8
+  audioplayers: ^5.2.1
 
 dev_dependencies:
   flutter_test:
