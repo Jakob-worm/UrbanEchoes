@@ -6,6 +6,7 @@ import 'package:urban_echoes/wigdets/searchbar.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:urban_echoes/utils/download_file.dart'; // Import the utility file
 
 class MakeObservationPage extends StatefulWidget {
   const MakeObservationPage({super.key});
@@ -76,14 +77,18 @@ class MakeObservationPageState extends State<MakeObservationPage> {
           .get(Uri.parse('$baseUrl/birdsound?scientific_name=$birdName'));
 
       if (response.statusCode == 200) {
-        final String soundUrl = json.decode(response.body);
+        final String soundUrl = response.body.replaceAll("", '');
         if (soundUrl.isNotEmpty) {
-          await _audioPlayer.play(UrlSource(soundUrl));
+          // Download the file
+          final file = await downloadFile(soundUrl, '$birdName.mp3');
+          print("after download file: ${file.path}");
+          await _audioPlayer.play(UrlSource(file.path));
+          print('Playing sound for $birdName');
         } else {
           print('No sound available for $birdName');
         }
       } else {
-        print('Failed to fetch bird sound');
+        print('Failed to fetch bird sound: ${response.statusCode}');
       }
     } catch (e) {
       print('Error playing sound: $e');
