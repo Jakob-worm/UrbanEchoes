@@ -25,6 +25,11 @@ class MyApp extends StatelessWidget {
         title: 'Urban Echoes',
         theme: ThemeData(
           primarySwatch: Colors.blue,
+            bottomNavigationBarTheme: BottomNavigationBarThemeData(
+          backgroundColor: Colors.black, // Change this to a visible color
+          selectedItemColor: Colors.white, // Selected icon color
+          unselectedItemColor: Colors.grey, // Unselected icon color
+        ),
         ),
         home: InitialScreen(),
       ),
