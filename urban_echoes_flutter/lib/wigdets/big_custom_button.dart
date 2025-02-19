@@ -27,34 +27,36 @@ class BigCustomButton extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.all(20),
-      child: Container(
-        width: width ?? screenWidth - (screenWidth * 0.30),
-        height: height ??
-            (imageUrl != null ? screenHeight * 0.60 : screenHeight * 0.20),
-        decoration: BoxDecoration(
-          color: onPressed != null ? theme.colorScheme.primary : Colors.grey,
-          borderRadius: BorderRadius.circular(8),
-          image: imageUrl != null
-              ? DecorationImage(
-                  image: AssetImage(imageUrl!),
-                  fit: BoxFit.cover,
-                )
-              : null,
-        ),
+      child: SizedBox(
+        width: width ?? screenWidth * 0.70,
+        height: height ?? (imageUrl != null ? screenHeight * 0.40 : screenHeight * 0.20),
         child: ElevatedButton(
           style: ElevatedButton.styleFrom(
             foregroundColor: theme.colorScheme.onPrimary,
-            backgroundColor: Colors.transparent,
+            backgroundColor: onPressed != null ? theme.colorScheme.primary : Colors.grey,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(8),
             ),
+            padding: EdgeInsets.zero,
           ),
           onPressed: onPressed,
-          child: Center(
-            child: Text(
-              text,
-              style: style,
-              textAlign: TextAlign.center,
+          child: Ink(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              image: imageUrl != null
+                  ? DecorationImage(
+                      image: AssetImage(imageUrl!),
+                      fit: BoxFit.cover,
+                    )
+                  : null,
+            ),
+            child: Container(
+              alignment: Alignment.center,
+              child: Text(
+                text,
+                style: style,
+                textAlign: TextAlign.center,
+              ),
             ),
           ),
         ),

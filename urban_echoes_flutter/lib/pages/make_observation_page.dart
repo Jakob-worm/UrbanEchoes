@@ -123,7 +123,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               FractionallySizedBox(
-                widthFactor: 0.5,
+                widthFactor: 0.7,
                 child: Column(
                   children: [
                     Searchbar(
@@ -145,24 +145,27 @@ class MakeObservationPageState extends State<MakeObservationPage> {
                         text: 'Vælg mængde af ',
                         style: DefaultTextStyle.of(context)
                             .style
-                            .copyWith(fontSize: 20),
+                            .copyWith(fontSize: 15),
                         children: <TextSpan>[
                           TextSpan(
                             text: _pluralize(_validSearchText),
                             style: TextStyle(
                                 fontWeight: FontWeight.bold,
                                 color: theme.colorScheme.primary,
-                                fontSize: 20),
+                                fontSize: 15),
                           ),
                           TextSpan(
                             text: ' set:',
-                            style: TextStyle(fontSize: 20),
+                            style: TextStyle(fontSize: 15),
                           ),
                         ],
                       ),
                     ),
                     SizedBox(width: 16),
-                    DropdownNumbers(
+                  ],
+                ),
+                SizedBox(width: 16),
+                DropdownNumbers(
                       initialValue: _selectedNumber,
                       onChanged: (value) {
                         setState(() {
@@ -170,9 +173,6 @@ class MakeObservationPageState extends State<MakeObservationPage> {
                         });
                       },
                     ),
-                  ],
-                ),
-                SizedBox(width: 16),
               ],
               if (_isValidInput && _selectedNumber != null)
                 BigCustomButton(
