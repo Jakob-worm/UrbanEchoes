@@ -11,10 +11,10 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins, or specify your Flutter app's URL
+    allow_origins=["*"],  # Change to specific domains for security
     allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 EBIRD_API_URL = "https://api.ebird.org/v2/data/obs/geo/recent"

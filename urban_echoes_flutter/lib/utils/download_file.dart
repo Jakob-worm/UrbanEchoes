@@ -4,6 +4,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 
 Future<String?> getXenoCantoDownloadUrl(String scientificName) async {
   try {
@@ -40,55 +41,61 @@ Future<String?> getXenoCantoDownloadUrl(String scientificName) async {
   }
 }
 
+Future<File> downloadFileWithDio(String url, String fileName) async {
+  try {
+    print('Downloading file: $url');
+    final directory = await getTemporaryDirectory();
+    final filePath = '${directory.path}/$fileName';
+
+    Dio dio = Dio();
+    await dio.download(
+      url,
+      filePath,
+      options: Options(
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36',
+        },
+      ),
+    );
+    print('File saved to: $filePath');
+    return File(filePath);
+  } catch (e) {
+    print('Download error: $e');
+    throw Exception('Download failed');
+  }
+}
+
 Future<File> downloadFile(String url, String fileName) async {
   try {
     print('Attempting to download file from URL: $url');
     final client = http.Client();
-    try {
-      // Parse the URL to get the recording ID
-      final uri = Uri.parse(url);
-      final segments = uri.pathSegments;
-      final recordingId = segments[0]; // First segment should be the ID
-      
-      // Visit the recording page first
-      final pageUrl = 'https://xeno-canto.org/$recordingId/download';
-      await client.get(
-        Uri.parse(pageUrl),
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36',
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        },
-      );
+    final request = http.Request('GET', Uri.parse(url))
+      ..headers.addAll({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36',
+        'Accept': '*/*',
+        'Referer': 'https://xeno-canto.org/'
+      });
 
-      // Make the download request
-      final response = await client.get(
-        Uri.parse(url),
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36',
-          'Accept': '*/*',
-          'Referer': pageUrl,
-        },
-      );
+    final streamedResponse = await client.send(request);
+    final response = await http.Response.fromStream(streamedResponse);
 
-      print('Response status code: ${response.statusCode}');
-      
-      if (response.statusCode == 200) {
-        final directory = await getTemporaryDirectory();
-        final file = File('${directory.path}/$fileName');
-        await file.writeAsBytes(response.bodyBytes);
-        print('File downloaded to: ${file.path}');
-        return file;
-      } else {
-        throw Exception('Failed to download file: ${response.statusCode}');
-      }
-    } finally {
-      client.close();
+    print('Response status code: ${response.statusCode}');
+
+    if (response.statusCode == 200) {
+      final directory = await getTemporaryDirectory();
+      final file = File('${directory.path}/$fileName');
+      await file.writeAsBytes(response.bodyBytes);
+      print('File downloaded to: ${file.path}');
+      return file;
+    } else {
+      throw Exception('Failed to download file: ${response.statusCode}');
     }
   } catch (e) {
     print('Error downloading file: $e');
     throw Exception('Error downloading file: $e');
   }
 }
+
 
 // Helper function to play the sound
 Future<void> playBirdSound(String scientificName, AudioPlayer audioPlayer) async {
@@ -98,7 +105,7 @@ Future<void> playBirdSound(String scientificName, AudioPlayer audioPlayer) async
     if (downloadUrl != null) {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final filename = '${scientificName}_$timestamp.mp3';
-      final file = await downloadFile(downloadUrl, filename);
+      final file = await downloadFileWithDio(downloadUrl, filename);
       if (await file.exists()) {
         await audioPlayer.play(DeviceFileSource(file.path));
         // Set up cleanup after playback

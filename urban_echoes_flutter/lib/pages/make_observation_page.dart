@@ -34,7 +34,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
       BuildContext context) async {
     final bool debugMode = Provider.of<bool>(context, listen: false);
     final String baseUrl = debugMode
-        ? 'http://127.0.0.1:8000' // Local backend
+        ? 'http://10.0.2.2:8000' // Local backend
         : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net'; // Azure backend
 
     final response = await http.get(Uri.parse('$baseUrl/birds'));

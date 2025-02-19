@@ -36,6 +36,8 @@
          https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
+         android:usesCleartextTraffic="true"
+         android:networkSecurityConfig="@xml/network_security_config"
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
