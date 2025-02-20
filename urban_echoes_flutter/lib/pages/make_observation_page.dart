@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:urban_echoes/wigdets/big_custom_button.dart';
@@ -18,6 +20,7 @@ class MakeObservationPage extends StatefulWidget {
 class MakeObservationPageState extends State<MakeObservationPage> {
   final AudioPlayer _audioPlayer = AudioPlayer(); // Declare AudioPlayer
   List<Map<String, String>> _birdData = [];
+  Timer? _debounce;
   bool _isValidInput = false;
   final TextEditingController _searchController = TextEditingController();
   int? _selectedNumber;
@@ -30,8 +33,10 @@ class MakeObservationPageState extends State<MakeObservationPage> {
     _fetchSuggestions(''); // Provide a default value
   }
 
-  Future<void> _fetchSuggestions(String query) async {
-    if (query.isEmpty) return; // Prevent empty queries
+void _fetchSuggestions(String query) {
+  if (_debounce?.isActive ?? false) _debounce!.cancel();
+  _debounce = Timer(const Duration(milliseconds: 300), () async {
+    if (query.isEmpty) return; // Prevent unnecessary calls
 
     final bool debugMode = Provider.of<bool>(context, listen: false);
     final String baseUrl = debugMode
@@ -46,14 +51,13 @@ class MakeObservationPageState extends State<MakeObservationPage> {
         if (data != null && data.containsKey('birds')) {
           final List<dynamic> birds = data['birds'];
           setState(() {
-            _suggestions = birds.map((bird) => bird['common_name'] as String).toList();
+            _suggestions = [...birds.map((bird) => bird['common_name'] as String)];
             _birdData = birds.map((bird) => {
               'common_name': bird['common_name'] as String,
               'scientificName': bird['scientificName'] as String
             }).toList();
           });
         } else {
-          print('No birds found for query: $query');
           setState(() {
             _suggestions = [];
             _birdData = [];
@@ -61,17 +65,16 @@ class MakeObservationPageState extends State<MakeObservationPage> {
         }
       } else {
         print('Failed to fetch suggestions: ${response.statusCode}');
-        print('Response body: ${response.body}');
       }
     } catch (e) {
       print('Exception during bird search: $e');
-      // Clear suggestions on error
       setState(() {
         _suggestions = [];
         _birdData = [];
       });
     }
-  }
+  });
+}
 
   Future<void> _playBirdSound(String scientificName) async {
     await playBirdSound(scientificName, _audioPlayer);
@@ -115,57 +118,19 @@ class MakeObservationPageState extends State<MakeObservationPage> {
     return '${text}r';
   }
 
-  @override
-  Widget build(BuildContext context) {
-    var theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        title: const Text('Lav observation'),
-      ),
-      body: Center(
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildSearchBar(),
-              if (_isValidInput) ...[
-                _buildQuantitySelector(theme),
-                SizedBox(height: 16),
-                DropdownNumbers(
-                  initialValue: _selectedNumber,
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedNumber = value;
-                    });
-                  },
-                ),
-              ],
-              if (_isValidInput && _selectedNumber != null)
-                BigCustomButton(
-                  text: 'Indsend observation',
-                  onPressed: _handleSubmit,
-                  width: 500,
-                  height: 50,
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildSearchBar() {
     return FractionallySizedBox(
       widthFactor: 0.7,
       child: Column(
         children: [
           Searchbar(
-            controller: _searchController,
-            onChanged: (value) => _fetchSuggestions(value),
-            suggestions: _suggestions,
-            onValidInput: _handleValidInput,
-          ),
+  controller: _searchController,
+  onChanged: (value) {
+    _fetchSuggestions(value);
+  },
+  suggestions: _suggestions,
+  onValidInput: _handleValidInput,
+),
           SizedBox(height: 16),
         ],
       ),
@@ -203,6 +168,46 @@ class MakeObservationPageState extends State<MakeObservationPage> {
         ),
         SizedBox(height: 16),
       ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    var theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        centerTitle: true,
+        title: const Text('Lav observation'),
+      ),
+      body: Center(
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildSearchBar(),
+              if (_isValidInput) ...[
+                _buildQuantitySelector(theme),
+                SizedBox(height: 16),
+                DropdownNumbers(
+                  initialValue: _selectedNumber,
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedNumber = value;
+                    });
+                  },
+                ),
+              ],
+              if (_isValidInput && _selectedNumber != null)
+                BigCustomButton(
+                  text: 'Indsend observation',
+                  onPressed: _handleSubmit,
+                  width: 500,
+                  height: 50,
+                ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
