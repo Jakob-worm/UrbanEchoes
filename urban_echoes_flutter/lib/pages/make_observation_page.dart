@@ -66,9 +66,9 @@ class MakeObservationPageState extends State<MakeObservationPage> {
     }
   }
 
- Future<void> _playBirdSound(String scientificName) async {
-  await playBirdSound(scientificName, _audioPlayer);
-}
+  Future<void> _playBirdSound(String scientificName) async {
+    await playBirdSound(scientificName, _audioPlayer);
+  }
 
   void _handleSubmit() async {
     final searchValue = _searchController.text;
@@ -82,8 +82,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
       );
 
       if (selectedBird['scientificName']!.isNotEmpty) {
-        await _playBirdSound(selectedBird[
-            'scientificName']!); // Play sound using scientific name
+        await _playBirdSound(selectedBird['scientificName']!); // Play sound using scientific name
       } else {
         print('Scientific name not found for $searchValue');
       }
@@ -122,57 +121,18 @@ class MakeObservationPageState extends State<MakeObservationPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              FractionallySizedBox(
-                widthFactor: 0.7,
-                child: Column(
-                  children: [
-                    Searchbar(
-                      controller: _searchController,
-                      onChanged: (value) {},
-                      suggestions: _suggestions,
-                      onValidInput: _handleValidInput,
-                    ),
-                    SizedBox(height: 16),
-                  ],
-                ),
-              ),
+              _buildSearchBar(),
               if (_isValidInput) ...[
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    RichText(
-                      text: TextSpan(
-                        text: 'Vælg mængde af ',
-                        style: DefaultTextStyle.of(context)
-                            .style
-                            .copyWith(fontSize: 15),
-                        children: <TextSpan>[
-                          TextSpan(
-                            text: _pluralize(_validSearchText),
-                            style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                color: theme.colorScheme.primary,
-                                fontSize: 15),
-                          ),
-                          TextSpan(
-                            text: ' set:',
-                            style: TextStyle(fontSize: 15),
-                          ),
-                        ],
-                      ),
-                    ),
-                    SizedBox(width: 16),
-                  ],
-                ),
-                SizedBox(width: 16),
+                _buildQuantitySelector(theme),
+                SizedBox(height: 16),
                 DropdownNumbers(
-                      initialValue: _selectedNumber,
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedNumber = value;
-                        });
-                      },
-                    ),
+                  initialValue: _selectedNumber,
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedNumber = value;
+                    });
+                  },
+                ),
               ],
               if (_isValidInput && _selectedNumber != null)
                 BigCustomButton(
@@ -185,6 +145,57 @@ class MakeObservationPageState extends State<MakeObservationPage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSearchBar() {
+    return FractionallySizedBox(
+      widthFactor: 0.7,
+      child: Column(
+        children: [
+          Searchbar(
+            controller: _searchController,
+            onChanged: (value) {},
+            suggestions: _suggestions,
+            onValidInput: _handleValidInput,
+          ),
+          SizedBox(height: 16),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuantitySelector(ThemeData theme) {
+    return Column(
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            RichText(
+              text: TextSpan(
+                text: 'Vælg mængde af ',
+                style: DefaultTextStyle.of(context).style.copyWith(fontSize: 15),
+                children: <TextSpan>[
+                  TextSpan(
+                    text: _pluralize(_validSearchText),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: theme.colorScheme.primary,
+                      fontSize: 15,
+                    ),
+                  ),
+                  TextSpan(
+                    text: ' set:',
+                    style: TextStyle(fontSize: 15),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 16),
+          ],
+        ),
+        SizedBox(height: 16),
+      ],
     );
   }
 }
