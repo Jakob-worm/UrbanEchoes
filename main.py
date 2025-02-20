@@ -1,9 +1,12 @@
-﻿from fastapi import FastAPI, HTTPException
+﻿from fastapi import FastAPI, HTTPException, Query, Depends
 import requests
-import os
-from dotenv import load_dotenv
-from fastapi.middleware.cors import CORSMiddleware
+import psycopg2
 import random
+import os
+
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+from psycopg2.extras import RealDictCursor
 
 load_dotenv()
 
@@ -16,6 +19,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Database connection function
+def get_db_connection():
+    return psycopg2.connect(
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
+        host=os.getenv("DB_HOST"),
+        port=os.getenv("DB_PORT", 5432),
+        database="urban_echoes_db ",
+        sslmode="require"
+    )
 
 EBIRD_API_URL = "https://api.ebird.org/v2/data/obs/geo/recent"
 EBIRD_TAXONOMY_URL = "https://api.ebird.org/v2/ref/taxonomy/ebird"
@@ -50,6 +64,17 @@ async def get_danish_taxonomy():
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Error fetching taxonomy: {str(e)}")
     
+
+@app.get("/birds")
+def get_birds():
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    cursor.execute("SELECT common_name, scientific_name, danish_name FROM birds")
+    birds = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    return {"birds": birds}
+
 @app.get("/birdsound")
 def get_bird_sound(scientific_name: str):
     params = {"query": scientific_name}
@@ -76,7 +101,27 @@ def get_bird_sound(scientific_name: str):
 
     return sound_url
 
-@app.get("/birds")
+@app.get("/search_birds")
+def search_birds(query: str = Query(..., min_length=1, description="Bird search query")):
+    """Search birds by Danish name dynamically"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        SELECT common_name, scientific_name 
+        FROM birds 
+        WHERE common_name ILIKE %s
+        LIMIT 10
+    """, (f"%{query}%",))
+
+    birds = [{"common_name": row[0], "scientificName": row[1]} for row in cursor.fetchall()]
+    
+    cursor.close()
+    conn.close()
+
+    return {"birds": birds}
+
+@app.get("/birdsOLD")
 async def get_bird_list():
     """Fetch recent bird observations with Danish names and corresponding sounds."""
     headers = {"X-eBirdApiToken": EBIRD_API_KEY}

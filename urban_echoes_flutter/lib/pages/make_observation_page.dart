@@ -27,42 +27,49 @@ class MakeObservationPageState extends State<MakeObservationPage> {
   @override
   void initState() {
     super.initState();
-    _fetchSuggestions();
+    _fetchSuggestions(''); // Provide a default value
   }
 
-  Future<List<Map<String, String>>> fetchBirdSuggestions(
-      BuildContext context) async {
+  Future<void> _fetchSuggestions(String query) async {
+    if (query.isEmpty) return; // Prevent empty queries
+
     final bool debugMode = Provider.of<bool>(context, listen: false);
     final String baseUrl = debugMode
-        ? 'http://10.0.2.2:8000' // Local backend
-        : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net'; // Azure backend
+        ? 'http://10.0.2.2:8000'
+        : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net';
 
-    final response = await http.get(Uri.parse('$baseUrl/birds'));
-
-    if (response.statusCode == 200) {
-      final Map<String, dynamic> data =
-          json.decode(utf8.decode(response.bodyBytes));
-      final List<dynamic> birds = data['birds'];
-      return birds
-          .map((bird) => {
-                'danishName': bird['danishName'] as String,
-                'scientificName': bird['scientificName'] as String,
-              })
-          .toList();
-    } else {
-      throw Exception('Failed to load bird names');
-    }
-  }
-
-  void _fetchSuggestions() async {
     try {
-      final suggestions = await fetchBirdSuggestions(context);
-      setState(() {
-        _suggestions = suggestions.map((bird) => bird['danishName']!).toList();
-        _birdData = suggestions; // Store the full bird data
-      });
+      final response = await http.get(Uri.parse('$baseUrl/search_birds?query=$query'));
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic>? data = json.decode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>?;
+        if (data != null && data.containsKey('birds')) {
+          final List<dynamic> birds = data['birds'];
+          setState(() {
+            _suggestions = birds.map((bird) => bird['common_name'] as String).toList();
+            _birdData = birds.map((bird) => {
+              'common_name': bird['common_name'] as String,
+              'scientificName': bird['scientificName'] as String
+            }).toList();
+          });
+        } else {
+          print('No birds found for query: $query');
+          setState(() {
+            _suggestions = [];
+            _birdData = [];
+          });
+        }
+      } else {
+        print('Failed to fetch suggestions: ${response.statusCode}');
+        print('Response body: ${response.body}');
+      }
     } catch (e) {
-      print('Failed to fetch suggestions: $e');
+      print('Exception during bird search: $e');
+      // Clear suggestions on error
+      setState(() {
+        _suggestions = [];
+        _birdData = [];
+      });
     }
   }
 
@@ -77,7 +84,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
 
       // Find the scientific name for the selected Danish name
       final selectedBird = _birdData.firstWhere(
-        (bird) => bird['danishName'] == searchValue,
+        (bird) => bird['common_name'] == searchValue,
         orElse: () => {'scientificName': ''},
       );
 
@@ -155,7 +162,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
         children: [
           Searchbar(
             controller: _searchController,
-            onChanged: (value) {},
+            onChanged: (value) => _fetchSuggestions(value),
             suggestions: _suggestions,
             onValidInput: _handleValidInput,
           ),
