@@ -32,8 +32,3 @@ https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsite
 Test: curl https://UrbanEchoes-fastapi-backend.azurewebsites.net/birds
 Or open https://UrbanEchoes-fastapi-backend.azurewebsites.net/birds in a browser.
 
-
-# For Home Pc
-Remember to make the .env file
-EBIRD_API_KEY=your_actual_ebird_api_key
-DATABASE_URL=your_database_url

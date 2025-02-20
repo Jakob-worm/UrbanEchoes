@@ -75,7 +75,6 @@ def get_bird_sound(scientific_name: str):
     sound_url = f"https://www.xeno-canto.org/{selected['id']}/download"
 
     return sound_url
-    
 
 @app.get("/birds")
 async def get_bird_list():
