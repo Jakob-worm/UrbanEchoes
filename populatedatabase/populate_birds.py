@@ -1,35 +1,11 @@
-import os
 import requests
-import psycopg2
 from dotenv import load_dotenv
 from tqdm import tqdm
 
-# Load environment variables from .env file
-load_dotenv()
+from populatedatabase import connect_to_database
+from populatedatabase.test_obervastions_database import EBIRD_API_KEY
 
-# Database credentials
-DB_HOST = os.getenv("DB_HOST")
-DB_NAME = os.getenv("DB_NAME")
-DB_PORT = os.getenv("DB_PORT", 5432)  # Default to 5432 if not set
-DB_USER = os.getenv("DB_USER")
-DB_PASSWORD = os.getenv("DB_PASSWORD")
-EBIRD_API_KEY = os.getenv("EBIRD_API_KEY")
-
-# Connect to PostgreSQL
-try:
-    conn = psycopg2.connect(
-        user=DB_USER,
-        password=DB_PASSWORD,
-        host=DB_HOST,
-        port=DB_PORT,
-        database="urban_echoes_db ",
-        sslmode="require",
-        connect_timeout=15
-    )
-    cursor = conn.cursor()
-except psycopg2.OperationalError as e:
-    print(f"Error connecting to the database: {e}")
-    exit(1)
+cursor = connect_to_database.create_connection()
 
 # Create table if it doesn't exist
 cursor.execute("""
