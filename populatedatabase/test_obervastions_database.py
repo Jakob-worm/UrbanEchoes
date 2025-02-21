@@ -4,12 +4,14 @@ import psycopg2
 from dotenv import load_dotenv
 from tqdm import tqdm
 
-from populatedatabase import connect_to_database
+from populatedatabase import database_connection
 
-cursor = connect_to_database.create_connection()
+#create connection to database
+db = database_connection.DatabaseConnection()
+db.create_connection()
 
 # Create table if it doesn't exist
-cursor.execute("""
+db.cursor.execute("""
 CREATE TABLE bird_observations (
   id SERIAL PRIMARY KEY,
   bird_name VARCHAR(255) NOT NULL,

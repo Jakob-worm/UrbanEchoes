@@ -12,6 +12,7 @@ class Searchbar extends StatefulWidget {
     required this.onChanged,
     required this.suggestions,
     required this.onValidInput,
+    required bool isLoading,
   });
 
   @override

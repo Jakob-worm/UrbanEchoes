@@ -2,13 +2,15 @@ import requests
 from dotenv import load_dotenv
 from tqdm import tqdm
 
-from populatedatabase import connect_to_database
+from populatedatabase import database_connection
 from populatedatabase.test_obervastions_database import EBIRD_API_KEY
 
-cursor = connect_to_database.create_connection()
+#create connection to database
+db = database_connection.DatabaseConnection()
+db.create_connection()
 
 # Create table if it doesn't exist
-cursor.execute("""
+db.cursor.execute("""
 CREATE TABLE IF NOT EXISTS birds (
     id SERIAL PRIMARY KEY,
     common_name VARCHAR(255),
@@ -33,7 +35,7 @@ for bird in tqdm(all_birds, desc="Inserting birds into database"):
     region = "Denmark"  # Change this for different countries
 
     # Insert into database
-    cursor.execute(
+    db.cursor.execute(
         """
         INSERT INTO birds (common_name, scientific_name, danish_name, region)
         VALUES (%s, %s, %s, %s)
@@ -55,12 +57,13 @@ for bird in tqdm(recent_birds, desc="Updating recent observations"):
     scientific_name = bird["sciName"]
     
     # Mark as recently observed (e.g., store timestamp)
-    cursor.execute(
+    db.cursor.execute(
         "UPDATE birds SET last_observed = NOW() WHERE scientific_name = %s AND region = 'Denmark'",
         (scientific_name,),
     )
 
-conn.commit()
-cursor.close()
-conn.close()
+# Commit changes and close connection
+db.conn.commit()
+db.cursor.close()
+db.conn.close()
 print("Birds table updated successfully!")
