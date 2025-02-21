@@ -33,48 +33,54 @@ class MakeObservationPageState extends State<MakeObservationPage> {
     _fetchSuggestions(''); // Provide a default value
   }
 
-void _fetchSuggestions(String query) {
-  if (_debounce?.isActive ?? false) _debounce!.cancel();
-  _debounce = Timer(const Duration(milliseconds: 300), () async {
-    if (query.isEmpty) return; // Prevent unnecessary calls
+  void _fetchSuggestions(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () async {
+      if (query.isEmpty) return; // Prevent unnecessary calls
 
-    final bool debugMode = Provider.of<bool>(context, listen: false);
-    final String baseUrl = debugMode
-        ? 'http://10.0.2.2:8000'
-        : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net';
+      final bool debugMode = Provider.of<bool>(context, listen: false);
+      final String baseUrl = debugMode
+          ? 'http://10.0.2.2:8000'
+          : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net';
 
-    try {
-      final response = await http.get(Uri.parse('$baseUrl/search_birds?query=$query'));
+      try {
+        final response =
+            await http.get(Uri.parse('$baseUrl/search_birds?query=$query'));
 
-      if (response.statusCode == 200) {
-        final Map<String, dynamic>? data = json.decode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>?;
-        if (data != null && data.containsKey('birds')) {
-          final List<dynamic> birds = data['birds'];
-          setState(() {
-            _suggestions = [...birds.map((bird) => bird['common_name'] as String)];
-            _birdData = birds.map((bird) => {
-              'common_name': bird['common_name'] as String,
-              'scientificName': bird['scientificName'] as String
-            }).toList();
-          });
+        if (response.statusCode == 200) {
+          final Map<String, dynamic>? data = json
+              .decode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>?;
+          if (data != null && data.containsKey('birds')) {
+            final List<dynamic> birds = data['birds'];
+            setState(() {
+              _suggestions = [
+                ...birds.map((bird) => bird['common_name'] as String)
+              ];
+              _birdData = birds
+                  .map((bird) => {
+                        'common_name': bird['common_name'] as String,
+                        'scientificName': bird['scientificName'] as String
+                      })
+                  .toList();
+            });
+          } else {
+            setState(() {
+              _suggestions = [];
+              _birdData = [];
+            });
+          }
         } else {
-          setState(() {
-            _suggestions = [];
-            _birdData = [];
-          });
+          print('Failed to fetch suggestions: ${response.statusCode}');
         }
-      } else {
-        print('Failed to fetch suggestions: ${response.statusCode}');
+      } catch (e) {
+        print('Exception during bird search: $e');
+        setState(() {
+          _suggestions = [];
+          _birdData = [];
+        });
       }
-    } catch (e) {
-      print('Exception during bird search: $e');
-      setState(() {
-        _suggestions = [];
-        _birdData = [];
-      });
-    }
-  });
-}
+    });
+  }
 
   Future<void> _playBirdSound(String scientificName) async {
     await playBirdSound(scientificName, _audioPlayer);
@@ -92,7 +98,8 @@ void _fetchSuggestions(String query) {
       );
 
       if (selectedBird['scientificName']!.isNotEmpty) {
-        await _playBirdSound(selectedBird['scientificName']!); // Play sound using scientific name
+        await _playBirdSound(selectedBird[
+            'scientificName']!); // Play sound using scientific name
       } else {
         print('Scientific name not found for $searchValue');
       }
@@ -112,25 +119,19 @@ void _fetchSuggestions(String query) {
     });
   }
 
-  String _pluralize(String text) {
-    if (text.isEmpty) return text;
-    if (text.endsWith('r')) return text; // Already plural
-    return '${text}r';
-  }
-
   Widget _buildSearchBar() {
     return FractionallySizedBox(
       widthFactor: 0.7,
       child: Column(
         children: [
           Searchbar(
-  controller: _searchController,
-  onChanged: (value) {
-    _fetchSuggestions(value);
-  },
-  suggestions: _suggestions,
-  onValidInput: _handleValidInput,
-),
+            controller: _searchController,
+            onChanged: (value) {
+              _fetchSuggestions(value);
+            },
+            suggestions: _suggestions,
+            onValidInput: _handleValidInput,
+          ),
           SizedBox(height: 16),
         ],
       ),
@@ -146,10 +147,11 @@ void _fetchSuggestions(String query) {
             RichText(
               text: TextSpan(
                 text: 'Vælg mængde af ',
-                style: DefaultTextStyle.of(context).style.copyWith(fontSize: 15),
+                style:
+                    DefaultTextStyle.of(context).style.copyWith(fontSize: 15),
                 children: <TextSpan>[
                   TextSpan(
-                    text: _pluralize(_validSearchText),
+                    text: (_validSearchText),
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: theme.colorScheme.primary,

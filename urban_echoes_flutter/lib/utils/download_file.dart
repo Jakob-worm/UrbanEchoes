@@ -23,8 +23,9 @@ Future<String?> getXenoCantoDownloadUrl(String scientificName) async {
         } else if (fileUrl.startsWith('https:https://')) {
           fileUrl = fileUrl.replaceFirst('https:https://', 'https://');
         }
-        
-        print('Found recording: ${recording['id']} - Quality: ${recording['q']}');
+
+        print(
+            'Found recording: ${recording['id']} - Quality: ${recording['q']}');
         print('Constructed download URL: $fileUrl');
         return fileUrl;
       } else {
@@ -53,7 +54,8 @@ Future<File> downloadFileWithDio(String url, String fileName) async {
       filePath,
       options: Options(
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36',
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36',
         },
       ),
     );
@@ -71,7 +73,8 @@ Future<File> downloadFile(String url, String fileName) async {
     final client = http.Client();
     final request = http.Request('GET', Uri.parse(url))
       ..headers.addAll({
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36',
+        'User-Agent':
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36',
         'Accept': '*/*',
         'Referer': 'https://xeno-canto.org/'
       });
@@ -96,9 +99,9 @@ Future<File> downloadFile(String url, String fileName) async {
   }
 }
 
-
 // Helper function to play the sound
-Future<void> playBirdSound(String scientificName, AudioPlayer audioPlayer) async {
+Future<void> playBirdSound(
+    String scientificName, AudioPlayer audioPlayer) async {
   try {
     await audioPlayer.stop(); // Stop any currently playing sound
     final downloadUrl = await getXenoCantoDownloadUrl(scientificName);
