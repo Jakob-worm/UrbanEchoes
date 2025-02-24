@@ -5,8 +5,8 @@ import 'package:path_provider/path_provider.dart';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:dio/dio.dart';
-
-Future<String?> getXenoCantoDownloadUrl(String scientificName) async {
+class DownloadFile {
+  Future<String?> getXenoCantoDownloadUrl(String scientificName) async {
   try {
     final query = Uri.encodeComponent('$scientificName q:A');
     final apiUrl = 'https://xeno-canto.org/api/2/recordings?query=$query';
@@ -129,4 +129,5 @@ Future<void> playBirdSound(
   } catch (e) {
     print('Error in playBirdSound: $e');
   }
+}
 }

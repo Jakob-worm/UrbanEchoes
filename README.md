@@ -14,6 +14,17 @@ To test the /birds Endpoint: curl http://127.0.0.1:8000/birds
 # When debugging on chrome
 flutter run -d chrome --web-browser-flag "--disable-web-security"
 
+# .env update
+AZURE_STORAGE_CONNECTION_STRING=your_connection_string
+AZURE_STORAGE_CONTAINER_NAME=bird-sounds  # or your preferred container name
+
+To get the Azure Storage connection string:
+
+Go to Azure Portal
+Navigate to your Storage Account
+Under "Security + networking", click "Access keys"
+Copy the connection string
+
 
 # Deploy and test Azure
 ## one time

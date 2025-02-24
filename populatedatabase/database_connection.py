@@ -25,7 +25,7 @@ class DatabaseConnection:
                 password=DB_PASSWORD,
                 host=DB_HOST,
                 port=DB_PORT,
-                database="urban_echoes_db",  # Removed trailing space
+                database="urban_echoes_db ",
                 sslmode="require",
                 connect_timeout=15
             )

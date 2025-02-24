@@ -5,6 +5,7 @@ import 'package:urban_echoes/utils/download_file.dart';
 class BirdSoundPlayer {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
+  DownloadFile _downloadFile = DownloadFile();
 
   Future<void> playSound(String scientificName) async {
     if (scientificName.isEmpty) {
@@ -17,7 +18,7 @@ class BirdSoundPlayer {
       }
 
       _isPlaying = true;
-      await playBirdSound(scientificName, _audioPlayer);
+      await _downloadFile.playBirdSound(scientificName, _audioPlayer);
     } catch (e) {
       _isPlaying = false;
       throw Exception('Failed to play bird sound: ${e.toString()}');
