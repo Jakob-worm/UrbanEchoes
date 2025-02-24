@@ -33,7 +33,8 @@ class _MapPageState extends State<MapPage> {
     try {
       final response = await http.get(Uri.parse(apiUrl));
       if (response.statusCode == 200) {
-        final data = json.decode(response.body);
+        final decodedBody = utf8.decode(response.bodyBytes); // Ensures UTF-8 decoding
+        final data = json.decode(decodedBody);
         final List<dynamic> fetchedObservations = data["observations"];
 
         setState(() {
