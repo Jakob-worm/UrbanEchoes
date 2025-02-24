@@ -10,6 +10,7 @@ from azure.core.exceptions import ResourceNotFoundError
 import tempfile
 
 from database_connection import DatabaseConnection
+import downloadXeno
 
 # Danish birds with scientific names
 DANISH_BIRDS = [
@@ -26,64 +27,15 @@ DANISH_BIRDS = [
 # Aarhus center coordinates
 AARHUS_CENTER = (56.1517, 10.2107)
 
-def get_xenocanto_download_url(scientific_name):
-    """Get download URL from Xeno-Canto API"""
-    try:
-        query = f"{scientific_name} q:A"
-        api_url = f'https://xeno-canto.org/api/2/recordings?query={query}'
-        print(f'Fetching from Xeno-Canto API: {api_url}')
-        
-        response = requests.get(api_url)
-        if response.status_code == 200:
-            data = response.json()
-            if int(data['numRecordings']) > 0 and data['recordings']:
-                recording = data['recordings'][0]
-                file_url = recording['file']
-                
-                # Fix URL format
-                if file_url.startswith('//'):
-                    file_url = f'https:{file_url}'
-                elif file_url.startswith('https:https://'):
-                    file_url = file_url.replace('https:https://', 'https://')
-                
-                print(f'Found recording: {recording["id"]} - Quality: {recording["q"]}')
-                print(f'Download URL: {file_url}')
-                return file_url
-        return None
-    except Exception as e:
-        print(f'Error fetching from Xeno-Canto API: {e}')
-        return None
 
-def download_sound_file(url, temp_dir):
-    """Download sound file from Xeno-Canto"""
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/94.0.4606.81 Safari/537.36',
-            'Accept': '*/*',
-            'Referer': 'https://xeno-canto.org/'
-        }
-        
-        response = requests.get(url, headers=headers, stream=True)
-        if response.status_code == 200:
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            filename = f'temp_bird_{timestamp}.mp3'
-            filepath = os.path.join(temp_dir, filename)
-            
-            with open(filepath, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-            return filepath
-        return None
-    except Exception as e:
-        print(f'Error downloading file: {e}')
-        return None
 
 class BirdSoundStorage:
+    
     def __init__(self):
         self.connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
         self.container_name = os.getenv("AZURE_STORAGE_CONTAINER_NAME", "bird-sounds")
         self.blob_service_client = BlobServiceClient.from_connection_string(self.connection_string)
+        self.downloadXeno = downloadXeno()
 
     def create_container_if_not_exists(self):
         try:
@@ -123,7 +75,8 @@ def create_bird_observations_table(db):
             observation_date DATE NOT NULL,
             observation_time TIME NOT NULL,
             observer_id INTEGER,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            quantity: quantity,
         )
         """)
         db.commit()
@@ -143,12 +96,12 @@ def populate_sample_data(db, sound_storage):
                 danish_name, scientific_name = bird
                 
                 # Get and download sound from Xeno-Canto
-                download_url = get_xenocanto_download_url(scientific_name)
+                download_url = downloadXeno.get_xenocanto_download_url(scientific_name)
                 sound_url = None
                 
                 if download_url:
                     # Download to temp directory
-                    temp_file_path = download_sound_file(download_url, temp_dir)
+                    temp_file_path = downloadXeno.download_sound_file(download_url, temp_dir)
                     if temp_file_path and sound_storage:
                         # Upload to Azure and get URL
                         sound_url = sound_storage.upload_sound_file(temp_file_path, danish_name)
@@ -169,11 +122,11 @@ def populate_sample_data(db, sound_storage):
                     INSERT INTO bird_observations 
                     (bird_name, scientific_name, sound_url, latitude, longitude, 
                      observation_date, observation_time, observer_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         danish_name, scientific_name, sound_url, lat, lon,
                         observation_date, observation_time,
-                        random.randint(1, 10)
+                        random.randint(1, 10), random.randint(1, 10)
                     ))
             
             db.commit()

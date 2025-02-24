@@ -7,6 +7,11 @@ To run the app in debug:
 venv\Scripts\activate
 pip freeze > requirements.txt
 
+# Debug mode
+Because i cant ffigure out how to just have on global varibale multiple varibles need to be set to false in order toouse azure backend these inlude
+main.dart debug = false
+bird_observer_controller debug also needs to be set to false
+
 # Test
 To start FastAPI app locally: uvicorn main:app --reload
 To test the /birds Endpoint: curl http://127.0.0.1:8000/birds

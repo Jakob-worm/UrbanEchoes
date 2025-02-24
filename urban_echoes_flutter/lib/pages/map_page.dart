@@ -35,6 +35,7 @@ class _MapPageState extends State<MapPage> {
       if (response.statusCode == 200) {
         final decodedBody = utf8.decode(response.bodyBytes); // Ensures UTF-8 decoding
         final data = json.decode(decodedBody);
+
         final List<dynamic> fetchedObservations = data["observations"];
 
         setState(() {
