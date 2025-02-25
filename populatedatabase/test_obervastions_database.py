@@ -28,14 +28,13 @@ DANISH_BIRDS = [
 AARHUS_CENTER = (56.1517, 10.2107)
 
 
-
 class BirdSoundStorage:
     
     def __init__(self):
         self.connection_string = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
         self.container_name = os.getenv("AZURE_STORAGE_CONTAINER_NAME", "bird-sounds")
         self.blob_service_client = BlobServiceClient.from_connection_string(self.connection_string)
-        self.downloadXeno = downloadXeno()
+        self.downloadXeno = downloadXeno
 
     def create_container_if_not_exists(self):
         try:
@@ -61,6 +60,7 @@ class BirdSoundStorage:
             print(f"Error uploading file {file_path}: {e}")
             return None
 
+
 def create_bird_observations_table(db):
     try:
         db.cursor.execute("DROP TABLE IF EXISTS bird_observations")
@@ -76,7 +76,7 @@ def create_bird_observations_table(db):
             observation_time TIME NOT NULL,
             observer_id INTEGER,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            quantity: quantity,
+            quantity INTEGER DEFAULT 1
         )
         """)
         db.commit()
@@ -121,7 +121,7 @@ def populate_sample_data(db, sound_storage):
                     db.cursor.execute("""
                     INSERT INTO bird_observations 
                     (bird_name, scientific_name, sound_url, latitude, longitude, 
-                     observation_date, observation_time, observer_id)
+                     observation_date, observation_time, observer_id,quantity)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         danish_name, scientific_name, sound_url, lat, lon,
@@ -137,6 +137,7 @@ def populate_sample_data(db, sound_storage):
             raise
 
 def main():
+    load_dotenv()
     db = DatabaseConnection()
     db.create_connection()
     
