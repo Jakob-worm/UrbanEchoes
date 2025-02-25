@@ -65,6 +65,24 @@ async def get_danish_taxonomy():
         raise HTTPException(status_code=500, detail=f"Error fetching taxonomy: {str(e)}")
     
 
+@app.get("/observations")
+def get_observations():
+    """Fetch all bird observations from the database."""
+    conn = get_db_connection()
+    cursor = conn.cursor(cursor_factory=RealDictCursor)
+    
+    cursor.execute("""
+        SELECT id, bird_name, scientific_name, sound_url, latitude, longitude, observation_date, observation_time 
+        FROM bird_observations
+    """)
+    
+    observations = cursor.fetchall()
+    cursor.close()
+    conn.close()
+    
+    return {"observations": observations}
+
+
 @app.get("/birds")
 def get_birds():
     conn = get_db_connection()
