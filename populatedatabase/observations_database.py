@@ -15,7 +15,7 @@ from database_connection import DatabaseConnection
 AARHUS_CENTER = (56.1517, 10.2107)
 
 # Toggle to reset the table (delete existing table before creating a new one)
-reset_table = True  # Set to True to reset the table
+reset_table = False  # Set to True to reset the table
 
 
 class BirdSoundStorage:
