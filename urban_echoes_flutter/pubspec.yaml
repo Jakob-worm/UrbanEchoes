@@ -53,6 +53,7 @@ dependencies:
   flutter_dotenv: ^5.0.2
   azblob: ^4.0.0
   location: ^5.0.0
+  xml: ^6.3.0
 
 dev_dependencies:
   flutter_test:
