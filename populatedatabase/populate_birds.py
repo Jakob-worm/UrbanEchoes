@@ -5,7 +5,7 @@ from tqdm import tqdm
 
 from database_connection import DatabaseConnection
 # Toggle to reset the table (delete existing table before creating a new one)
-reset_table = True  # Set to True to reset the table
+reset_table = False  # Set to True to reset the table
 
 # Create connection to database
 db = DatabaseConnection()
