@@ -1,14 +1,12 @@
 // Bird sound player
 import 'package:audioplayers/audioplayers.dart';
-import 'package:urban_echoes/utils/download_file.dart';
 
 class BirdSoundPlayer {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isPlaying = false;
-  final DownloadFile _downloadFile = DownloadFile();
 
-  Future<void> playSound(String scientificName) async {
-    if (scientificName.isEmpty) {
+  Future<void> playSound(String soundUrl) async {
+    if (soundUrl.isEmpty) {
       throw ArgumentError('Scientific name cannot be empty');
     }
 
@@ -16,9 +14,8 @@ class BirdSoundPlayer {
       if (_isPlaying) {
         await _audioPlayer.stop();
       }
-
+      _audioPlayer.play(UrlSource(soundUrl));
       _isPlaying = true;
-      await _downloadFile.playBirdSound(scientificName, _audioPlayer);
     } catch (e) {
       _isPlaying = false;
       throw Exception('Failed to play bird sound: ${e.toString()}');

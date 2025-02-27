@@ -7,6 +7,7 @@ import 'package:urban_echoes/services/bird_sound_player.dart';
 import 'package:location/location.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter/foundation.dart';
 
 class BirdObservationController {
   final DatabaseService _databaseService = DatabaseService();
@@ -16,243 +17,138 @@ class BirdObservationController {
 
   bool _initialized = false;
 
-  // Validate environment variables
-  Future<bool> _validateEnvironmentVariables() {
+  Future<bool> _validateEnvironmentVariables() async {
     final missingVars = <String>[];
 
-    // Check Azure storage vars
-    if (dotenv.env['AZURE_STORAGE_CONNECTION_STRING']?.isEmpty ?? true)
-      missingVars.add('AZURE_STORAGE_CONNECTION_STRING');
-
-    // Check DB vars
-    if (dotenv.env['DB_HOST']?.isEmpty ?? true) missingVars.add('DB_HOST');
-    if (dotenv.env['DB_USER']?.isEmpty ?? true) missingVars.add('DB_USER');
-    if (dotenv.env['DB_PASSWORD']?.isEmpty ?? true)
-      missingVars.add('DB_PASSWORD');
-
-    if (missingVars.isNotEmpty) {
-      print(
-          'Missing required environment variables: ${missingVars.join(', ')}');
-      return Future.value(false);
+    for (var key in [
+      'AZURE_STORAGE_CONNECTION_STRING',
+      'DB_HOST',
+      'DB_USER',
+      'DB_PASSWORD'
+    ]) {
+      if (dotenv.env[key]?.isEmpty ?? true) missingVars.add(key);
     }
 
-    return Future.value(true);
+    if (missingVars.isNotEmpty) {
+      debugPrint(
+          'Missing required environment variables: ${missingVars.join(', ')}');
+      return false;
+    }
+    return true;
   }
 
   Future<bool> initialize() async {
-    try {
-      if (_initialized) return true;
+    if (_initialized) return true;
 
-      print('Validating environment variables...');
-      if (!await _validateEnvironmentVariables()) {
-        print('Environment validation failed.');
-        return false;
-      }
+    debugPrint('Validating environment variables...');
+    if (!await _validateEnvironmentVariables()) return false;
 
-      print('Initializing database service...');
-      final dbInitialized = await _databaseService.initialize();
+    debugPrint('Initializing database service...');
+    if (!await _databaseService.initialize()) return false;
 
-      if (!dbInitialized) {
-        print('Database service failed to initialize.');
-        return false;
-      }
-
-      _initialized = true;
-      print('BirdObservationController initialized successfully.');
-      return true;
-    } catch (e, stackTrace) {
-      print('Error initializing BirdObservationController: $e');
-      print(stackTrace);
-      _initialized = false;
-      return false;
-    }
+    _initialized = true;
+    debugPrint('BirdObservationController initialized successfully.');
+    return true;
   }
 
   void dispose() {
     try {
       _databaseService.closeConnection();
       _soundPlayer.dispose();
-      print('BirdObservationController disposed');
+      debugPrint('BirdObservationController disposed');
     } catch (e) {
-      print('Error disposing BirdObservationController: $e');
+      debugPrint('Error disposing BirdObservationController: $e');
     }
   }
 
-  String _formatScientificName(String scientificName) {
-    return scientificName.toLowerCase().replaceAll(' ', '_');
-  }
-
-  // Play bird sound based on the scientific name
-  Future<void> playBirdSound(String scientificName) async {
+  Future<void> playBirdSound(String soundUrl) async {
     try {
-      await _soundPlayer.playSound(scientificName);
+      await _soundPlayer.playSound(soundUrl);
     } catch (e) {
-      print('Error playing sound: $e');
-      // Don't rethrow - non-critical error
+      debugPrint('Error playing sound: $e');
     }
   }
 
-  // Submit a bird observation with an optional sound file
   Future<bool> submitObservation(
       String birdName, String scientificName, int quantity,
       {File? soundFile}) async {
-    try {
-      print('Submitting observation for $birdName ($scientificName)');
+    if (!await initialize()) return false;
 
-      // Initialize with proper error handling
-      bool initSuccess = await initialize();
-      if (!initSuccess) {
-        print('Failed to initialize services - unable to submit observation');
-        // Consider saving locally for later sync
-        return false;
-      }
+    debugPrint('Submitting observation for $birdName ($scientificName)');
 
-      // Get current location
-      LocationData locationData;
-      try {
-        locationData = await _getCurrentLocation();
-        print(
-            'Location obtained: ${locationData.latitude}, ${locationData.longitude}');
-      } catch (e) {
-        print('Error getting location: $e');
-        // Use default location if failed
-        locationData = LocationData.fromMap({
-          'latitude': 0.0,
-          'longitude': 0.0,
-          'accuracy': 0.0,
-          'altitude': 0.0,
-          'speed': 0.0,
-          'speed_accuracy': 0.0,
-          'heading': 0.0
-        });
-      }
+    final locationData = await _getCurrentLocationOrDefault();
+    final soundUrl = await _handleSoundFile(scientificName, soundFile);
 
-      // Check if sound files exist for this bird species and either upload or select existing
-      String? soundUrl;
-      if (scientificName.isNotEmpty) {
-        try {
-          // Ensure we use the correct folder format
-          final String folderPath =
-              'bird-sounds/${_formatScientificName(scientificName)}';
-          print('Checking for existing sound files in $folderPath');
+    final observation = BirdObservation(
+      birdName: birdName,
+      scientificName: scientificName,
+      soundUrl: soundUrl,
+      latitude: locationData.latitude ?? 0.0,
+      longitude: locationData.longitude ?? 0.0,
+      observationDate: DateTime.now(),
+      observationTime: DateFormat('HH:mm:ss').format(DateTime.now()),
+      observerId: null,
+      quantity: quantity,
+    );
 
-          // First check if any sound files exist for this species
-          final List<String> existingSoundUrls =
-              await _storageService.listFiles(folderPath);
-
-          if (existingSoundUrls.isNotEmpty) {
-            // Randomly select one of the existing sound files
-            final random = Random();
-            soundUrl =
-                existingSoundUrls[random.nextInt(existingSoundUrls.length)];
-            print('Using existing sound file: $soundUrl');
-          } else if (soundFile != null) {
-            print('No existing sound files found. Uploading new file');
-            // No existing sound files, upload the new one
-            soundUrl =
-                await _storageService.uploadFile(soundFile, folder: folderPath);
-            print('Uploaded new sound file: $soundUrl');
-          } else {
-            print('No sound file provided and no existing files found');
-          }
-        } catch (e) {
-          print('Error handling sound files: $e');
-          // Continue without sound URL if there's an error
-        }
-      }
-
-      // Create observation object
-      final now = DateTime.now();
-      final observation = BirdObservation(
-        birdName: birdName,
-        scientificName: scientificName,
-        soundUrl: soundUrl,
-        latitude: locationData.latitude ?? 0.0,
-        longitude: locationData.longitude ?? 0.0,
-        observationDate: now,
-        observationTime: DateFormat('HH:mm:ss').format(now),
-        observerId: null, // Update with authentication logic
-        quantity: quantity,
-      );
-
-      print('Saving observation to database');
-      try {
-        // Save observation to database
-        final id = await _databaseService.addBirdObservation(observation);
-
-        if (id > 0) {
-          print('$birdName ($quantity) recorded successfully with ID: $id');
-
-          // Play the bird sound if available
-          if (scientificName.isNotEmpty) {
-            try {
-              await playBirdSound(scientificName);
-            } catch (e) {
-              print('Non-critical error playing sound: $e');
-            }
-          } else {
-            print('Warning: No scientific name found for $birdName');
-          }
-
-          return true;
-        } else {
-          print('Failed to record observation - database returned ID $id');
-          return false;
-        }
-      } catch (e) {
-        print('Database error: $e');
-        return false;
-      }
-    } catch (e) {
-      print('Critical error submitting observation: $e');
-      return false;
+    final id = await _databaseService.addBirdObservation(observation);
+    if (id > 0) {
+      debugPrint('$birdName ($quantity) recorded successfully with ID: $id');
+      if (soundUrl != null) await playBirdSound(soundUrl);
+      return true;
     }
+
+    debugPrint('Failed to record observation');
+    return false;
   }
 
-  // Get current location
-  Future<LocationData> _getCurrentLocation() async {
-    bool serviceEnabled;
-    PermissionStatus permissionGranted;
-
+  Future<LocationData> _getCurrentLocationOrDefault() async {
     try {
-      serviceEnabled = await _location.serviceEnabled();
-      if (!serviceEnabled) {
-        print('Location service not enabled, requesting...');
-        serviceEnabled = await _location.requestService();
-        if (!serviceEnabled) {
-          throw Exception('Location service disabled by user');
-        }
+      if (!await _location.serviceEnabled() &&
+          !await _location.requestService()) {
+        throw Exception('Location service disabled');
       }
 
-      permissionGranted = await _location.hasPermission();
-      if (permissionGranted == PermissionStatus.denied) {
-        print('Location permission denied, requesting...');
-        permissionGranted = await _location.requestPermission();
-        if (permissionGranted != PermissionStatus.granted) {
-          throw Exception('Location permission not granted by user');
-        }
+      if (await _location.hasPermission() == PermissionStatus.denied &&
+          await _location.requestPermission() != PermissionStatus.granted) {
+        throw Exception('Location permission denied');
       }
 
-      print('Getting current location...');
       return await _location.getLocation();
     } catch (e) {
-      print('Error in _getCurrentLocation: $e');
-      rethrow;
+      debugPrint('Error getting location: $e');
+      return LocationData.fromMap({'latitude': 0.0, 'longitude': 0.0});
     }
   }
 
-  // Fetch all recorded observations
-  Future<List<BirdObservation>> getAllObservations() async {
+  Future<String?> _handleSoundFile(
+      String scientificName, File? soundFile) async {
+    if (scientificName.isEmpty) return null;
+
+    final folderPath =
+        'bird-sounds/${scientificName.toLowerCase().replaceAll(' ', '_')}';
+    debugPrint('Checking for existing sound files in $folderPath');
+
     try {
-      bool initSuccess = await initialize();
-      if (!initSuccess) {
-        print('Failed to initialize services - unable to get observations');
-        return [];
+      final existingSoundUrls = await _storageService.listFiles(folderPath);
+      if (existingSoundUrls.isNotEmpty) {
+        debugPrint('Found existing sound files: $existingSoundUrls');
+        return existingSoundUrls[Random().nextInt(existingSoundUrls.length)];
       }
-      return await _databaseService.getAllBirdObservations();
+      if (soundFile != null) {
+        debugPrint('Uploading new sound file: ${soundFile.path}');
+        return await _storageService.uploadFile(soundFile, folder: folderPath);
+      }
     } catch (e) {
-      print('Error getting all observations: $e');
-      return []; // Return empty list on error
+      debugPrint('Error handling sound files: $e');
     }
+
+    return null;
+  }
+
+  Future<List<BirdObservation>> getAllObservations() async {
+    return (await initialize())
+        ? await _databaseService.getAllBirdObservations()
+        : [];
   }
 }

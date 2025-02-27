@@ -18,6 +18,25 @@ class _MapPageState extends State<MapPage> {
   List<CircleMarker> circles = [];
   final AudioPlayer _audioPlayer = AudioPlayer();
 
+  // Quantity-based color mapping
+  final Map<int, Color> quantityColorMap = {
+    1: Colors.blue,
+    2: Colors.green,
+    3: Colors.yellow,
+    4: Colors.orange,
+    5: Colors.red,
+    6: Colors.purple,
+    7: Colors.brown,
+    8: Colors.pink,
+    9: Colors.teal,
+    10: Colors.black,
+  };
+
+  Color getQuantityColor(int quantity) {
+    return quantityColorMap[quantity] ??
+        Colors.grey; // Default if quantity > 10
+  }
+
   @override
   void initState() {
     final bool debugMode = Provider.of<bool>(context, listen: false);
@@ -27,13 +46,14 @@ class _MapPageState extends State<MapPage> {
 
   Future<void> fetchObservations(bool debugMode) async {
     final String apiUrl = debugMode
-      ? 'http://10.0.2.2:8000/observations'
-      : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
+        ? 'http://10.0.2.2:8000/observations'
+        : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
 
     try {
       final response = await http.get(Uri.parse(apiUrl));
       if (response.statusCode == 200) {
-        final decodedBody = utf8.decode(response.bodyBytes); // Ensures UTF-8 decoding
+        final decodedBody =
+            utf8.decode(response.bodyBytes); // Ensure UTF-8 decoding
         final data = json.decode(decodedBody);
 
         final List<dynamic> fetchedObservations = data["observations"];
@@ -48,6 +68,7 @@ class _MapPageState extends State<MapPage> {
               "observation_date": obs["observation_date"],
               "observation_time": obs["observation_time"],
               "sound_url": obs["sound_url"],
+              "quantity": obs["quantity"], // Add quantity field
             };
           }).toList();
 
@@ -56,8 +77,8 @@ class _MapPageState extends State<MapPage> {
               point: LatLng(obs["latitude"], obs["longitude"]),
               radius: 100,
               useRadiusInMeter: true,
-              color: Colors.blue.withOpacity(0.3),
-              borderColor: Colors.blue.withOpacity(0.7),
+              color: getQuantityColor(obs["quantity"]).withOpacity(0.3),
+              borderColor: getQuantityColor(obs["quantity"]).withOpacity(0.7),
               borderStrokeWidth: 2,
             );
           }).toList();
@@ -70,66 +91,6 @@ class _MapPageState extends State<MapPage> {
     }
   }
 
-  void _onMapTap(LatLng tappedPoint) {
-    double minDistance = double.infinity;
-    Map<String, dynamic>? nearestObservation;
-
-    for (var obs in observations) {
-      final distance = Distance().as(
-        LengthUnit.Meter,
-        tappedPoint,
-        LatLng(obs["latitude"], obs["longitude"]),
-      );
-
-      if (distance < minDistance && distance <= 100) { // Check if within radius
-        minDistance = distance;
-        nearestObservation = obs;
-      }
-    }
-
-    if (nearestObservation != null) {
-      _showObservationDetails(nearestObservation);
-    }
-  }
-
-  void _showObservationDetails(Map<String, dynamic> observation) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(observation["bird_name"]),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text("Scientific Name: ${observation["scientific_name"]}"),
-              Text("Date: ${observation["observation_date"]}"),
-              Text("Time: ${observation["observation_time"]}"),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: () => _playSound(observation["sound_url"]),
-                child: const Text("Play Bird Sound"),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text("Close"),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  void _playSound(String soundUrl) async {
-    try {
-      await _audioPlayer.play(UrlSource(soundUrl));
-    } catch (e) {
-      print("Error playing sound: $e");
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -139,7 +100,6 @@ class _MapPageState extends State<MapPage> {
             options: MapOptions(
               initialCenter: LatLng(56.177839, 10.216839),
               initialZoom: 12.0,
-              onTap: (_, tappedPoint) => _onMapTap(tappedPoint), // Handle taps
             ),
             children: [
               TileLayer(
