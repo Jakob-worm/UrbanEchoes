@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class Audiopage extends StatelessWidget {
-  const Audiopage({Key? key}) : super(key: key);
+  const Audiopage({super.key});
 
   @override
   Widget build(BuildContext context) {

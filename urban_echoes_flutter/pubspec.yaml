@@ -76,6 +76,7 @@ flutter:
     - assets/images/dresden-7122254_1920.jpg
     - assets/images/kingfisher-6562537_1920.jpg
     - assets/images/song-sparrow-7942522_1920.jpg
+    - .env
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:

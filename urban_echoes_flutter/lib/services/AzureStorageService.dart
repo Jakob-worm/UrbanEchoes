@@ -7,10 +7,9 @@ import 'package:path/path.dart' as path;
 import 'package:xml/xml.dart' as xml;
 
 class AzureStorageService {
-  late String _storageAccountName;
-  late String _containerName;
-  late String _sasToken;
-  late AzureStorage _storage;
+  String? _storageAccountName;
+  String? _containerName;
+  AzureStorage? _storage;
 
   bool _initialized = false;
 
@@ -23,60 +22,56 @@ class AzureStorageService {
 
   AzureStorageService._internal();
 
-  Future<void> initialize() async {
+  Future<bool> initialize() async {
     try {
-      if (_initialized) return;
+      if (_initialized && _storage != null) return true;
 
-      _storageAccountName = dotenv.env['AZURE_STORAGE_ACCOUNT'] ?? '';
-      _containerName = dotenv.env['AZURE_STORAGE_CONTAINER'] ?? 'bird-sounds';
-      _sasToken = dotenv.env['AZURE_STORAGE_SAS_TOKEN'] ?? '';
+      _storageAccountName = dotenv.env['AZURE_STORAGE_CONNECTION_STRING'] ?? '';
+      _containerName =
+          dotenv.env['AZURE_STORAGE_CONTAINER_NAME'] ?? 'bird-sounds';
 
-      if (_storageAccountName.isEmpty || _sasToken.isEmpty) {
-        throw Exception('Azure Storage credentials are missing');
+      if (_storageAccountName!.isEmpty) {
+        print('Azure Storage credentials are missing');
+        return false;
       }
 
-      _storage = AzureStorage.parse(
-          "https://$_storageAccountName.blob.core.windows.net$_sasToken");
+      _storage = AzureStorage.parse("");
 
       _initialized = true;
       print('Azure Storage Service initialized successfully');
+      return true;
     } catch (e) {
       print('Error initializing Azure Storage Service: $e');
-      // Don't rethrow - we want to fail gracefully
       _initialized = false;
+      return false;
     }
   }
 
-  // Modified listFiles method to be more robust
+  // Fixed listFiles method to handle folder naming
   Future<List<String>> listFiles(String folderPath) async {
     try {
       // Ensure the service is initialized
-      if (!_initialized) {
-        await initialize();
-        if (!_initialized) {
+      if (!_initialized || _storage == null) {
+        bool success = await initialize();
+        if (!success || _storage == null) {
           print(
               'Cannot list files: Azure Storage Service initialization failed');
           return [];
         }
       }
 
+      // Format folder name - convert spaces to underscores
+      String formattedPath = folderPath.replaceAll(' ', '_');
+      print('Looking for files in formatted path: $formattedPath');
+
       // Use a safer approach - download blob directly with folder prefix
       List<String> fileUrls = [];
 
       // Try to get some blobs using a direct HTTP request approach
       try {
-        // Make sure SAS token is formatted correctly
-        String sasPart = _sasToken;
-        if (_sasToken.startsWith('?')) {
-          sasPart = _sasToken.substring(1);
-        }
-
         // Create the URL with both restype=container and comp=list
         final listUrl = Uri.parse(
-            'https://$_storageAccountName.blob.core.windows.net/$_containerName?restype=container&comp=list&prefix=$folderPath&$sasPart');
-
-        print(
-            'Requesting blob list from: ${listUrl.toString().replaceAll(_sasToken, "REDACTED")}');
+            'https://$_storageAccountName.blob.core.windows.net/$_containerName?restype=container&comp=list&prefix=$formattedPath');
 
         final response = await http.get(listUrl);
 
@@ -91,7 +86,8 @@ class AzureStorageService {
               final blobName = nameElement.innerText;
 
               // Skip folders and any blob not in the specified folder
-              if (!blobName.endsWith('/') && blobName.startsWith(folderPath)) {
+              if (!blobName.endsWith('/') &&
+                  blobName.startsWith(formattedPath)) {
                 final blobUrl =
                     'https://$_storageAccountName.blob.core.windows.net/$_containerName/$blobName';
                 fileUrls.add(blobUrl);
@@ -110,7 +106,7 @@ class AzureStorageService {
         print('HTTP error while listing blobs: $httpError');
       }
 
-      print('Found ${fileUrls.length} files in $folderPath');
+      print('Found ${fileUrls.length} files in $formattedPath');
       return fileUrls;
     } catch (e) {
       print('Error listing files in $folderPath: $e');
@@ -118,23 +114,29 @@ class AzureStorageService {
     }
   }
 
-  // Upload a file to Azure Storage with optional folder path
+  // Upload a file to Azure Storage with consistent folder naming
   Future<String> uploadFile(File file,
       {String? customFileName, String? folder}) async {
     try {
       // Ensure the service is initialized
-      if (!_initialized) {
-        await initialize();
-        if (!_initialized) {
+      if (!_initialized || _storage == null) {
+        bool success = await initialize();
+        if (!success || _storage == null) {
           throw Exception('Azure Storage Service initialization failed');
         }
       }
 
       final fileName = customFileName ?? path.basename(file.path);
 
+      // Format folder name - convert spaces to underscores
+      String? formattedFolder = folder;
+      if (folder != null) {
+        formattedFolder = folder.replaceAll(' ', '_');
+      }
+
       // Create blob name with folder if provided
-      final String blobName = folder != null
-          ? '$folder/${DateTime.now().millisecondsSinceEpoch}_$fileName'
+      final String blobName = formattedFolder != null
+          ? '$formattedFolder/${DateTime.now().millisecondsSinceEpoch}_$fileName'
           : '${DateTime.now().millisecondsSinceEpoch}_$fileName';
 
       print('Uploading file to $blobName');
@@ -142,7 +144,7 @@ class AzureStorageService {
       // Read file as bytes before uploading to avoid file access issues
       final bytes = await file.readAsBytes();
 
-      await _storage.putBlob(
+      await _storage!.putBlob(
         '/$_containerName/$blobName',
         bodyBytes: bytes,
         contentType: _getContentType(fileName),
@@ -163,19 +165,25 @@ class AzureStorageService {
       {String? folder}) async {
     try {
       // Ensure the service is initialized
-      if (!_initialized) {
-        await initialize();
-        if (!_initialized) {
+      if (!_initialized || _storage == null) {
+        bool success = await initialize();
+        if (!success || _storage == null) {
           throw Exception('Azure Storage Service initialization failed');
         }
       }
 
+      // Format folder name - convert spaces to underscores
+      String? formattedFolder = folder;
+      if (folder != null) {
+        formattedFolder = folder.replaceAll(' ', '_');
+      }
+
       // Create blob name with folder if provided
-      final String blobName = folder != null
-          ? '$folder/${DateTime.now().millisecondsSinceEpoch}_$fileName'
+      final String blobName = formattedFolder != null
+          ? '$formattedFolder/${DateTime.now().millisecondsSinceEpoch}_$fileName'
           : '${DateTime.now().millisecondsSinceEpoch}_$fileName';
 
-      await _storage.putBlob(
+      await _storage!.putBlob(
         '/$_containerName/$blobName',
         bodyBytes: audioData,
         contentType: _getContentType(fileName),
@@ -191,56 +199,7 @@ class AzureStorageService {
     }
   }
 
-  // Download a file from Azure Storage
-  Future<File> downloadFile(String blobUrl, String localPath) async {
-    try {
-      // Ensure the service is initialized
-      if (!_initialized) {
-        await initialize();
-        if (!_initialized) {
-          throw Exception('Azure Storage Service initialization failed');
-        }
-      }
-
-      final uri = Uri.parse(blobUrl);
-      final response = await http.get(uri);
-
-      if (response.statusCode == 200) {
-        final file = File(localPath);
-        await file.writeAsBytes(response.bodyBytes);
-        return file;
-      } else {
-        throw Exception('Failed to download file: ${response.statusCode}');
-      }
-    } catch (e) {
-      print('Error downloading file: $e');
-      throw Exception('Failed to download file: $e');
-    }
-  }
-
-  // Delete a file from Azure Storage
-  Future<void> deleteFile(String blobUrl) async {
-    try {
-      // Ensure the service is initialized
-      if (!_initialized) {
-        await initialize();
-        if (!_initialized) {
-          throw Exception('Azure Storage Service initialization failed');
-        }
-      }
-
-      final uri = Uri.parse(blobUrl);
-      final blobName = uri.pathSegments.last;
-
-      await _storage.deleteBlob('/$_containerName/$blobName');
-      print('File deleted: $blobName');
-    } catch (e) {
-      print('Error deleting file: $e');
-      throw Exception('Failed to delete file: $e');
-    }
-  }
-
-  // Helper method to determine content type
+  // Helper methods remain the same
   String _getContentType(String fileName) {
     final ext = path.extension(fileName).toLowerCase();
     switch (ext) {
@@ -259,6 +218,5 @@ class AzureStorageService {
     }
   }
 
-  // Utility method for min value
   int min(int a, int b) => a < b ? a : b;
 }

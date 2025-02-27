@@ -1,11 +1,10 @@
 import 'package:postgres/postgres.dart';
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:urban_echoes/models/BirdObservation.dart';
 
 class DatabaseService {
-  late PostgreSQLConnection _connection;
+  PostgreSQLConnection? _connection; // Changed from late to nullable
   bool _isConnected = false;
 
   // Singleton pattern
@@ -17,67 +16,85 @@ class DatabaseService {
 
   DatabaseService._internal();
 
-  Future<void> initialize() async {
-    await _createConnection();
+  Future<bool> initialize() async {
+    try {
+      if (_isConnected && _connection != null) return true;
+
+      return await _createConnection();
+    } catch (e) {
+      print('Database initialization failed: $e');
+      return false;
+    }
   }
 
-  Future<void> _createConnection() async {
-    // Get database credentials from environment variables
-    final dbHost = dotenv.env['DB_HOST'] ?? '';
-    final dbName = dotenv.env['DB_NAME'] ?? 'urban_echoes_db';
-    final dbPort = int.tryParse(dotenv.env['DB_PORT'] ?? '5432') ?? 5432;
-    final dbUser = dotenv.env['DB_USER'] ?? '';
-    final dbPassword = dotenv.env['DB_PASSWORD'] ?? '';
-
-    if (dbHost.isEmpty || dbUser.isEmpty || dbPassword.isEmpty) {
-      throw Exception('Database configuration is missing');
-    }
-
-    _connection = PostgreSQLConnection(
-      dbHost,
-      dbPort,
-      dbName,
-      username: dbUser,
-      password: dbPassword,
-      useSSL: true,
-    );
-
+  Future<bool> _createConnection() async {
     try {
-      await _connection.open();
-      _isConnected = true;
+      print('Reading environment variables...');
+      final dbHost = dotenv.env['DB_HOST'] ?? '';
+      final dbUser = dotenv.env['DB_USER'] ?? '';
+      final dbPassword = dotenv.env['DB_PASSWORD'] ?? '';
+
+      if (dbHost.isEmpty || dbUser.isEmpty || dbPassword.isEmpty) {
+        print('Missing database credentials: host=$dbHost, user=$dbUser');
+        return false;
+      }
+
+      print('Creating database connection...');
+      _connection = PostgreSQLConnection(dbHost, 5432, 'urban_echoes_db',
+          username: dbUser, password: dbPassword, useSSL: true);
+
+      await _connection!.open();
       print('Database connection established successfully');
-    } catch (e) {
+      _isConnected = true;
+      return true;
+    } catch (e, stackTrace) {
+      print('Database connection failed: $e');
+      print(stackTrace);
       _isConnected = false;
-      print('Failed to connect to database: $e');
-      throw Exception('Failed to connect to database: $e');
+      return false;
     }
   }
 
   Future<void> closeConnection() async {
-    if (_isConnected) {
-      await _connection.close();
+    if (_isConnected && _connection != null) {
+      await _connection!.close();
       _isConnected = false;
       print('Database connection closed');
     }
   }
 
   // Method to handle reconnection if needed
-  Future<void> _ensureConnection() async {
-    if (!_isConnected) {
+  Future<bool> _ensureConnection() async {
+    if (_connection == null || !_isConnected) {
       try {
-        await _createConnection();
+        return await _createConnection();
       } catch (e) {
-        throw Exception('Failed to reconnect to database: $e');
+        print('Failed to reconnect to database: $e');
+        return false;
       }
+    }
+
+    // Check if connection is still valid
+    try {
+      // Simple query to test connection
+      await _connection!.query('SELECT 1');
+      return true;
+    } catch (e) {
+      print('Connection test failed, reconnecting: $e');
+      _isConnected = false;
+      return await _createConnection();
     }
   }
 
   // Method to add a bird observation to the database
   Future<int> addBirdObservation(BirdObservation observation) async {
-    await _ensureConnection();
+    bool connected = await _ensureConnection();
+    if (!connected || _connection == null) {
+      throw Exception('Database connection not available');
+    }
 
     try {
-      final results = await _connection.query(
+      final results = await _connection!.query(
         '''
         INSERT INTO bird_observations (
           bird_name, 
@@ -127,10 +144,13 @@ class DatabaseService {
 
   // Method to get all bird observations
   Future<List<BirdObservation>> getAllBirdObservations() async {
-    await _ensureConnection();
+    bool connected = await _ensureConnection();
+    if (!connected || _connection == null) {
+      return []; // Return empty list if connection fails
+    }
 
     try {
-      final results = await _connection.query('''
+      final results = await _connection!.query('''
         SELECT 
           id, 
           bird_name, 
@@ -162,7 +182,7 @@ class DatabaseService {
           .toList();
     } catch (e) {
       print('Error fetching bird observations: $e');
-      throw Exception('Error fetching bird observations: $e');
+      return []; // Return empty list on error
     }
   }
 }

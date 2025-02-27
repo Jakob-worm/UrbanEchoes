@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 class BirdObservation {
   final int? id; // null for new records
   final String birdName;

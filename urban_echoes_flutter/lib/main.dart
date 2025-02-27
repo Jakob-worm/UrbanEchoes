@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:urban_echoes/pages/nav_bars_page.dart';
 import 'package:urban_echoes/pages/intro_screen.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 import 'package:provider/provider.dart';
 
-void main() {
-  const bool debugMode = true; // Set to false for Azure deployment
-  runApp(MyApp(debugMode: debugMode));
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
+  runApp(MyApp(debugMode: true));
 }
 
 class MyApp extends StatelessWidget {
@@ -25,11 +27,11 @@ class MyApp extends StatelessWidget {
         title: 'Urban Echoes',
         theme: ThemeData(
           primarySwatch: Colors.blue,
-            bottomNavigationBarTheme: BottomNavigationBarThemeData(
-          backgroundColor: Colors.black, // Change this to a visible color
-          selectedItemColor: Colors.white, // Selected icon color
-          unselectedItemColor: Colors.grey, // Unselected icon color
-        ),
+          bottomNavigationBarTheme: BottomNavigationBarThemeData(
+            backgroundColor: Colors.black, // Change this to a visible color
+            selectedItemColor: Colors.white, // Selected icon color
+            unselectedItemColor: Colors.grey, // Unselected icon color
+          ),
         ),
         home: InitialScreen(),
       ),
