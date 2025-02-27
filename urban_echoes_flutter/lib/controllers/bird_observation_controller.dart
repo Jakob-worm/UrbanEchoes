@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'package:azblob/azblob.dart';
 import 'package:urban_echoes/models/BirdObservation.dart';
 import 'package:urban_echoes/services/AzureStorageService.dart';
 import 'package:urban_echoes/services/DatabaseService.dart';
@@ -8,10 +10,10 @@ import 'package:location/location.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
+import 'package:xml/xml.dart';
 
 class BirdObservationController {
   final DatabaseService _databaseService = DatabaseService();
-  final AzureStorageService _storageService = AzureStorageService();
   final BirdSoundPlayer _soundPlayer = BirdSoundPlayer();
   final Location _location = Location();
 
@@ -130,14 +132,40 @@ class BirdObservationController {
     debugPrint('Checking for existing sound files in $folderPath');
 
     try {
-      final existingSoundUrls = await _storageService.listFiles(folderPath);
-      if (existingSoundUrls.isNotEmpty) {
-        debugPrint('Found existing sound files: $existingSoundUrls');
-        return existingSoundUrls[Random().nextInt(existingSoundUrls.length)];
+      final connectionString =
+          dotenv.env['AZURE_STORAGE_CONNECTION_STRING'] ?? '';
+      final storage = AzureStorage.parse(connectionString);
+
+      // List blobs with the folder path prefix
+      final response = await storage.getBlob(folderPath);
+
+      // Wait for the response to complete and parse the blob information
+      final responseBody = await response.stream.bytesToString();
+
+      // Check if the response is an error (e.g., BlobNotFound)
+      if (responseBody.contains('<Code>BlobNotFound</Code>')) {
+        debugPrint('BlobNotFound: No blobs found in the folder.');
+        return null;
       }
+
+      // Parse the XML response (if it's not an error)
+      final document = XmlDocument.parse(responseBody);
+
+      // Extract blob names from XML response (adjust based on actual XML structure)
+      final blobs = document.findAllElements('Blob').toList();
+
+      if (blobs.isNotEmpty) {
+        debugPrint('Found existing sound files: $blobs');
+        // Pick a random file from the list
+        return blobs[Random().nextInt(blobs.length)]
+            .getElement('Name')
+            ?.innerText;
+      }
+
+      // If no files are found and a new sound file is provided, upload it
       if (soundFile != null) {
-        debugPrint('Uploading new sound file: ${soundFile.path}');
-        return await _storageService.uploadFile(soundFile, folder: folderPath);
+        print('Does not work yet');
+        debugPrint('Uploaded new sound file:');
       }
     } catch (e) {
       debugPrint('Error handling sound files: $e');
