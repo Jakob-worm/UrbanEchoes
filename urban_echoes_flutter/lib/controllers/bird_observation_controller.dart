@@ -21,8 +21,8 @@ class BirdObservationController {
     final missingVars = <String>[];
 
     // Check Azure storage vars
-    if (dotenv.env['AZURE_STORAGE_ACCOUNT']?.isEmpty ?? true)
-      missingVars.add('AZURE_STORAGE_ACCOUNT');
+    if (dotenv.env['AZURE_STORAGE_CONNECTION_STRING']?.isEmpty ?? true)
+      missingVars.add('AZURE_STORAGE_CONNECTION_STRING');
 
     // Check DB vars
     if (dotenv.env['DB_HOST']?.isEmpty ?? true) missingVars.add('DB_HOST');
