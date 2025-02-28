@@ -32,10 +32,18 @@ class _MapPageState extends State<MapPage> {
     10: Colors.black,
   };
 
-  Color getQuantityColor(int quantity) {
-    return quantityColorMap[quantity] ??
-        Colors.grey; // Default if quantity > 10
+  Color getQuantityColor(dynamic quantity) {
+  // Handle null case
+  if (quantity == null) {
+    return Colors.grey; // Default color for null quantity
   }
+  
+  // Convert to int if it's not already
+  final int quantityInt = quantity is int ? quantity : int.tryParse(quantity.toString()) ?? 0;
+  
+  return quantityColorMap[quantityInt] ?? 
+      Colors.grey; // Default if quantity > 10 or invalid
+}
 
   @override
   void initState() {

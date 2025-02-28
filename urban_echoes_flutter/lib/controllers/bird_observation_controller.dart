@@ -14,30 +14,9 @@ import 'package:xml/xml.dart';
 
 class BirdObservationController {
   final DatabaseService _databaseService = DatabaseService();
-  final BirdSoundPlayer _soundPlayer = BirdSoundPlayer();
-  final Location _location = Location();
-
   bool _initialized = false;
-
-  Future<bool> _validateEnvironmentVariables() async {
-    final missingVars = <String>[];
-
-    for (var key in [
-      'AZURE_STORAGE_CONNECTION_STRING',
-      'DB_HOST',
-      'DB_USER',
-      'DB_PASSWORD'
-    ]) {
-      if (dotenv.env[key]?.isEmpty ?? true) missingVars.add(key);
-    }
-
-    if (missingVars.isNotEmpty) {
-      debugPrint(
-          'Missing required environment variables: ${missingVars.join(', ')}');
-      return false;
-    }
-    return true;
-  }
+  final Location _location = Location();
+  final BirdSoundPlayer _soundPlayer = BirdSoundPlayer();
 
   Future<bool> initialize() async {
     if (_initialized) return true;
@@ -89,7 +68,7 @@ class BirdObservationController {
       longitude: locationData.longitude ?? 0.0,
       observationDate: DateTime.now(),
       observationTime: DateFormat('HH:mm:ss').format(DateTime.now()),
-      observerId: null,
+      observerId: 1, //One observerID for now
       quantity: quantity,
     );
 
@@ -102,6 +81,32 @@ class BirdObservationController {
 
     debugPrint('Failed to record observation');
     return false;
+  }
+
+  Future<List<BirdObservation>> getAllObservations() async {
+    return (await initialize())
+        ? await _databaseService.getAllBirdObservations()
+        : [];
+  }
+
+  Future<bool> _validateEnvironmentVariables() async {
+    final missingVars = <String>[];
+
+    for (var key in [
+      'AZURE_STORAGE_CONNECTION_STRING',
+      'DB_HOST',
+      'DB_USER',
+      'DB_PASSWORD'
+    ]) {
+      if (dotenv.env[key]?.isEmpty ?? true) missingVars.add(key);
+    }
+
+    if (missingVars.isNotEmpty) {
+      debugPrint(
+          'Missing required environment variables: ${missingVars.join(', ')}');
+      return false;
+    }
+    return true;
   }
 
   Future<LocationData> _getCurrentLocationOrDefault() async {
@@ -123,60 +128,102 @@ class BirdObservationController {
     }
   }
 
-  Future<String?> _handleSoundFile(
-      String scientificName, File? soundFile) async {
-    if (scientificName.isEmpty) return null;
+// First, let's create helper functions for each major operation
 
-    final folderPath =
-        'bird-sounds/${scientificName.toLowerCase().replaceAll(' ', '_')}';
-    debugPrint('Checking for existing sound files in $folderPath');
+// Helper function to extract Azure storage information from connection string
+Map<String, String> _extractAzureStorageInfo(String connectionString) {
+  final accountName = RegExp(r'AccountName=([^;]+)').firstMatch(connectionString)?.group(1) ?? '';
+  const containerName = 'bird-sounds'; // Replace with your actual container name or make it configurable
+  final baseUrl = 'https://$accountName.blob.core.windows.net/$containerName';
+  
+  return {
+    'accountName': accountName,
+    'containerName': containerName,
+    'baseUrl': baseUrl,
+  };
+}
 
-    try {
-      final connectionString =
-          dotenv.env['AZURE_STORAGE_CONNECTION_STRING'] ?? '';
-      final storage = AzureStorage.parse(connectionString);
+// Helper function to find existing sound files
+Future<String?> _findExistingSoundFile(AzureStorage storage, String folderPath, String baseUrl) async {
+  try {
+    final response = await storage.getBlob(folderPath);
+    final responseBody = await response.stream.bytesToString();
 
-      // List blobs with the folder path prefix
-      final response = await storage.getBlob(folderPath);
-
-      // Wait for the response to complete and parse the blob information
-      final responseBody = await response.stream.bytesToString();
-
-      // Check if the response is an error (e.g., BlobNotFound)
-      if (responseBody.contains('<Code>BlobNotFound</Code>')) {
-        debugPrint('BlobNotFound: No blobs found in the folder.');
-        return null;
-      }
-
-      // Parse the XML response (if it's not an error)
+    // Check if we have valid blobs
+    if (!responseBody.contains('<Code>BlobNotFound</Code>')) {
+      // Parse the XML response
       final document = XmlDocument.parse(responseBody);
-
-      // Extract blob names from XML response (adjust based on actual XML structure)
       final blobs = document.findAllElements('Blob').toList();
 
       if (blobs.isNotEmpty) {
-        debugPrint('Found existing sound files: $blobs');
+        debugPrint('Found ${blobs.length} existing sound files');
         // Pick a random file from the list
-        return blobs[Random().nextInt(blobs.length)]
-            .getElement('Name')
-            ?.innerText;
+        final selectedBlob = blobs[Random().nextInt(blobs.length)];
+        final blobName = selectedBlob.findElements('Name').firstOrNull?.innerText;
+        
+        if (blobName != null) {
+          // Get the full URL for the blob
+          final blobUrl = "$baseUrl/$blobName";
+          debugPrint('Selected sound file: $blobUrl');
+          return blobUrl;
+        }
       }
-
-      // If no files are found and a new sound file is provided, upload it
-      if (soundFile != null) {
-        print('Does not work yet');
-        debugPrint('Uploaded new sound file:');
-      }
-    } catch (e) {
-      debugPrint('Error handling sound files: $e');
     }
+  } catch (e) {
+    debugPrint('Error checking for existing sound files: $e');
+  }
+  
+  return null;
+}
 
-    return null;
+Future<String?> _handleSoundFile(String scientificName, File? soundFile) async {
+  if (scientificName.isEmpty) return null;
+
+  final folderPath = 'bird-sounds/${scientificName.toLowerCase().replaceAll(' ', '_')}'; // No trailing slash
+  debugPrint('Checking for existing sound files in $folderPath');
+
+  try {
+    final connectionString = dotenv.env['AZURE_STORAGE_CONNECTION_STRING'] ?? '';
+    final storage = AzureStorage.parse(connectionString);
+
+    // Extract storage info
+    final storageInfo = _extractAzureStorageInfo(connectionString);
+    final baseUrl = storageInfo['baseUrl'] ?? '';
+    final containerName = storageInfo['containerName'] ?? '';
+
+    // Fetch the raw blob list from Azure
+    final response = await storage.listBlobsRaw(folderPath);
+    final responseBody = await response.stream.bytesToString();
+
+    // Parse XML response
+    final document = XmlDocument.parse(responseBody);
+    final blobs = document.findAllElements('Blob');
+
+    // Debug: Print all retrieved blob names
+    blobs.forEach((blob) {
+      final name = blob.findElements('Name').first.innerText;
+      debugPrint('Found Blob: $name');
+    });
+
+    final mp3Files = blobs
+    .map((blob) => blob.findElements('Name').first.innerText)
+    .where((name) => name.toLowerCase().endsWith('.mp3')) // Only check for ".mp3"
+    .toList();
+
+  if (mp3Files.isNotEmpty) {
+    final selectedFile = mp3Files[Random().nextInt(mp3Files.length)];
+    final blobUrl = '$baseUrl/$containerName/$selectedFile'; // Ensure correct URL format
+
+    debugPrint('Selected sound file: $blobUrl');
+    return blobUrl;
   }
 
-  Future<List<BirdObservation>> getAllObservations() async {
-    return (await initialize())
-        ? await _databaseService.getAllBirdObservations()
-        : [];
+
+    debugPrint('No existing MP3 files found for $scientificName');
+  } catch (e) {
+    debugPrint('Error handling sound files: $e');
   }
+
+  return null;
+}
 }
