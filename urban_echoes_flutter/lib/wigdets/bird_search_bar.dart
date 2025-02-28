@@ -10,14 +10,14 @@ class BirdSearchBar extends StatelessWidget {
   final String errorMessage;
 
   const BirdSearchBar({
-    Key? key,
+    super.key,
     required this.controller,
     required this.onChanged,
     required this.suggestions,
     required this.onValidInput,
     this.isLoading = false,
     this.errorMessage = '',
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

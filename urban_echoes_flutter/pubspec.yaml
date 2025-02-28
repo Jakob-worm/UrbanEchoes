@@ -44,10 +44,16 @@ dependencies:
   path: ^1.9.0
   introduction_screen: ^3.1.16
   shared_preferences: ^2.0.8
-  audioplayers: ^5.2.1
+  audioplayers: ^6.2.0
   dio: ^5.8.0+1
   intl: ^0.20.2
   geolocator: ^13.0.2
+  dotenv: ^4.2.0
+  postgres: ^2.6.1
+  flutter_dotenv: ^5.0.2
+  azblob: ^4.0.0
+  location: ^8.0.0
+  xml: ^6.3.0
 
 dev_dependencies:
   flutter_test:
@@ -70,6 +76,7 @@ flutter:
     - assets/images/dresden-7122254_1920.jpg
     - assets/images/kingfisher-6562537_1920.jpg
     - assets/images/song-sparrow-7942522_1920.jpg
+    - .env
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:

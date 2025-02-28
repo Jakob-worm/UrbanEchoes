@@ -18,6 +18,12 @@ class _MapPageState extends State<MapPage> {
   List<CircleMarker> circles = [];
   final AudioPlayer _audioPlayer = AudioPlayer();
 
+  Color getObservationColor(Map<String, dynamic> obs) {
+    bool? isTestData = obs["is_test_data"];
+    if (isTestData == null) return Colors.grey;
+    return isTestData ? Colors.blue : Colors.red;
+  }
+
   @override
   void initState() {
     final bool debugMode = Provider.of<bool>(context, listen: false);
@@ -27,15 +33,14 @@ class _MapPageState extends State<MapPage> {
 
   Future<void> fetchObservations(bool debugMode) async {
     final String apiUrl = debugMode
-      ? 'http://10.0.2.2:8000/observations'
-      : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
+        ? 'http://10.0.2.2:8000/observations'
+        : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
 
     try {
       final response = await http.get(Uri.parse(apiUrl));
       if (response.statusCode == 200) {
-        final decodedBody = utf8.decode(response.bodyBytes); // Ensures UTF-8 decoding
+        final decodedBody = utf8.decode(response.bodyBytes);
         final data = json.decode(decodedBody);
-
         final List<dynamic> fetchedObservations = data["observations"];
 
         setState(() {
@@ -48,6 +53,8 @@ class _MapPageState extends State<MapPage> {
               "observation_date": obs["observation_date"],
               "observation_time": obs["observation_time"],
               "sound_url": obs["sound_url"],
+              "quantity": obs["quantity"],
+              "is_test_data": obs["is_test_data"] ?? false,
             };
           }).toList();
 
@@ -56,8 +63,8 @@ class _MapPageState extends State<MapPage> {
               point: LatLng(obs["latitude"], obs["longitude"]),
               radius: 100,
               useRadiusInMeter: true,
-              color: Colors.blue.withOpacity(0.3),
-              borderColor: Colors.blue.withOpacity(0.7),
+              color: getObservationColor(obs).withOpacity(0.3),
+              borderColor: getObservationColor(obs).withOpacity(0.7),
               borderStrokeWidth: 2,
             );
           }).toList();
@@ -81,7 +88,7 @@ class _MapPageState extends State<MapPage> {
         LatLng(obs["latitude"], obs["longitude"]),
       );
 
-      if (distance < minDistance && distance <= 100) { // Check if within radius
+      if (distance < minDistance && distance <= 100) {
         minDistance = distance;
         nearestObservation = obs;
       }
@@ -139,7 +146,7 @@ class _MapPageState extends State<MapPage> {
             options: MapOptions(
               initialCenter: LatLng(56.177839, 10.216839),
               initialZoom: 12.0,
-              onTap: (_, tappedPoint) => _onMapTap(tappedPoint), // Handle taps
+              onTap: (_, tappedPoint) => _onMapTap(tappedPoint),
             ),
             children: [
               TileLayer(

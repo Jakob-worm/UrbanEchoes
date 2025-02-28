@@ -10,6 +10,7 @@ enum NavRailPageType {
   takeImage,
   backendTest,
   map,
+  testAudio
   // Add more pages as needed
 }
 
@@ -28,6 +29,7 @@ class PageStateManager extends ChangeNotifier {
     NavRailPageType.takeImage: TakeImagePage(),
     NavRailPageType.backendTest: BackEndTest(),
     NavRailPageType.map: MapPage(),
+    NavRailPageType.testAudio: Placeholder(),
     // Add more pages as needed
   };
 

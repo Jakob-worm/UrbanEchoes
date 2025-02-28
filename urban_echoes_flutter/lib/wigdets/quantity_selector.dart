@@ -7,11 +7,11 @@ class QuantitySelector extends StatelessWidget {
   final Function(int?) onNumberChanged;
 
   const QuantitySelector({
-    Key? key,
+    super.key,
     required this.birdName,
     required this.selectedNumber,
     required this.onNumberChanged,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

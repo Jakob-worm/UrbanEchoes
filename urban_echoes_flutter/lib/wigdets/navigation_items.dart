@@ -32,6 +32,10 @@ class NavigationItems extends StatelessWidget {
         icon: Icon(Icons.map),
         label: Text('Kort'),
       ),
+      NavigationRailDestination(
+        icon: Icon(Icons.audio_file),
+        label: Text('Audio'),
+      ),
     ];
 
     if (isRail) {
