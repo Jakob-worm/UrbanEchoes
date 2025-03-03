@@ -85,6 +85,10 @@ class _AudioPageState extends State<AudioPage> {
                 onPressed: _playNextSound,
                 child: const Text("Play"),
               ),
+            ElevatedButton(
+              onPressed: _playNextSound,
+              child: const Text("Spil næste lyd"),
+            ),
           ],
         ),
       ),
