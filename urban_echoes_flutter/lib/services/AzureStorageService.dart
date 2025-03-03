@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:azblob/azblob.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:path/path.dart' as path;
@@ -31,17 +32,17 @@ class AzureStorageService {
           dotenv.env['AZURE_STORAGE_CONTAINER_NAME'] ?? 'bird-sounds';
 
       if (_storageAccountName!.isEmpty) {
-        print('Azure Storage credentials are missing');
+        debugPrint('Azure Storage credentials are missing');
         return false;
       }
 
       _storage = AzureStorage.parse("");
 
       _initialized = true;
-      print('Azure Storage Service initialized successfully');
+      debugPrint('Azure Storage Service initialized successfully');
       return true;
     } catch (e) {
-      print('Error initializing Azure Storage Service: $e');
+      debugPrint('Error initializing Azure Storage Service: $e');
       _initialized = false;
       return false;
     }
@@ -54,7 +55,7 @@ class AzureStorageService {
       if (!_initialized || _storage == null) {
         bool success = await initialize();
         if (!success || _storage == null) {
-          print(
+          debugPrint(
               'Cannot list files: Azure Storage Service initialization failed');
           return [];
         }
@@ -62,7 +63,7 @@ class AzureStorageService {
 
       // Format folder name - convert spaces to underscores
       String formattedPath = folderPath.replaceAll(' ', '_');
-      print('Looking for files in formatted path: $formattedPath');
+      debugPrint('Looking for files in formatted path: $formattedPath');
 
       // Use a safer approach - download blob directly with folder prefix
       List<String> fileUrls = [];
@@ -94,22 +95,22 @@ class AzureStorageService {
               }
             }
           } catch (xmlError) {
-            print('Error parsing XML response: $xmlError');
-            print(
+            debugPrint('Error parsing XML response: $xmlError');
+            debugPrint(
                 'Response body: ${response.body.substring(0, min(100, response.body.length))}...');
           }
         } else {
-          print('Failed to list blobs: HTTP ${response.statusCode}');
-          print('Response: ${response.body}');
+          debugPrint('Failed to list blobs: HTTP ${response.statusCode}');
+          debugPrint('Response: ${response.body}');
         }
       } catch (httpError) {
-        print('HTTP error while listing blobs: $httpError');
+        debugPrint('HTTP error while listing blobs: $httpError');
       }
 
-      print('Found ${fileUrls.length} files in $formattedPath');
+      debugPrint('Found ${fileUrls.length} files in $formattedPath');
       return fileUrls;
     } catch (e) {
-      print('Error listing files in $folderPath: $e');
+      debugPrint('Error listing files in $folderPath: $e');
       return [];
     }
   }
@@ -139,7 +140,7 @@ class AzureStorageService {
           ? '$formattedFolder/${DateTime.now().millisecondsSinceEpoch}_$fileName'
           : '${DateTime.now().millisecondsSinceEpoch}_$fileName';
 
-      print('Uploading file to $blobName');
+      debugPrint('Uploading file to $blobName');
 
       // Read file as bytes before uploading to avoid file access issues
       final bytes = await file.readAsBytes();
@@ -152,10 +153,10 @@ class AzureStorageService {
 
       final url =
           'https://$_storageAccountName.blob.core.windows.net/$_containerName/$blobName';
-      print('File uploaded: $url');
+      debugPrint('File uploaded: $url');
       return url;
     } catch (e) {
-      print('Error uploading file: $e');
+      debugPrint('Error uploading file: $e');
       throw Exception('Failed to upload file: $e');
     }
   }
@@ -191,10 +192,10 @@ class AzureStorageService {
 
       final url =
           'https://$_storageAccountName.blob.core.windows.net/$_containerName/$blobName';
-      print('Audio data uploaded: $url');
+      debugPrint('Audio data uploaded: $url');
       return url;
     } catch (e) {
-      print('Error uploading audio data: $e');
+      debugPrint('Error uploading audio data: $e');
       throw Exception('Failed to upload audio data: $e');
     }
   }

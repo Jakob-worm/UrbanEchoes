@@ -20,7 +20,6 @@ class _MapPageState extends State<MapPage> {
 
   Color getObservationColor(Map<String, dynamic> obs) {
     bool isTestData = obs["is_test_data"];
-    debugPrint("isTestData: $isTestData");
     return isTestData ? Colors.red : Colors.blue;
   }
 
@@ -67,8 +66,10 @@ class _MapPageState extends State<MapPage> {
               point: LatLng(obs["latitude"], obs["longitude"]),
               radius: 100,
               useRadiusInMeter: true,
-              color: getObservationColor(obs).withOpacity(0.3),
-              borderColor: getObservationColor(obs).withOpacity(0.7),
+              color: getObservationColor(obs).withValues(
+                alpha: 30,
+              ),
+              borderColor: getObservationColor(obs).withValues(alpha: 70),
               borderStrokeWidth: 2,
             );
           }).toList();

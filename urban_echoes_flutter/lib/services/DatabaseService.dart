@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:postgres/postgres.dart';
 import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -22,33 +23,33 @@ class DatabaseService {
 
       return await _createConnection();
     } catch (e) {
-      print('Database initialization failed: $e');
+      debugPrint('Database initialization failed: $e');
       return false;
     }
   }
 
   Future<bool> _createConnection() async {
     try {
-      print('Reading environment variables...');
+      debugPrint('Reading environment variables...');
       final dbHost = dotenv.env['DB_HOST'] ?? '';
       final dbUser = dotenv.env['DB_USER'] ?? '';
       final dbPassword = dotenv.env['DB_PASSWORD'] ?? '';
 
       if (dbHost.isEmpty || dbUser.isEmpty || dbPassword.isEmpty) {
-        print('Missing database credentials: host=$dbHost, user=$dbUser');
+        debugPrint('Missing database credentials: host=$dbHost, user=$dbUser');
         return false;
       }
 
-      print('Creating database connection...');
+      debugPrint('Creating database connection...');
       _connection = PostgreSQLConnection(dbHost, 5432, 'urban_echoes_db ',
           username: dbUser, password: dbPassword, useSSL: true);
 
       await _connection!.open();
-      print('Database connection established successfully');
+      debugPrint('Database connection established successfully');
       _isConnected = true;
       return true;
     } catch (e, stackTrace) {
-      print('Database connection failed: $e');
+      debugPrint('Database connection failed: $e');
       print(stackTrace);
       _isConnected = false;
       return false;
@@ -59,7 +60,7 @@ class DatabaseService {
     if (_isConnected && _connection != null) {
       await _connection!.close();
       _isConnected = false;
-      print('Database connection closed');
+      debugPrint('Database connection closed');
     }
   }
 
@@ -69,7 +70,7 @@ class DatabaseService {
       try {
         return await _createConnection();
       } catch (e) {
-        print('Failed to reconnect to database: $e');
+        debugPrint('Failed to reconnect to database: $e');
         return false;
       }
     }
@@ -80,7 +81,7 @@ class DatabaseService {
       await _connection!.query('SELECT 1');
       return true;
     } catch (e) {
-      print('Connection test failed, reconnecting: $e');
+      debugPrint('Connection test failed, reconnecting: $e');
       _isConnected = false;
       return await _createConnection();
     }
@@ -137,7 +138,7 @@ class DatabaseService {
         throw Exception('Failed to insert bird observation');
       }
     } catch (e) {
-      print('Error adding bird observation: $e');
+      debugPrint('Error adding bird observation: $e');
       throw Exception('Error adding bird observation: $e');
     }
   }
@@ -181,7 +182,7 @@ class DatabaseService {
               ))
           .toList();
     } catch (e) {
-      print('Error fetching bird observations: $e');
+      debugPrint('Error fetching bird observations: $e');
       return []; // Return empty list on error
     }
   }
