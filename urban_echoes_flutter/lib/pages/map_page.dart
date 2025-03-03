@@ -1,10 +1,10 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:http/http.dart' as http;
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
+
+import '../services/ObservationService .dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -23,27 +23,17 @@ class _MapPageState extends State<MapPage> {
     return isTestData ? Colors.red : Colors.blue;
   }
 
-  @override
-  void initState() {
-    final bool debugMode = Provider.of<bool>(context, listen: false);
-    super.initState();
-    fetchObservations(debugMode);
-  }
-
-  Future<void> fetchObservations(bool debugMode) async {
-    final String apiUrl = debugMode
-        ? 'http://10.0.2.2:8000/observations'
-        : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
-
-    try {
-      final response = await http.get(Uri.parse(apiUrl));
-      if (response.statusCode == 200) {
-        final decodedBody = utf8.decode(response.bodyBytes);
-        final data = json.decode(decodedBody);
-        final List<dynamic> fetchedObservations = data["observations"];
-
-        setState(() {
-          observations = fetchedObservations.map((obs) {
+@override
+void initState() {
+  final bool debugMode = Provider.of<bool>(context, listen: false);
+  final String apiUrl = debugMode
+      ? 'http://10.0.2.2:8000/observations'
+      : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
+  super.initState();
+  
+  ObservationService(apiUrl: apiUrl).fetchObservations().then((data) {
+    setState(() {
+       observations = data.map((obs) {
             return {
               "id": obs["id"],
               "bird_name": obs["bird_name"],
@@ -60,7 +50,6 @@ class _MapPageState extends State<MapPage> {
               "test_batch_id": obs["test_batch_id"],
             };
           }).toList();
-
           circles = observations.map((obs) {
             return CircleMarker(
               point: LatLng(obs["latitude"], obs["longitude"]),
@@ -73,14 +62,9 @@ class _MapPageState extends State<MapPage> {
               borderStrokeWidth: 2,
             );
           }).toList();
-        });
-      } else {
-        throw Exception("Failed to load observations");
-      }
-    } catch (e) {
-      print("Error fetching observations: $e");
-    }
-  }
+    });
+  });
+}
 
   void _onMapTap(LatLng tappedPoint) {
     double minDistance = double.infinity;
