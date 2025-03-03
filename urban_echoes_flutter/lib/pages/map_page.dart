@@ -19,9 +19,9 @@ class _MapPageState extends State<MapPage> {
   final AudioPlayer _audioPlayer = AudioPlayer();
 
   Color getObservationColor(Map<String, dynamic> obs) {
-    bool? isTestData = obs["is_test_data"];
-    if (isTestData == null) return Colors.grey;
-    return isTestData ? Colors.blue : Colors.red;
+    bool isTestData = obs["is_test_data"];
+    debugPrint("isTestData: $isTestData");
+    return isTestData ? Colors.red : Colors.blue;
   }
 
   @override
@@ -46,15 +46,19 @@ class _MapPageState extends State<MapPage> {
         setState(() {
           observations = fetchedObservations.map((obs) {
             return {
-              "latitude": obs["latitude"],
-              "longitude": obs["longitude"],
+              "id": obs["id"],
               "bird_name": obs["bird_name"],
               "scientific_name": obs["scientific_name"],
+              "sound_url": obs["sound_url"],
+              "latitude": obs["latitude"],
+              "longitude": obs["longitude"],
               "observation_date": obs["observation_date"],
               "observation_time": obs["observation_time"],
-              "sound_url": obs["sound_url"],
+              "observer_id": obs["observer_id"],
+              "created_at": obs["created_at"],
               "quantity": obs["quantity"],
-              "is_test_data": obs["is_test_data"] ?? false,
+              "is_test_data": obs["is_test_data"],
+              "test_batch_id": obs["test_batch_id"],
             };
           }).toList();
 
