@@ -54,6 +54,7 @@ dependencies:
   azblob: ^4.0.0
   location: ^8.0.0
   xml: ^6.3.0
+  just_audio: ^0.9.46
 
 dev_dependencies:
   flutter_test:

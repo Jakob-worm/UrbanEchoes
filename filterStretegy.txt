@@ -1,0 +1,58 @@
+# Bird Call Noise Filtering Strategy for Flutter App
+
+## Technical Approaches to Isolating Bird Calls
+
+### 1. Spectral Subtraction Technique
+- Utilize spectral subtraction algorithms to remove background noise
+- Create a noise profile by analyzing quiet sections of the recording
+- Subtract this noise profile from the full recording
+- Effective for stationary background noises like wind or ambient environment sounds
+
+### 2. Machine Learning-Based Noise Reduction
+- Train a deep learning model (CNN or LSTM) to:
+  - Recognize bird call spectral signatures
+  - Distinguish between bird calls and other sounds
+- Potential frameworks:
+  - TensorFlow Lite for Flutter
+  - Keras with audio preprocessing libraries
+- Requires a large dataset of labeled bird call recordings
+
+### 3. Frequency-Based Filtering
+- Most bird calls occur in specific frequency ranges (typically 2-8 kHz)
+- Implement bandpass filters to:
+  - Remove low-frequency rumbles
+  - Cut out high-frequency environmental noise
+- Use libraries like `audio_processing` in Dart/Flutter
+
+### 4. Energy-Based Detection
+- Analyze sound energy and temporal characteristics
+- Identify short, distinct sound events typical of bird calls
+- Threshold-based approach to isolate potential bird call segments
+
+### Recommended Implementation Steps
+1. Preprocessing
+   - Convert audio to spectrogram
+   - Normalize audio amplitude
+   - Apply initial noise reduction
+
+2. Feature Extraction
+   - Extract spectral features
+   - Compute mel-frequency cepstral coefficients (MFCCs)
+   - Analyze temporal dynamics
+
+3. Noise Reduction Techniques
+   - Combine multiple approaches:
+     * Spectral subtraction
+     * Frequency filtering
+     * Machine learning classification
+
+### Flutter/Dart Libraries to Consider
+- `audio_processing`
+- `just_audio`
+- `audio_waveforms`
+- TensorFlow Lite for mobile ML
+
+### Potential Challenges
+- Variability in bird call recordings
+- Complex acoustic environments
+- Computational overhead of advanced filtering
