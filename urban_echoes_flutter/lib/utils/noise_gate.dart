@@ -1,151 +1,64 @@
-import 'dart:math';
-import 'package:flutter/material.dart';
+import 'dart:typed_data';
 
 class NoiseGate {
-  // Parameters for noise gate
-  final double threshold; // Amplitude threshold to trigger the gate
-  final double attackTime; // How quickly the gate opens
-  final double releaseTime; // How quickly the gate closes
-  final double sampleRate; // Audio sample rate
+  final double threshold;
+  final double attackTime;
+  final double releaseTime;
+  final double sampleRate;
 
   NoiseGate({
-    this.threshold = 0.1, // Default threshold (adjust based on your audio)
-    this.attackTime = 0.01, // 10ms attack time
-    this.releaseTime = 0.1, // 100ms release time
-    this.sampleRate = 44100.0, // Standard sample rate
+    this.threshold = 0.1,
+    this.attackTime = 0.01,
+    this.releaseTime = 0.1,
+    this.sampleRate = 44100.0,
   });
 
-  // Apply noise gate to audio samples
-  List<double> process(List<double> inputSamples) {
-    List<double> outputSamples = List.from(inputSamples);
+  // Simplified noise gate processing for byte data
+  Uint8List processAudioBytes(Uint8List inputBytes) {
+    // Convert byte data to Float32List
+    Float32List samples = _convertBytesToFloat32(inputBytes);
     
-    // Calculate attack and release coefficients
-    double attackCoeff = calculateCoefficient(attackTime);
-    double releaseCoeff = calculateCoefficient(releaseTime);
+    // Process samples
+    Float32List processedSamples = _processSamples(samples);
     
-    // State variables for envelope tracking
-    double envelopeOut = 0.0;
+    // Convert back to byte data
+    return _convertFloat32ToBytes(processedSamples);
+  }
+
+  Float32List _processSamples(Float32List inputSamples) {
+    Float32List outputSamples = Float32List.fromList(inputSamples);
     
     for (int i = 0; i < inputSamples.length; i++) {
-      // Calculate absolute value (envelope) of the signal
-      double envIn = inputSamples[i].abs();
-      
-      // Envelope detection with different attack and release rates
-      if (envIn > envelopeOut) {
-        // Attack phase
-        envelopeOut += (envIn - envelopeOut) * attackCoeff;
-      } else {
-        // Release phase
-        envelopeOut += (envIn - envelopeOut) * releaseCoeff;
-      }
-      
-      // Apply noise gate
-      if (envelopeOut < threshold) {
-        // Below threshold: attenuate or mute
-        outputSamples[i] = 0.0; // Mute
-        // Alternative: soft attenuation
-        // outputSamples[i] *= 0.1; // Reduce volume instead of complete mute
+      // Simple threshold-based noise reduction
+      if (inputSamples[i].abs() < threshold) {
+        outputSamples[i] = 0.0;
       }
     }
     
     return outputSamples;
   }
 
-  // Calculate coefficient for envelope tracking
-  double calculateCoefficient(double time) {
-    // Convert time constant to coefficient
-    return 1.0 - exp(-1.0 / (time * sampleRate));
-  }
-}
-
-class NoiseGateDemo extends StatefulWidget {
-  @override
-  _NoiseGateDemoState createState() => _NoiseGateDemoState();
-}
-
-class _NoiseGateDemoState extends State<NoiseGateDemo> {
-  // Noise gate parameters
-  double _threshold = 0.1;
-  double _attackTime = 0.01;
-  double _releaseTime = 0.1;
-
-  // Noise gate instance
-  late NoiseGate _noiseGate;
-
-  @override
-  void initState() {
-    super.initState();
-    _noiseGate = NoiseGate(
-      threshold: _threshold,
-      attackTime: _attackTime,
-      releaseTime: _releaseTime,
-    );
+  // Utility methods for byte conversion
+  Float32List _convertBytesToFloat32(Uint8List bytes) {
+    // Assumes 16-bit PCM audio
+    Float32List floats = Float32List(bytes.length ~/ 2);
+    for (int i = 0; i < floats.length; i++) {
+      // Convert 16-bit signed integer to float
+      int sample = bytes[i * 2] | (bytes[i * 2 + 1] << 8);
+      if (sample > 32767) sample -= 65536;
+      floats[i] = sample / 32768.0;
+    }
+    return floats;
   }
 
-  // Method to apply noise gate to audio samples
-  List<double> applyNoiseGate(List<double> audioSamples) {
-    return _noiseGate.process(audioSamples);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Noise Gate Demo')),
-      body: Column(
-        children: [
-          // Threshold Slider
-          Slider(
-            value: _threshold,
-            min: 0.01,
-            max: 1.0,
-            label: 'Threshold: ${(_threshold * 100).toStringAsFixed(2)}%',
-            onChanged: (value) {
-              setState(() {
-                _threshold = value;
-                _noiseGate = NoiseGate(
-                  threshold: _threshold,
-                  attackTime: _attackTime,
-                  releaseTime: _releaseTime,
-                );
-              });
-            },
-          ),
-          // Attack Time Slider
-          Slider(
-            value: _attackTime,
-            min: 0.001,
-            max: 0.1,
-            label: 'Attack Time: ${(_attackTime * 1000).toStringAsFixed(2)}ms',
-            onChanged: (value) {
-              setState(() {
-                _attackTime = value;
-                _noiseGate = NoiseGate(
-                  threshold: _threshold,
-                  attackTime: _attackTime,
-                  releaseTime: _releaseTime,
-                );
-              });
-            },
-          ),
-          // Release Time Slider
-          Slider(
-            value: _releaseTime,
-            min: 0.01,
-            max: 0.5,
-            label: 'Release Time: ${(_releaseTime * 1000).toStringAsFixed(2)}ms',
-            onChanged: (value) {
-              setState(() {
-                _releaseTime = value;
-                _noiseGate = NoiseGate(
-                  threshold: _threshold,
-                  attackTime: _attackTime,
-                  releaseTime: _releaseTime,
-                );
-              });
-            },
-          ),
-        ],
-      ),
-    );
+  Uint8List _convertFloat32ToBytes(Float32List floats) {
+    Uint8List bytes = Uint8List(floats.length * 2);
+    for (int i = 0; i < floats.length; i++) {
+      // Convert float back to 16-bit PCM
+      int sample = (floats[i] * 32767).toInt();
+      bytes[i * 2] = sample & 0xFF;
+      bytes[i * 2 + 1] = (sample >> 8) & 0xFF;
+    }
+    return bytes;
   }
 }
