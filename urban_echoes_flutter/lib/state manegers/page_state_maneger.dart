@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:urban_echoes/pages/AudioPage.dart';
+import 'package:urban_echoes/pages/NoiseGateTestPage.dart';
 import 'package:urban_echoes/pages/backend_test.dart';
 import 'package:urban_echoes/pages/home_page.dart';
 import 'package:urban_echoes/pages/make_observation/make_observation_page.dart';
@@ -30,7 +31,7 @@ class PageStateManager extends ChangeNotifier {
     NavRailPageType.takeImage: TakeImagePage(),
     NavRailPageType.backendTest: BackEndTest(),
     NavRailPageType.map: MapPage(),
-    NavRailPageType.testAudio: AudioPage(),
+    NavRailPageType.testAudio: NoiseGateTestPage(),
     // Add more pages as needed
   };
 
