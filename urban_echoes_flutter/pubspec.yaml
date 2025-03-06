@@ -78,6 +78,8 @@ flutter:
     - assets/images/dresden-7122254_1920.jpg
     - assets/images/kingfisher-6562537_1920.jpg
     - assets/images/song-sparrow-7942522_1920.jpg
+    - assets/audio/XC944072 - Bougainvillesanger - Cincloramphus llaneae.wav
+    - assets/audio/XC521615 - Blåmejse - Cyanistes caeruleus.mp3
     - .env
   uses-material-design: true
 

@@ -1,5 +1,6 @@
 import 'dart:typed_data';
-import 'package:flutter/foundation.dart' show kIsWeb;
+
+import 'package:flutter/material.dart';
 
 class NoiseGate {
   final double threshold;
@@ -19,17 +20,17 @@ class NoiseGate {
     try {
       // Detect input audio format
       AudioFormat format = _detectAudioFormat(inputBytes);
-      
+
       // Convert bytes to float samples based on format
       Float32List samples = _convertBytesToFloat32(inputBytes, format);
-      
+
       // Process samples with noise gate
       Float32List processedSamples = _processSamples(samples);
-      
+
       // Convert back to original format
       return _convertFloat32ToBytes(processedSamples, format);
     } catch (e) {
-      print('Noise gate processing error: $e');
+      debugPrint('Noise gate processing error: $e');
       return inputBytes; // Return original if processing fails
     }
   }
@@ -38,10 +39,10 @@ class NoiseGate {
   Float32List _processSamples(Float32List inputSamples) {
     Float32List outputSamples = Float32List.fromList(inputSamples);
     double envelopeFollower = 0.0;
-    
+
     for (int i = 0; i < inputSamples.length; i++) {
       double absSample = inputSamples[i].abs();
-      
+
       // Soft knee noise gate
       if (absSample < threshold) {
         // Soft fade out below threshold
@@ -49,7 +50,7 @@ class NoiseGate {
         outputSamples[i] *= attenuation;
       }
     }
-    
+
     return outputSamples;
   }
 
@@ -57,9 +58,9 @@ class NoiseGate {
   double _softKnee(double sample) {
     // Smooth transition around threshold
     if (sample < threshold * 0.5) {
-      return 0.0;  // Complete silence for very low levels
+      return 0.0; // Complete silence for very low levels
     }
-    
+
     // Gradual reduction near threshold
     return (sample - threshold) / (1.0 - threshold);
   }
@@ -74,7 +75,7 @@ class NoiseGate {
     } else if (bytes.length % 3 == 0) {
       return AudioFormat.pcm24Bit;
     }
-    
+
     // Default fallback
     return AudioFormat.pcm16Bit;
   }
@@ -108,9 +109,8 @@ class NoiseGate {
   Float32List _convertPcm24ToFloat32(Uint8List bytes) {
     Float32List floats = Float32List(bytes.length ~/ 3);
     for (int i = 0; i < floats.length; i++) {
-      int sample = bytes[i * 3] | 
-                   (bytes[i * 3 + 1] << 8) | 
-                   (bytes[i * 3 + 2] << 16);
+      int sample =
+          bytes[i * 3] | (bytes[i * 3 + 1] << 8) | (bytes[i * 3 + 2] << 16);
       if (sample > 8388607) sample -= 16777216;
       floats[i] = sample / 8388608.0;
     }
@@ -121,7 +121,7 @@ class NoiseGate {
   Float32List _convertPcm32ToFloat32(Uint8List bytes) {
     Float32List floats = Float32List(bytes.length ~/ 4);
     ByteData byteData = ByteData.sublistView(bytes);
-    
+
     for (int i = 0; i < floats.length; i++) {
       int sample = byteData.getInt32(i * 4, Endian.little);
       floats[i] = sample / 2147483648.0;
@@ -170,7 +170,7 @@ class NoiseGate {
   Uint8List _convertFloat32ToPcm32(Float32List floats) {
     Uint8List bytes = Uint8List(floats.length * 4);
     ByteData byteData = ByteData.sublistView(bytes);
-    
+
     for (int i = 0; i < floats.length; i++) {
       int sample = (floats[i] * 2147483647).toInt();
       byteData.setInt32(i * 4, sample, Endian.little);

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 class ObservationService {
@@ -16,7 +17,7 @@ class ObservationService {
         throw Exception("Failed to load observations");
       }
     } catch (e) {
-      print("Error fetching observations: $e");
+      debugPrint("Error fetching observations: $e");
       return [];
     }
   }
