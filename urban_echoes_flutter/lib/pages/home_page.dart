@@ -5,6 +5,8 @@ import 'package:urban_echoes/wigdets/big_custom_button.dart';
 import 'dart:math';
 
 class HomePage extends StatelessWidget {
+  HomePage({super.key});
+
   // List of image paths
   final List<String> images = [
     'assets/images/dresden-7122254_1920.jpg',
@@ -15,8 +17,6 @@ class HomePage extends StatelessWidget {
 
   // Generate a random index
   final random = Random();
-
-  HomePage({super.key});
 
   String getRandomImage() {
     return images[random.nextInt(images.length)];
@@ -49,9 +49,15 @@ class HomePage extends StatelessWidget {
               imageUrl: getRandomImage(), // Use the random image
             ),
             BigCustomButton(
+              text: 'Opret tur',
+              onPressed: () =>
+              handleButtonPress(context, ButtonPageType.profile),
+              height: 50,),
+            BigCustomButton(
               text: 'Profil',
               onPressed: () =>
                   handleButtonPress(context, ButtonPageType.profile),
+              height: 50,
             ),
           ],
         ),

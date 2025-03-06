@@ -1,10 +1,10 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:http/http.dart' as http;
-import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
+import 'package:urban_echoes/services/bird_sound_player.dart';
+
+import '../services/ObservationService .dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -16,65 +16,59 @@ class MapPage extends StatefulWidget {
 class _MapPageState extends State<MapPage> {
   List<Map<String, dynamic>> observations = [];
   List<CircleMarker> circles = [];
-  final AudioPlayer _audioPlayer = AudioPlayer();
-
-  Color getObservationColor(Map<String, dynamic> obs) {
-    bool? isTestData = obs["is_test_data"];
-    if (isTestData == null) return Colors.grey;
-    return isTestData ? Colors.blue : Colors.red;
-  }
+  late BirdSoundPlayer _birdSoundPlayer;
+  double _noiseGateThreshold = 0.1;
 
   @override
   void initState() {
-    final bool debugMode = Provider.of<bool>(context, listen: false);
     super.initState();
-    fetchObservations(debugMode);
-  }
+    
+    // Initialize BirdSoundPlayer with default noise gate settings
+    _birdSoundPlayer = BirdSoundPlayer(
+    );
 
-  Future<void> fetchObservations(bool debugMode) async {
+    final bool debugMode = Provider.of<bool>(context, listen: false);
     final String apiUrl = debugMode
         ? 'http://10.0.2.2:8000/observations'
         : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
+    
+    ObservationService(apiUrl: apiUrl).fetchObservations().then((data) {
+      setState(() {
+        observations = data.map((obs) {
+          return {
+            "id": obs["id"],
+            "bird_name": obs["bird_name"],
+            "scientific_name": obs["scientific_name"],
+            "sound_url": obs["sound_url"],
+            "latitude": obs["latitude"],
+            "longitude": obs["longitude"],
+            "observation_date": obs["observation_date"],
+            "observation_time": obs["observation_time"],
+            "observer_id": obs["observer_id"],
+            "created_at": obs["created_at"],
+            "quantity": obs["quantity"],
+            "is_test_data": obs["is_test_data"],
+            "test_batch_id": obs["test_batch_id"],
+          };
+        }).toList();
+        
+        circles = observations.map((obs) {
+          return CircleMarker(
+            point: LatLng(obs["latitude"], obs["longitude"]),
+            radius: 100,
+            useRadiusInMeter: true,
+            color: getObservationColor(obs).withOpacity(0.3),
+            borderColor: getObservationColor(obs).withOpacity(0.7),
+            borderStrokeWidth: 2,
+          );
+        }).toList();
+      });
+    });
+  }
 
-    try {
-      final response = await http.get(Uri.parse(apiUrl));
-      if (response.statusCode == 200) {
-        final decodedBody = utf8.decode(response.bodyBytes);
-        final data = json.decode(decodedBody);
-        final List<dynamic> fetchedObservations = data["observations"];
-
-        setState(() {
-          observations = fetchedObservations.map((obs) {
-            return {
-              "latitude": obs["latitude"],
-              "longitude": obs["longitude"],
-              "bird_name": obs["bird_name"],
-              "scientific_name": obs["scientific_name"],
-              "observation_date": obs["observation_date"],
-              "observation_time": obs["observation_time"],
-              "sound_url": obs["sound_url"],
-              "quantity": obs["quantity"],
-              "is_test_data": obs["is_test_data"] ?? false,
-            };
-          }).toList();
-
-          circles = observations.map((obs) {
-            return CircleMarker(
-              point: LatLng(obs["latitude"], obs["longitude"]),
-              radius: 100,
-              useRadiusInMeter: true,
-              color: getObservationColor(obs).withOpacity(0.3),
-              borderColor: getObservationColor(obs).withOpacity(0.7),
-              borderStrokeWidth: 2,
-            );
-          }).toList();
-        });
-      } else {
-        throw Exception("Failed to load observations");
-      }
-    } catch (e) {
-      print("Error fetching observations: $e");
-    }
+  Color getObservationColor(Map<String, dynamic> obs) {
+    bool isTestData = obs["is_test_data"];
+    return isTestData ? Colors.red : Colors.blue;
   }
 
   void _onMapTap(LatLng tappedPoint) {
@@ -105,18 +99,35 @@ class _MapPageState extends State<MapPage> {
       builder: (BuildContext context) {
         return AlertDialog(
           title: Text(observation["bird_name"]),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text("Scientific Name: ${observation["scientific_name"]}"),
-              Text("Date: ${observation["observation_date"]}"),
-              Text("Time: ${observation["observation_time"]}"),
-              const SizedBox(height: 10),
-              ElevatedButton(
-                onPressed: () => _playSound(observation["sound_url"]),
-                child: const Text("Play Bird Sound"),
-              ),
-            ],
+          content: StatefulBuilder(
+            builder: (BuildContext context, StateSetter setState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text("Scientific Name: ${observation["scientific_name"]}"),
+                  Text("Date: ${observation["observation_date"]}"),
+                  Text("Time: ${observation["observation_time"]}"),
+                  const SizedBox(height: 10),
+                  // Noise Gate Threshold Slider
+                  Slider(
+                    value: _noiseGateThreshold,
+                    min: 0.01,
+                    max: 1.0,
+                    divisions: 100,
+                    label: 'Noise Gate Threshold: ${(_noiseGateThreshold * 100).toStringAsFixed(2)}%',
+                    onChanged: (value) {
+                      setState(() {
+                        _noiseGateThreshold = value;
+                      });
+                    },
+                  ),
+                  ElevatedButton(
+                    onPressed: () => _playSound(observation["sound_url"]),
+                    child: const Text("Play Bird Sound"),
+                  ),
+                ],
+              );
+            },
           ),
           actions: [
             TextButton(
@@ -129,11 +140,15 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
-  void _playSound(String soundUrl) async {
+  void _playSound(String soundUrl) {
     try {
-      await _audioPlayer.play(UrlSource(soundUrl));
+      _birdSoundPlayer.playSound(
+        soundUrl
+      );
     } catch (e) {
-      print("Error playing sound: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error playing sound: $e')),
+      );
     }
   }
 
@@ -159,5 +174,11 @@ class _MapPageState extends State<MapPage> {
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _birdSoundPlayer.dispose();
+    super.dispose();
   }
 }
