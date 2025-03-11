@@ -39,7 +39,7 @@ class _MapPageState extends State<MapPage> {
             "id": obs["id"],
             "bird_name": obs["bird_name"],
             "scientific_name": obs["scientific_name"],
-            "sound_url": obs["sound_url"],
+            "sound_directory": obs["sound_directory"],
             "latitude": obs["latitude"],
             "longitude": obs["longitude"],
             "observation_date": obs["observation_date"],
@@ -122,7 +122,7 @@ class _MapPageState extends State<MapPage> {
                     },
                   ),
                   ElevatedButton(
-                    onPressed: () => _playSound(observation["sound_url"]),
+                    onPressed: () => _playSound(observation["sound_directory"]),
                     child: const Text("Play Bird Sound"),
                   ),
                 ],
@@ -142,7 +142,7 @@ class _MapPageState extends State<MapPage> {
 
   void _playSound(String soundUrl) {
     try {
-      _birdSoundPlayer.playSound(
+      _birdSoundPlayer.playRandomSound(
         soundUrl
       );
     } catch (e) {
