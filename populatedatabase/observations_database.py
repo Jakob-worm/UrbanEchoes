@@ -66,7 +66,7 @@ def create_bird_observations_table(db):
             id SERIAL PRIMARY KEY,
             bird_name VARCHAR(255) NOT NULL,
             scientific_name VARCHAR(255),
-            sound_url TEXT,
+            sound_directory TEXT,
             latitude DECIMAL(10, 7) NOT NULL,
             longitude DECIMAL(10, 7) NOT NULL,
             observation_date DATE NOT NULL,
