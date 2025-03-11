@@ -72,7 +72,7 @@ def get_observations():
     cursor = conn.cursor(cursor_factory=RealDictCursor)
     
     cursor.execute("""
-        SELECT id, bird_name, scientific_name, sound_url, latitude, longitude, observation_date, observation_time, observer_id, created_at, quantity, is_test_data, test_batch_id
+        SELECT id, bird_name, scientific_name, sound_directory, latitude, longitude, observation_date, observation_time, observer_id, created_at, quantity, is_test_data, test_batch_id
         FROM bird_observations
     """)
     
