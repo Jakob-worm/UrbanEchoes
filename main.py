@@ -32,7 +32,7 @@ def get_db_connection():
         password=os.getenv("DB_PASSWORD"),
         host=os.getenv("DB_HOST"),
         port=os.getenv("DB_PORT", 5432),
-        database=os.getenv("DB_NAME", "urban_echoes_db "),
+        database=os.getenv("DB_NAME ", "urban_echoes_db "),
         sslmode="require"
     )
 
