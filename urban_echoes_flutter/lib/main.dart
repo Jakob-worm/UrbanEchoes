@@ -12,7 +12,7 @@ import 'services/LocationService.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
-  runApp(MyApp(debugMode: true));
+  runApp(MyApp(debugMode: false));
 }
 
 class MyApp extends StatelessWidget {
