@@ -10,7 +10,7 @@ class BirdSoundPlayer {
   Future<void> playRandomSound(String folderPath) async {
     try {
       // Fetch the list of available sound files from Azure Storage
-      print("folder path " + folderPath);
+      print("folder path $folderPath");
       List<String> files = await _storageService.listFiles(folderPath);
 
       if (files.isEmpty) {
