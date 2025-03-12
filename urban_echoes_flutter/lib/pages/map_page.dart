@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
-import 'package:urban_echoes/services/bird_sound_player.dart';
-
-import '../services/ObservationService .dart';
+import 'package:urban_echoes/services/ObservationService.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -16,15 +14,10 @@ class MapPage extends StatefulWidget {
 class _MapPageState extends State<MapPage> {
   List<Map<String, dynamic>> observations = [];
   List<CircleMarker> circles = [];
-  late BirdSoundPlayer _birdSoundPlayer;
-  double _noiseGateThreshold = 0.1;
 
   @override
   void initState() {
     super.initState();
-
-    // Initialize BirdSoundPlayer with default noise gate settings
-    _birdSoundPlayer = BirdSoundPlayer();
 
     final bool debugMode = Provider.of<bool>(context, listen: false);
     final String apiUrl = debugMode
@@ -115,24 +108,6 @@ class _MapPageState extends State<MapPage> {
                   Text("Date: ${observation["observation_date"]}"),
                   Text("Time: ${observation["observation_time"]}"),
                   const SizedBox(height: 10),
-                  // Noise Gate Threshold Slider
-                  Slider(
-                    value: _noiseGateThreshold,
-                    min: 0.01,
-                    max: 1.0,
-                    divisions: 100,
-                    label:
-                        'Noise Gate Threshold: ${(_noiseGateThreshold * 100).toStringAsFixed(2)}%',
-                    onChanged: (value) {
-                      setState(() {
-                        _noiseGateThreshold = value;
-                      });
-                    },
-                  ),
-                  ElevatedButton(
-                    onPressed: () => _playSound(observation["sound_directory"]),
-                    child: const Text("Play Bird Sound"),
-                  ),
                 ],
               );
             },
@@ -146,16 +121,6 @@ class _MapPageState extends State<MapPage> {
         );
       },
     );
-  }
-
-  void _playSound(String soundUrl) {
-    try {
-      _birdSoundPlayer.playRandomSound(soundUrl);
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error playing sound: $e')),
-      );
-    }
   }
 
   @override
@@ -180,11 +145,5 @@ class _MapPageState extends State<MapPage> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _birdSoundPlayer.dispose();
-    super.dispose();
   }
 }
