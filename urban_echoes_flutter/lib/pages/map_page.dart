@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
-import 'package:urban_echoes/services/bird_sound_player.dart';
-
-import '../services/ObservationService .dart';
+import 'package:urban_echoes/services/ObservationService.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -16,22 +14,17 @@ class MapPage extends StatefulWidget {
 class _MapPageState extends State<MapPage> {
   List<Map<String, dynamic>> observations = [];
   List<CircleMarker> circles = [];
-  late BirdSoundPlayer _birdSoundPlayer;
-  double _noiseGateThreshold = 0.1;
+  double _zoomLevel = 16.0; // Set initial zoom level.
 
   @override
   void initState() {
     super.initState();
-    
-    // Initialize BirdSoundPlayer with default noise gate settings
-    _birdSoundPlayer = BirdSoundPlayer(
-    );
 
     final bool debugMode = Provider.of<bool>(context, listen: false);
     final String apiUrl = debugMode
         ? 'http://10.0.2.2:8000/observations'
         : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
-    
+
     ObservationService(apiUrl: apiUrl).fetchObservations().then((data) {
       setState(() {
         observations = data.map((obs) {
@@ -39,7 +32,7 @@ class _MapPageState extends State<MapPage> {
             "id": obs["id"],
             "bird_name": obs["bird_name"],
             "scientific_name": obs["scientific_name"],
-            "sound_url": obs["sound_url"],
+            "sound_directory": obs["sound_directory"],
             "latitude": obs["latitude"],
             "longitude": obs["longitude"],
             "observation_date": obs["observation_date"],
@@ -51,7 +44,7 @@ class _MapPageState extends State<MapPage> {
             "test_batch_id": obs["test_batch_id"],
           };
         }).toList();
-        
+
         circles = observations.map((obs) {
           return CircleMarker(
             point: LatLng(obs["latitude"], obs["longitude"]),
@@ -68,7 +61,15 @@ class _MapPageState extends State<MapPage> {
 
   Color getObservationColor(Map<String, dynamic> obs) {
     bool isTestData = obs["is_test_data"];
-    return isTestData ? Colors.red : Colors.blue;
+    int observerId = obs["observer_id"] ?? -1; // Default to -1 if null
+
+    if (observerId == 0) {
+      return Colors.green;
+    } else if (isTestData) {
+      return Colors.red;
+    } else {
+      return Colors.blue;
+    }
   }
 
   void _onMapTap(LatLng tappedPoint) {
@@ -108,23 +109,6 @@ class _MapPageState extends State<MapPage> {
                   Text("Date: ${observation["observation_date"]}"),
                   Text("Time: ${observation["observation_time"]}"),
                   const SizedBox(height: 10),
-                  // Noise Gate Threshold Slider
-                  Slider(
-                    value: _noiseGateThreshold,
-                    min: 0.01,
-                    max: 1.0,
-                    divisions: 100,
-                    label: 'Noise Gate Threshold: ${(_noiseGateThreshold * 100).toStringAsFixed(2)}%',
-                    onChanged: (value) {
-                      setState(() {
-                        _noiseGateThreshold = value;
-                      });
-                    },
-                  ),
-                  ElevatedButton(
-                    onPressed: () => _playSound(observation["sound_url"]),
-                    child: const Text("Play Bird Sound"),
-                  ),
                 ],
               );
             },
@@ -140,18 +124,6 @@ class _MapPageState extends State<MapPage> {
     );
   }
 
-  void _playSound(String soundUrl) {
-    try {
-      _birdSoundPlayer.playSound(
-        soundUrl
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error playing sound: $e')),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -159,9 +131,19 @@ class _MapPageState extends State<MapPage> {
         children: [
           FlutterMap(
             options: MapOptions(
-              initialCenter: LatLng(56.177839, 10.216839),
-              initialZoom: 12.0,
+              initialCenter: LatLng(56.171812, 10.187769),
+              minZoom: 10, // Set initial zoom level
+              initialZoom: _zoomLevel,
+              maxZoom: 18.0,
               onTap: (_, tappedPoint) => _onMapTap(tappedPoint),
+              onPositionChanged: (position, bool hasGesture) {
+                // Update zoom level when pinch-zoom occurs
+                if (hasGesture) {
+                  setState(() {
+                    _zoomLevel = position.zoom;
+                  });
+                }
+              },
             ),
             children: [
               TileLayer(
@@ -174,11 +156,5 @@ class _MapPageState extends State<MapPage> {
         ],
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _birdSoundPlayer.dispose();
-    super.dispose();
   }
 }

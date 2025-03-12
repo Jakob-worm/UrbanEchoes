@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
-import '../services/ObservationService .dart';
+import '../services/ObservationService.dart';
 
 class AudioPage extends StatefulWidget {
   const AudioPage({super.key});
@@ -23,11 +23,11 @@ class _AudioPageState extends State<AudioPage> {
   }
 
   void loadObservations() {
-  final bool debugMode = Provider.of<bool>(context, listen: false);
-  final String apiUrl = debugMode
-      ? 'http://10.0.2.2:8000/observations'
-      : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
-  super.initState();
+    final bool debugMode = Provider.of<bool>(context, listen: false);
+    final String apiUrl = debugMode
+        ? 'http://10.0.2.2:8000/observations'
+        : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
+    super.initState();
 
     ObservationService(apiUrl: apiUrl).fetchObservations().then((data) {
       setState(() {

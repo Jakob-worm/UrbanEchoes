@@ -27,16 +27,16 @@ class AzureStorageService {
     try {
       if (_initialized && _storage != null) return true;
 
-      _storageAccountName = dotenv.env['AZURE_STORAGE_CONNECTION_STRING'] ?? '';
-      _containerName =
-          dotenv.env['AZURE_STORAGE_CONTAINER_NAME'] ?? 'bird-sounds';
+      _storageAccountName = dotenv.env['AZURE_STORAGE_ACCOUNT_NAME'] ?? '';
+      final connectionString =
+          dotenv.env['AZURE_STORAGE_CONNECTION_STRING'] ?? '';
 
-      if (_storageAccountName!.isEmpty) {
+      if (_storageAccountName!.isEmpty || connectionString.isEmpty) {
         debugPrint('Azure Storage credentials are missing');
         return false;
       }
 
-      _storage = AzureStorage.parse("");
+      _storage = AzureStorage.parse(connectionString);
 
       _initialized = true;
       debugPrint('Azure Storage Service initialized successfully');
@@ -48,67 +48,63 @@ class AzureStorageService {
     }
   }
 
-  // Fixed listFiles method to handle folder naming
   Future<List<String>> listFiles(String folderPath) async {
     try {
       // Ensure the service is initialized
       if (!_initialized || _storage == null) {
-        bool success = await initialize();
-        if (!success || _storage == null) {
+        if (!await initialize()) {
           debugPrint(
               'Cannot list files: Azure Storage Service initialization failed');
           return [];
         }
       }
 
-      // Format folder name - convert spaces to underscores
-      String formattedPath = folderPath.replaceAll(' ', '_');
-      debugPrint('Looking for files in formatted path: $formattedPath');
-
-      // Use a safer approach - download blob directly with folder prefix
-      List<String> fileUrls = [];
-
-      // Try to get some blobs using a direct HTTP request approach
-      try {
-        // Create the URL with both restype=container and comp=list
-        final listUrl = Uri.parse(
-            'https://$_storageAccountName.blob.core.windows.net/$_containerName?restype=container&comp=list&prefix=$formattedPath');
-
-        final response = await http.get(listUrl);
-
-        if (response.statusCode == 200) {
-          // Use the xml package for safer parsing
-          try {
-            final document = xml.XmlDocument.parse(response.body);
-            final blobs = document.findAllElements('Blob');
-
-            for (final blob in blobs) {
-              final nameElement = blob.findElements('Name').first;
-              final blobName = nameElement.innerText;
-
-              // Skip folders and any blob not in the specified folder
-              if (!blobName.endsWith('/') &&
-                  blobName.startsWith(formattedPath)) {
-                final blobUrl =
-                    'https://$_storageAccountName.blob.core.windows.net/$_containerName/$blobName';
-                fileUrls.add(blobUrl);
-              }
-            }
-          } catch (xmlError) {
-            debugPrint('Error parsing XML response: $xmlError');
-            debugPrint(
-                'Response body: ${response.body.substring(0, min(100, response.body.length))}...');
-          }
-        } else {
-          debugPrint('Failed to list blobs: HTTP ${response.statusCode}');
-          debugPrint('Response: ${response.body}');
-        }
-      } catch (httpError) {
-        debugPrint('HTTP error while listing blobs: $httpError');
+      // Extract the container name and path
+      final uri = Uri.parse(folderPath);
+      final segments = uri.pathSegments;
+      if (segments.isEmpty) {
+        debugPrint('Invalid folderPath: $folderPath');
+        return [];
       }
 
-      debugPrint('Found ${fileUrls.length} files in $formattedPath');
-      return fileUrls;
+      final containerName = segments.first; // e.g., "bird-sounds-test"
+      final prefix = segments.length > 1 ? segments.sublist(1).join('/') : '';
+
+      // Azure List Blobs API URL with required parameters
+      final listUrl = Uri.parse(
+          'https://${_storageAccountName}.blob.core.windows.net/$containerName?restype=container&comp=list&prefix=$prefix');
+
+      debugPrint('Listing files from: $listUrl');
+
+      // Make the HTTP request
+      final response = await http.get(listUrl);
+
+      if (response.statusCode != 200) {
+        debugPrint('Failed to list blobs: HTTP ${response.statusCode}');
+        return [];
+      }
+
+      // Parse XML response
+      try {
+        final document = xml.XmlDocument.parse(response.body);
+        final blobs = document.findAllElements('Blob');
+
+        List<String> fileUrls = [];
+        for (final blob in blobs) {
+          final blobName = blob.findElements('Name').first.innerText;
+
+          if (!blobName.endsWith('/')) {
+            fileUrls.add(
+                'https://${_storageAccountName}.blob.core.windows.net/$containerName/$blobName');
+          }
+        }
+
+        debugPrint('Found ${fileUrls.length} files in $folderPath');
+        return fileUrls;
+      } catch (xmlError) {
+        debugPrint('Error parsing XML response: $xmlError');
+        return [];
+      }
     } catch (e) {
       debugPrint('Error listing files in $folderPath: $e');
       return [];

@@ -5,16 +5,21 @@ import 'package:urban_echoes/pages/nav_bars_page.dart';
 import 'package:urban_echoes/pages/intro_screen.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 import 'package:provider/provider.dart';
+import 'package:urban_echoes/pages/map_page.dart';
+
+import 'services/LocationService.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
-  runApp(MyApp(debugMode: true));
+  runApp(MyApp(debugMode: false));
 }
 
 class MyApp extends StatelessWidget {
   final bool debugMode;
-  const MyApp({super.key, required this.debugMode});
+  final LocationService _locationService = LocationService();
+
+  MyApp({super.key, required this.debugMode});
 
   @override
   Widget build(BuildContext context) {
@@ -22,6 +27,7 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (context) => PageStateManager()),
         Provider<bool>(create: (context) => debugMode),
+        Provider<LocationService>(create: (_) => _locationService),
       ],
       child: MaterialApp(
         title: 'Urban Echoes',
@@ -53,6 +59,8 @@ class InitialScreenState extends State<InitialScreen> {
   void initState() {
     super.initState();
     _checkFirstTime();
+    // Initialize the location service
+    Provider.of<LocationService>(context, listen: false).initialize(context);
   }
 
   Future<void> _checkFirstTime() async {
@@ -81,5 +89,29 @@ class InitialScreenState extends State<InitialScreen> {
     } else {
       return NavBarsPage();
     }
+  }
+}
+
+class MyHomePage extends StatefulWidget {
+  @override
+  _MyHomePageState createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<MyHomePage> {
+  @override
+  void initState() {
+    super.initState();
+    // Initialize the location service
+    Provider.of<LocationService>(context, listen: false).initialize(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Urban Echoes'),
+      ),
+      body: MapPage(),
+    );
   }
 }
