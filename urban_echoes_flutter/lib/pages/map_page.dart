@@ -14,6 +14,7 @@ class MapPage extends StatefulWidget {
 class _MapPageState extends State<MapPage> {
   List<Map<String, dynamic>> observations = [];
   List<CircleMarker> circles = [];
+  double _zoomLevel = 16.0; // Set initial zoom level.
 
   @override
   void initState() {
@@ -131,8 +132,18 @@ class _MapPageState extends State<MapPage> {
           FlutterMap(
             options: MapOptions(
               initialCenter: LatLng(56.171812, 10.187769),
-              initialZoom: 16.0,
+              minZoom: 10, // Set initial zoom level
+              initialZoom: _zoomLevel,
+              maxZoom: 18.0,
               onTap: (_, tappedPoint) => _onMapTap(tappedPoint),
+              onPositionChanged: (position, bool hasGesture) {
+                // Update zoom level when pinch-zoom occurs
+                if (hasGesture) {
+                  setState(() {
+                    _zoomLevel = position.zoom;
+                  });
+                }
+              },
             ),
             children: [
               TileLayer(
