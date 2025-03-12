@@ -22,16 +22,15 @@ class _MapPageState extends State<MapPage> {
   @override
   void initState() {
     super.initState();
-    
+
     // Initialize BirdSoundPlayer with default noise gate settings
-    _birdSoundPlayer = BirdSoundPlayer(
-    );
+    _birdSoundPlayer = BirdSoundPlayer();
 
     final bool debugMode = Provider.of<bool>(context, listen: false);
     final String apiUrl = debugMode
         ? 'http://10.0.2.2:8000/observations'
         : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
-    
+
     ObservationService(apiUrl: apiUrl).fetchObservations().then((data) {
       setState(() {
         observations = data.map((obs) {
@@ -51,7 +50,7 @@ class _MapPageState extends State<MapPage> {
             "test_batch_id": obs["test_batch_id"],
           };
         }).toList();
-        
+
         circles = observations.map((obs) {
           return CircleMarker(
             point: LatLng(obs["latitude"], obs["longitude"]),
@@ -68,7 +67,15 @@ class _MapPageState extends State<MapPage> {
 
   Color getObservationColor(Map<String, dynamic> obs) {
     bool isTestData = obs["is_test_data"];
-    return isTestData ? Colors.red : Colors.blue;
+    int observerId = obs["observer_id"] ?? -1; // Default to -1 if null
+
+    if (observerId == 0) {
+      return Colors.green;
+    } else if (isTestData) {
+      return Colors.red;
+    } else {
+      return Colors.blue;
+    }
   }
 
   void _onMapTap(LatLng tappedPoint) {
@@ -114,7 +121,8 @@ class _MapPageState extends State<MapPage> {
                     min: 0.01,
                     max: 1.0,
                     divisions: 100,
-                    label: 'Noise Gate Threshold: ${(_noiseGateThreshold * 100).toStringAsFixed(2)}%',
+                    label:
+                        'Noise Gate Threshold: ${(_noiseGateThreshold * 100).toStringAsFixed(2)}%',
                     onChanged: (value) {
                       setState(() {
                         _noiseGateThreshold = value;
@@ -142,9 +150,7 @@ class _MapPageState extends State<MapPage> {
 
   void _playSound(String soundUrl) {
     try {
-      _birdSoundPlayer.playRandomSound(
-        soundUrl
-      );
+      _birdSoundPlayer.playRandomSound(soundUrl);
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error playing sound: $e')),
