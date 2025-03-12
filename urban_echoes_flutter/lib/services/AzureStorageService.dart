@@ -72,7 +72,7 @@ class AzureStorageService {
 
       // Azure List Blobs API URL with required parameters
       final listUrl = Uri.parse(
-          'https://${_storageAccountName}.blob.core.windows.net/$containerName?restype=container&comp=list&prefix=$prefix');
+          'https://$_storageAccountName.blob.core.windows.net/$containerName?restype=container&comp=list&prefix=$prefix');
 
       debugPrint('Listing files from: $listUrl');
 
@@ -95,7 +95,7 @@ class AzureStorageService {
 
           if (!blobName.endsWith('/')) {
             fileUrls.add(
-                'https://${_storageAccountName}.blob.core.windows.net/$containerName/$blobName');
+                'https://$_storageAccountName.blob.core.windows.net/$containerName/$blobName');
           }
         }
 

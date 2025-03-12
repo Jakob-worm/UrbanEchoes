@@ -3,6 +3,7 @@ import requests
 import psycopg2
 import random
 import os
+import logging
 
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -20,6 +21,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Database connection function
 def get_db_connection():
     return psycopg2.connect(
@@ -27,7 +32,7 @@ def get_db_connection():
         password=os.getenv("DB_PASSWORD"),
         host=os.getenv("DB_HOST"),
         port=os.getenv("DB_PORT", 5432),
-        database="urbanechoes-fastapi-db",
+        database="urban_echoes_db",
         sslmode="require"
     )
 
@@ -68,30 +73,38 @@ async def get_danish_taxonomy():
 @app.get("/observations")
 def get_observations():
     """Fetch all bird observations from the database."""
-    conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    
-    cursor.execute("""
-        SELECT id, bird_name, scientific_name, sound_directory, latitude, longitude, observation_date, observation_time, observer_id, created_at, quantity, is_test_data, test_batch_id
-        FROM bird_observations
-    """)
-    
-    observations = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    
-    return {"observations": observations}
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        
+        cursor.execute("""
+            SELECT id, bird_name, scientific_name, sound_directory, latitude, longitude, observation_date, observation_time, observer_id, created_at, quantity, is_test_data, test_batch_id
+            FROM bird_observations
+        """)
+        
+        observations = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        
+        return {"observations": observations}
+    except Exception as e:
+        logger.error(f"Error fetching observations: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
 @app.get("/birds")
 def get_birds():
-    conn = get_db_connection()
-    cursor = conn.cursor(cursor_factory=RealDictCursor)
-    cursor.execute("SELECT common_name, scientific_name, danish_name FROM birds")
-    birds = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return {"birds": birds}
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("SELECT common_name, scientific_name, danish_name FROM birds")
+        birds = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return {"birds": birds}
+    except Exception as e:
+        logger.error(f"Error fetching birds: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @app.get("/birdsound")
 def get_bird_sound(scientific_name: str):
@@ -122,22 +135,26 @@ def get_bird_sound(scientific_name: str):
 @app.get("/search_birds")
 def search_birds(query: str = Query(..., min_length=1, description="Bird search query")):
     """Search birds by Danish name dynamically"""
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    
-    cursor.execute("""
-        SELECT common_name, scientific_name 
-        FROM birds 
-        WHERE common_name ILIKE %s
-        LIMIT 10
-    """, (f"%{query}%",))
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT common_name, scientific_name 
+            FROM birds 
+            WHERE common_name ILIKE %s
+            LIMIT 10
+        """, (f"%{query}%",))
 
-    birds = [{"common_name": row[0], "scientificName": row[1]} for row in cursor.fetchall()]
-    
-    cursor.close()
-    conn.close()
+        birds = [{"common_name": row[0], "scientificName": row[1]} for row in cursor.fetchall()]
+        
+        cursor.close()
+        conn.close()
 
-    return {"birds": birds}
+        return {"birds": birds}
+    except Exception as e:
+        logger.error(f"Error searching birds: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @app.get("/birdsOLD")
 async def get_bird_list():
