@@ -28,8 +28,8 @@ class AzureStorageService {
       if (_initialized && _storage != null) return true;
 
       _storageAccountName = dotenv.env['AZURE_STORAGE_ACCOUNT_NAME'] ?? '';
-      _containerName = dotenv.env['AZURE_STORAGE_CONTAINER_NAME'] ?? 'bird-sounds';
-      final connectionString = dotenv.env['AZURE_STORAGE_CONNECTION_STRING'] ?? '';
+      final connectionString =
+          dotenv.env['AZURE_STORAGE_CONNECTION_STRING'] ?? '';
 
       if (_storageAccountName!.isEmpty || connectionString.isEmpty) {
         debugPrint('Azure Storage credentials are missing');
@@ -48,80 +48,63 @@ class AzureStorageService {
     }
   }
 
-Future<List<String>> listFiles(String folderPath) async {
-  try {
-    // Ensure the service is initialized
-    if (!_initialized || _storage == null) {
-      bool success = await initialize();
-      if (!success || _storage == null) {
-        debugPrint('Cannot list files: Azure Storage Service initialization failed');
-        return [];
+  Future<List<String>> listFiles(String folderPath) async {
+    try {
+      // Ensure the service is initialized
+      if (!_initialized || _storage == null) {
+        if (!await initialize()) {
+          debugPrint(
+              'Cannot list files: Azure Storage Service initialization failed');
+          return [];
+        }
       }
-    }
 
-    // Extract just the path part if a full URL was passed
-    String pathOnly = folderPath;
-    if (folderPath.startsWith('http')) {
-      // Extract just the path after the container name
+      // Extract the container name and path
       final uri = Uri.parse(folderPath);
       final segments = uri.pathSegments;
-      if (segments.length > 1) {
-        // First segment is the container name, we want everything after that
-        pathOnly = segments.sublist(1).join('/');
-      } else {
-        pathOnly = '';
+      if (segments.isEmpty) {
+        debugPrint('Invalid folderPath: $folderPath');
+        return [];
       }
-    }
 
-    // Format the path
-    String formattedPath = pathOnly.replaceAll(' ', '_');
-    formattedPath = formattedPath.endsWith('/') ? formattedPath : "$formattedPath/";
+      final containerName = segments.first; // e.g., "bird-sounds-test"
+      final prefix = segments.length > 1 ? segments.sublist(1).join('/') : '';
 
-    debugPrint('Looking for files in formatted path: $formattedPath');
-    debugPrint('https://$_storageAccountName.blob.core.windows.net/$_containerName?restype=container&comp=list&prefix=$formattedPath');
+      // Azure List Blobs API URL with required parameters
+      final listUrl = Uri.parse(
+          'https://${_storageAccountName}.blob.core.windows.net/$containerName?restype=container&comp=list&prefix=$prefix');
 
-    // Use a safer approach - download blob directly with folder prefix
-    List<String> fileUrls = [];
+      debugPrint('Listing files from: $listUrl');
 
-      // Try to get some blobs using a direct HTTP request approach
+      // Make the HTTP request
+      final response = await http.get(listUrl);
+
+      if (response.statusCode != 200) {
+        debugPrint('Failed to list blobs: HTTP ${response.statusCode}');
+        return [];
+      }
+
+      // Parse XML response
       try {
-        // Create the URL with both restype=container and comp=list
-        final listUrl = Uri.parse(
-            'https://$_storageAccountName.blob.core.windows.net/$_containerName?restype=container&comp=list&prefix=$formattedPath');
+        final document = xml.XmlDocument.parse(response.body);
+        final blobs = document.findAllElements('Blob');
 
-        final response = await http.get(listUrl);
+        List<String> fileUrls = [];
+        for (final blob in blobs) {
+          final blobName = blob.findElements('Name').first.innerText;
 
-        if (response.statusCode == 200) {
-          // Use the xml package for safer parsing
-          try {
-            final document = xml.XmlDocument.parse(response.body);
-            final blobs = document.findAllElements('Blob');
-
-            for (final blob in blobs) {
-              final nameElement = blob.findElements('Name').first;
-              final blobName = nameElement.innerText;
-
-              // Skip folders and any blob not in the specified folder
-              if (!blobName.endsWith('/') && blobName.startsWith(formattedPath)) {
-                final blobUrl =
-                    'https://$_storageAccountName.blob.core.windows.net/$_containerName/$blobName';
-                fileUrls.add(blobUrl);
-              }
-            }
-          } catch (xmlError) {
-            debugPrint('Error parsing XML response: $xmlError');
-            debugPrint('Response body: ${response.body.substring(0, min(100, response.body.length))}...');
+          if (!blobName.endsWith('/')) {
+            fileUrls.add(
+                'https://${_storageAccountName}.blob.core.windows.net/$containerName/$blobName');
           }
-        } else {
-          debugPrint('Failed to list blobs: HTTP ${response.statusCode}');
-          debugPrint('Response: ${response.body}');
         }
-      } catch (httpError) {
-        debugPrint('HTTP error while listing blobs: $httpError');
-      }
 
-      debugPrint('Found ${fileUrls.length} files in $formattedPath');
-      return fileUrls;
+        debugPrint('Found ${fileUrls.length} files in $folderPath');
+        return fileUrls;
+      } catch (xmlError) {
+        debugPrint('Error parsing XML response: $xmlError');
+        return [];
+      }
     } catch (e) {
       debugPrint('Error listing files in $folderPath: $e');
       return [];
@@ -129,7 +112,8 @@ Future<List<String>> listFiles(String folderPath) async {
   }
 
   // Upload a file to Azure Storage with consistent folder naming
-  Future<String> uploadFile(File file, {String? customFileName, String? folder}) async {
+  Future<String> uploadFile(File file,
+      {String? customFileName, String? folder}) async {
     try {
       // Ensure the service is initialized
       if (!_initialized || _storage == null) {
@@ -174,7 +158,8 @@ Future<List<String>> listFiles(String folderPath) async {
   }
 
   // Upload audio data directly from memory
-  Future<String> uploadAudioData(Uint8List audioData, String fileName, {String? folder}) async {
+  Future<String> uploadAudioData(Uint8List audioData, String fileName,
+      {String? folder}) async {
     try {
       // Ensure the service is initialized
       if (!_initialized || _storage == null) {
