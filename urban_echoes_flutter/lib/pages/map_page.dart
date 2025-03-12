@@ -130,8 +130,8 @@ class _MapPageState extends State<MapPage> {
         children: [
           FlutterMap(
             options: MapOptions(
-              initialCenter: LatLng(56.177839, 10.216839),
-              initialZoom: 12.0,
+              initialCenter: LatLng(56.171812, 10.187769),
+              initialZoom: 16.0,
               onTap: (_, tappedPoint) => _onMapTap(tappedPoint),
             ),
             children: [
