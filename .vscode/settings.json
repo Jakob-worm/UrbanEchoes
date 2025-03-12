@@ -3,5 +3,6 @@
     "appService.defaultWebAppToDeploy": "None",
     "python.analysis.extraPaths": [
         "./DatabseScripts/connection_and_oprations"
-    ]
+    ],
+    "java.configuration.updateBuildConfiguration": "automatic"
 }
