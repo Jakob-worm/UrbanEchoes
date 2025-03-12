@@ -89,7 +89,7 @@ def get_observations():
         return {"observations": observations}
     except Exception as e:
         logger.error(f"Error fetching observations: {str(e)}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(e)}")
 
 
 @app.get("/birds")
