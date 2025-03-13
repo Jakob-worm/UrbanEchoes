@@ -64,7 +64,7 @@ class BirdObservationController {
   // Media playback
   Future<void> playBirdSound(String soundUrl) async {
     try {
-      await _soundPlayer.playRandomSound(soundUrl);
+     await _soundPlayer.playRandomSoundOld(soundUrl);
     } catch (e) {
       debugPrint('Error playing sound: $e');
     }
