@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:urban_echoes/services/ObservationService.dart';
+import 'package:geolocator/geolocator.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -14,12 +15,63 @@ class MapPage extends StatefulWidget {
 class _MapPageState extends State<MapPage> {
   List<Map<String, dynamic>> observations = [];
   List<CircleMarker> circles = [];
-  double _zoomLevel = 16.0; // Set initial zoom level.
+  double _zoomLevel = 16.0;
+  LatLng _userLocation = LatLng(56.171812, 10.187769); // Default location until we get user's position
+  final MapController _mapController = MapController();
+  bool _isLocationLoaded = false;
 
   @override
   void initState() {
     super.initState();
+    _getUserLocation();
+    _loadObservations();
+  }
 
+  Future<void> _getUserLocation() async {
+    try {
+      // Check for location permission
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          // Permissions are denied, show a message to the user
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permissions are denied')),
+          );
+          return;
+        }
+      }
+      
+      if (permission == LocationPermission.deniedForever) {
+        // Permissions are permanently denied, handle accordingly
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Location permissions are permanently denied')),
+        );
+        return;
+      }
+      
+      // Get current position
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+      
+      setState(() {
+        _userLocation = LatLng(position.latitude, position.longitude);
+        _isLocationLoaded = true;
+        
+        // Center map on user location if this is initial load
+        if (_mapController.camera.zoom != 0) {
+          _mapController.move(_userLocation, _zoomLevel);
+        }
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error getting location: $e')),
+      );
+    }
+  }
+
+  void _loadObservations() {
     final bool debugMode = Provider.of<bool>(context, listen: false);
     final String apiUrl = debugMode
         ? 'http://10.0.2.2:8000/observations'
@@ -130,14 +182,14 @@ class _MapPageState extends State<MapPage> {
       body: Stack(
         children: [
           FlutterMap(
+            mapController: _mapController,
             options: MapOptions(
-              initialCenter: LatLng(56.171812, 10.187769),
-              minZoom: 10, // Set initial zoom level
+              initialCenter: _userLocation,
+              minZoom: 10,
               initialZoom: _zoomLevel,
               maxZoom: 18.0,
               onTap: (_, tappedPoint) => _onMapTap(tappedPoint),
               onPositionChanged: (position, bool hasGesture) {
-                // Update zoom level when pinch-zoom occurs
                 if (hasGesture) {
                   setState(() {
                     _zoomLevel = position.zoom;
@@ -151,7 +203,54 @@ class _MapPageState extends State<MapPage> {
                 userAgentPackageName: 'com.example.app',
               ),
               CircleLayer(circles: circles),
+              // User location marker
+              MarkerLayer(
+                markers: [
+                  if (_isLocationLoaded)
+                    Marker(
+                      point: _userLocation,
+                      width: 30,
+                      height: 30,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Outer blue circle
+                          Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.3),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          // Inner blue circle
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: const BoxDecoration(
+                              color: Colors.blue,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
             ],
+          ),
+          // Location recenter button
+          Positioned(
+            right: 16,
+            bottom: 160,
+            child: FloatingActionButton(
+              heroTag: "locationButton",
+              onPressed: () {
+                _getUserLocation(); // Update and recenter to user location
+              },
+              backgroundColor: Colors.white,
+              child: const Icon(Icons.my_location, color: Colors.blue),
+            ),
           ),
         ],
       ),
