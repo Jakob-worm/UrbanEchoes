@@ -2,7 +2,8 @@
     "cmake.sourceDirectory": "D:/Uni/10 semester/UrbanEchoes/urban_echoes_flutter/windows/flutter",
     "appService.defaultWebAppToDeploy": "None",
     "python.analysis.extraPaths": [
-        "./DatabseScripts/connection_and_oprations"
+        "./DatabseScripts/connection_and_oprations",
+        "./DatabaseScripts/connection_and_oprations"
     ],
     "java.configuration.updateBuildConfiguration": "automatic"
 }

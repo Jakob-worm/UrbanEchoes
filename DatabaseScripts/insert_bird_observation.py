@@ -1,6 +1,5 @@
-
-from DatabaseScripts.connection_and_oprations.database_connection import DatabaseConnection
-from DatabaseScripts.util import BirdObservation
+from database_connection import DatabaseConnection
+from .util import BirdObservation
 
 
 def insert_multiple_bird_observations(db, observations):
