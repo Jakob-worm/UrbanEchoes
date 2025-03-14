@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:math';
 import 'package:azblob/azblob.dart';
-import 'package:urban_echoes/models/BirdObservation.dart';
+import 'package:urban_echoes/models/bird_observation.dart';
 import 'package:urban_echoes/services/DatabaseService.dart';
 import 'package:urban_echoes/services/bird_sound_player.dart';
 import 'package:location/location.dart';
@@ -84,13 +84,15 @@ class BirdObservationController {
     final observation = BirdObservation(
       birdName: birdName,
       scientificName: scientificName,
-      soundUrl: soundUrl,
+      soundDirectory: soundUrl ?? '',
       latitude: locationData.latitude ?? 0.0,
       longitude: locationData.longitude ?? 0.0,
       observationDate: DateTime.now(),
       observationTime: DateFormat('HH:mm:ss').format(DateTime.now()),
       observerId: 1, // One observerID for now
       quantity: quantity,
+      isTestData: false,
+      testBatchId: 1, // Example test batch ID
     );
 
     final id = await _databaseService.addBirdObservation(observation);

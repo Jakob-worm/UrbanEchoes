@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:urban_echoes/pages/backend_test.dart';
 import 'package:urban_echoes/pages/home_page.dart';
 import 'package:urban_echoes/pages/make_observation/make_observation_page.dart';
 import 'package:urban_echoes/pages/map_page.dart';
-import 'package:urban_echoes/pages/take_image_page.dart';
 
 enum NavRailPageType {
   home,
@@ -26,8 +24,6 @@ class PageStateManager extends ChangeNotifier {
 
   final Map<NavRailPageType, Widget> navRailPages = {
     NavRailPageType.home: HomePage(),
-    NavRailPageType.takeImage: TakeImagePage(),
-    NavRailPageType.backendTest: BackEndTest(),
     NavRailPageType.map: MapPage(),
     // Add more pages as needed
   };

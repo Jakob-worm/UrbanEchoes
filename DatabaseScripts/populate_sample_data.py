@@ -33,7 +33,7 @@ def populate_sample_data(db, sound_storage, test_batch_count=100):
                     continue
                 
                 # Get multiple sound recordings for this species
-                import DatabseScripts.util.download_xeno as download_xeno
+                import DatabaseScripts.util.download_xeno as download_xeno
                 sound_files = download_xeno.get_multiple_bird_sounds(scientific_name, temp_dir)
                 
                 bird_sound_urls[scientific_name] = []
