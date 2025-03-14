@@ -21,21 +21,9 @@ class NavigationItems extends StatelessWidget {
         label: Text('Hjem'),
       ),
       NavigationRailDestination(
-        icon: Icon(Icons.camera),
-        label: Text('tag billde side'),
-      ),
-      NavigationRailDestination(
-        icon: Icon(Icons.abc),
-        label: Text('Backend Test'),
-      ),
-      NavigationRailDestination(
         icon: Icon(Icons.map),
         label: Text('Kort'),
-      ),
-      NavigationRailDestination(
-        icon: Icon(Icons.audio_file),
-        label: Text('Audio'),
-      ),
+      )
     ];
 
     if (isRail) {

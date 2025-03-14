@@ -5,10 +5,7 @@ import 'package:urban_echoes/pages/map_page.dart';
 
 enum NavRailPageType {
   home,
-  takeImage,
-  backendTest,
-  map,
-  testAudio
+  map
   // Add more pages as needed
 }
 
