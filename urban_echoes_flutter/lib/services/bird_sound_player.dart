@@ -9,8 +9,16 @@ class BirdSoundPlayer {
   bool _isPlaying = false;
   final AudioPlayer _audioPlayer = AudioPlayer();
   
-  // Start playing random sounds in sequence for an observation
-  Future<void> startSequentialRandomSounds(String folderPath, int observationId) async {
+  // Parameters for panning calculation
+  final double _panningExponent = 0.5; // Square root for constant power pan law
+  
+  // Start playing random sounds in sequence for an observation with panning
+  Future<void> startSequentialRandomSoundsWithPanning(
+    String folderPath, 
+    int observationId, 
+    double pan, 
+    double volume
+  ) async {
     _isActive[observationId] = true;
     
     // Create a dedicated player for this observation
@@ -21,16 +29,100 @@ class BirdSoundPlayer {
       _players[observationId]!.onPlayerComplete.listen((_) {
         // When sound finishes, play another if still active
         if (_isActive[observationId] == true) {
-          _playNextRandomSound(folderPath, observationId);
+          _playNextRandomSoundWithPanning(folderPath, observationId, pan, volume);
         }
       });
     }
     
+    // Apply panning and volume
+    await _applyPanningAndVolume(_players[observationId]!, pan, volume);
+    
     // Start playing the first sound
-    await _playNextRandomSound(folderPath, observationId);
+    await _playNextRandomSoundWithPanning(folderPath, observationId, pan, volume);
   }
   
-  // Play the next random sound from the folder
+  // For backward compatibility
+  Future<void> startSequentialRandomSounds(String folderPath, int observationId) async {
+    // Default to center panning (0.0) and full volume (1.0)
+    await startSequentialRandomSoundsWithPanning(folderPath, observationId, 0.0, 1.0);
+  }
+  
+  // Apply panning and volume to an audio player
+  Future<void> _applyPanningAndVolume(AudioPlayer player, double pan, double volume) async {
+    // Apply constant power panning law
+    double adjustedPan = _applyPanningLaw(pan);
+    
+    // Convert pan value (-1.0 to 1.0) to balance value for audioplayers
+    // audioplayers uses -1.0 (left) to 1.0 (right) for balance
+    await player.setBalance(adjustedPan);
+    
+    // Set volume (0.0 to 1.0)
+    await player.setVolume(volume);
+  }
+  
+  // Apply constant power panning law
+  double _applyPanningLaw(double rawPan) {
+    // Ensure pan is within range
+    if (rawPan < -1.0) rawPan = -1.0;
+    if (rawPan > 1.0) rawPan = 1.0;
+    
+    // Apply constant power panning law
+    // Using square root by default for constant power curve
+    return rawPan < 0 
+        ? -pow(-rawPan, _panningExponent).toDouble()
+        : pow(rawPan, _panningExponent).toDouble();
+  }
+  
+  // Update panning and volume for an existing player
+  Future<void> updatePanningAndVolume(int observationId, double pan, double volume) async {
+    if (_players.containsKey(observationId)) {
+      await _applyPanningAndVolume(_players[observationId]!, pan, volume);
+    }
+  }
+  
+  // Play the next random sound with panning from the folder
+  Future<void> _playNextRandomSoundWithPanning(
+    String folderPath, 
+    int observationId, 
+    double pan, 
+    double volume
+  ) async {
+    try {
+      // Check if still active
+      if (_isActive[observationId] != true) return;
+      
+      // Fetch the list of available sound files from Azure Storage
+      print("folder path $folderPath");
+      List<String> files = await _storageService.listFiles(folderPath);
+      
+      if (files.isEmpty) {
+        print('No bird sounds found in folder: $folderPath');
+        return;
+      }
+      
+      // Pick a random file
+      final random = Random();
+      String randomFile = files[random.nextInt(files.length)];
+      
+      // Apply current panning and volume settings
+      await _applyPanningAndVolume(_players[observationId]!, pan, volume);
+      
+      // Play the selected file
+      await _players[observationId]!.play(UrlSource(randomFile));
+      
+    } catch (e) {
+      print('Failed to play bird sound: ${e.toString()}');
+      
+      // If there was an error, attempt to play another sound after a delay
+      if (_isActive[observationId] == true) {
+        Future.delayed(Duration(seconds: 3), () {
+          _playNextRandomSoundWithPanning(folderPath, observationId, pan, volume);
+        });
+      }
+    }
+  }
+  
+  // Original play method without changes
   Future<void> _playNextRandomSound(String folderPath, int observationId) async {
     try {
       // Check if still active
@@ -84,6 +176,7 @@ class BirdSoundPlayer {
     _players.clear();
     _isActive.clear();
   }
+  
   Future<void> playRandomSoundOld(String folderPath) async {
     try {
       // Fetch the list of available sound files from Azure Storage
@@ -111,7 +204,4 @@ class BirdSoundPlayer {
       throw Exception('Failed to play bird sound: ${e.toString()}');
     }
   }
-
-  
-    
-  }
+}
