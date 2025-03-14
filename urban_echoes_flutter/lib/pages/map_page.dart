@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import 'package:urban_echoes/consants.dart';
 import 'package:urban_echoes/services/ObservationService.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:urban_echoes/services/LocationService.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -15,7 +17,7 @@ class MapPage extends StatefulWidget {
 class _MapPageState extends State<MapPage> {
   List<Map<String, dynamic>> observations = [];
   List<CircleMarker> circles = [];
-  double _zoomLevel = 16.0;
+  double _zoomLevel = AppConstants.defaultZoom;
   LatLng _userLocation = LatLng(56.171812, 10.187769); // Default location until we get user's position
   final MapController _mapController = MapController();
   bool _isLocationLoaded = false;
@@ -100,7 +102,7 @@ class _MapPageState extends State<MapPage> {
         circles = observations.map((obs) {
           return CircleMarker(
             point: LatLng(obs["latitude"], obs["longitude"]),
-            radius: 100,
+            radius: AppConstants.defaultPointRadius,
             useRadiusInMeter: true,
             color: getObservationColor(obs).withOpacity(0.3),
             borderColor: getObservationColor(obs).withOpacity(0.7),
@@ -178,6 +180,9 @@ class _MapPageState extends State<MapPage> {
 
   @override
   Widget build(BuildContext context) {
+    final locationService = Provider.of<LocationService>(context);
+    final activeBirdSound = locationService.getActiveBirdSound();
+
     return Scaffold(
       body: Stack(
         children: [
@@ -185,9 +190,9 @@ class _MapPageState extends State<MapPage> {
             mapController: _mapController,
             options: MapOptions(
               initialCenter: _userLocation,
-              minZoom: 10,
+              minZoom: AppConstants.minZoom,
               initialZoom: _zoomLevel,
-              maxZoom: 18.0,
+              maxZoom: AppConstants.maxZoom,
               onTap: (_, tappedPoint) => _onMapTap(tappedPoint),
               onPositionChanged: (position, bool hasGesture) {
                 if (hasGesture) {
@@ -252,6 +257,45 @@ class _MapPageState extends State<MapPage> {
               child: const Icon(Icons.my_location, color: Colors.blue),
             ),
           ),
+          // Active bird sound information
+          if (activeBirdSound != null)
+            Positioned(
+              top: 16,
+              left: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(8.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4.0,
+                      spreadRadius: 2.0,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Listening to:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16.0,
+                      ),
+                    ),
+                    Text(
+                      '${activeBirdSound["bird_name"]} (${activeBirdSound["scientific_name"]})',
+                      style: TextStyle(
+                        fontSize: 14.0,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
         ],
       ),
     );

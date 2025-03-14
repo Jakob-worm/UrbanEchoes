@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import 'package:urban_echoes/consants.dart';
 import 'package:urban_echoes/services/bird_sound_player.dart';
 import 'ObservationService.dart';
 
@@ -11,13 +12,16 @@ class LocationService {
   final BirdSoundPlayer _birdSoundPlayer = BirdSoundPlayer();
   List<Map<String, dynamic>> _observations = [];
   bool _isInitialized = false;
+  // Track the active bird sound information
+  Map<int, Map<String, dynamic>> _activeBirdSounds = {};
+
 
   // Track which observations are currently active
   final Map<int, bool> _activeObservations = {};
 
   // Spatial grid for quick lookups (using 1km grid cells)
   final Map<String, List<Map<String, dynamic>>> _spatialGrid = {};
-  final int _gridSize = 1000; // Grid size in meters
+  final int _gridSize = AppConstants.gridSize;
 
   // Store last position to avoid redundant checks
   Position? _lastPosition;
@@ -26,7 +30,16 @@ class LocationService {
   static const int _locationUpdateIntervalSeconds = 5;
 
   // Parameters for spatial audio
-  final double _maxAudioDistance = 100.0; // Maximum distance for audio (in meters)
+  final double _maxAudioDistance = AppConstants.defaultPointRadius; // Maximum distance for audio (in meters)
+
+   // Method to get the active bird sound information
+  Map<String, dynamic>? getActiveBirdSound() {
+    if (_activeBirdSounds.isNotEmpty) {
+      return _activeBirdSounds.values.first;
+    }
+    return null;
+  }
+
 
   Future<void> initialize(BuildContext context) async {
     if (_isInitialized) return;
@@ -144,8 +157,8 @@ class LocationService {
         position.longitude
       );
 
-      // If we haven't moved more than 5 meters, skip this update
-      if (distance < 5) {
+      // If we haven't moved more than 0.2 meters, skip this update
+      if (distance < 0.2) {
         return;
       }
     }
@@ -312,7 +325,9 @@ class LocationService {
         pan, 
         volume
       );
-    } catch (e) {
+       _activeBirdSounds[observationId] = _observations.firstWhere((obs) => obs["id"] == observationId);
+    }
+     catch (e) {
       debugPrint('Error starting bird sounds with panning: $e');
     }
   }
