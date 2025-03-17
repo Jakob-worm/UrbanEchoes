@@ -59,8 +59,11 @@ class InitialScreenState extends State<InitialScreen> {
   void initState() {
     super.initState();
     _checkFirstTime();
-    // Initialize the location service
-    Provider.of<LocationService>(context, listen: false).initialize(context);
+
+    // Initialize the location service after the frame is built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Provider.of<LocationService>(context, listen: false).initialize(context);
+    });
   }
 
   Future<void> _checkFirstTime() async {
@@ -100,13 +103,6 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  @override
-  void initState() {
-    super.initState();
-    // Initialize the location service
-    Provider.of<LocationService>(context, listen: false).initialize(context);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
