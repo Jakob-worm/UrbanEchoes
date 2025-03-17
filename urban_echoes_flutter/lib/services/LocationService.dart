@@ -13,6 +13,11 @@ class LocationService {
   List<Map<String, dynamic>> _observations = [];
   bool _isInitialized = false;
 
+  final LocationSettings locationSettings = LocationSettings(
+    accuracy: LocationAccuracy.high,
+    distanceFilter: 100,
+  );
+
   // Track the active bird sound information
   final Map<int, Map<String, dynamic>> _activeBirdSounds = {};
 

@@ -55,9 +55,7 @@ class _MapPageState extends State<MapPage> {
       }
 
       // Get current position
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.high,
-      );
+      Position position = await Geolocator.getCurrentPosition();
 
       setState(() {
         _userLocation = LatLng(position.latitude, position.longitude);
