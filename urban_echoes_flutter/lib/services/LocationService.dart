@@ -13,8 +13,7 @@ class LocationService {
   List<Map<String, dynamic>> _observations = [];
   bool _isInitialized = false;
   // Track the active bird sound information
-  Map<int, Map<String, dynamic>> _activeBirdSounds = {};
-
+  final Map<int, Map<String, dynamic>> _activeBirdSounds = {};
 
   // Track which observations are currently active
   final Map<int, bool> _activeObservations = {};
@@ -30,16 +29,16 @@ class LocationService {
   static const int _locationUpdateIntervalSeconds = 5;
 
   // Parameters for spatial audio
-  final double _maxAudioDistance = AppConstants.defaultPointRadius; // Maximum distance for audio (in meters)
+  final double _maxAudioDistance =
+      AppConstants.defaultPointRadius; // Maximum distance for audio (in meters)
 
-   // Method to get the active bird sound information
-  Map<String, dynamic>? getActiveBirdSound() {
+  List<Map<String, dynamic>> getActiveBirdSounds() {
     if (_activeBirdSounds.isNotEmpty) {
-      return _activeBirdSounds.values.first;
+      return _activeBirdSounds.values.toList();
+    } else {
+      return [];
     }
-    return null;
   }
-
 
   Future<void> initialize(BuildContext context) async {
     if (_isInitialized) return;
@@ -49,7 +48,8 @@ class LocationService {
         ? 'http://10.0.2.2:8000/observations'
         : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
 
-    _observations = await ObservationService(apiUrl: apiUrl).fetchObservations();
+    _observations =
+        await ObservationService(apiUrl: apiUrl).fetchObservations();
 
     // Initialize active observations map
     for (var obs in _observations) {
@@ -87,8 +87,10 @@ class LocationService {
   // Get the cell key for a specific latitude and longitude
   String _getGridCellKey(double lat, double lng) {
     // Convert coordinates to grid cell indices
-    int latIndex = (lat * 111319 / _gridSize).floor(); // 1 degree lat ≈ 111.319 km
-    int lngIndex = (lng * 111319 * cos(lat * pi / 180) / _gridSize).floor(); // Adjust for longitude
+    int latIndex =
+        (lat * 111319 / _gridSize).floor(); // 1 degree lat ≈ 111.319 km
+    int lngIndex = (lng * 111319 * cos(lat * pi / 180) / _gridSize)
+        .floor(); // Adjust for longitude
 
     return '$latIndex:$lngIndex';
   }
@@ -139,23 +141,22 @@ class LocationService {
       timeLimit: Duration(seconds: _locationUpdateIntervalSeconds),
     );
 
-    _geolocatorPlatform.getPositionStream(locationSettings: locationSettings).listen((Position position) {
+    _geolocatorPlatform
+        .getPositionStream(locationSettings: locationSettings)
+        .listen((Position position) {
       _processLocationUpdate(position);
     });
   }
 
   void _processLocationUpdate(Position position) {
     // Check if we've moved to a new grid cell
-    String currentGridCell = _getGridCellKey(position.latitude, position.longitude);
+    String currentGridCell =
+        _getGridCellKey(position.latitude, position.longitude);
 
     // Skip processing if we're in the same grid cell and haven't moved significantly
     if (_lastPosition != null && _lastGridCell == currentGridCell) {
-      double distance = Geolocator.distanceBetween(
-        _lastPosition!.latitude,
-        _lastPosition!.longitude,
-        position.latitude,
-        position.longitude
-      );
+      double distance = Geolocator.distanceBetween(_lastPosition!.latitude,
+          _lastPosition!.longitude, position.latitude, position.longitude);
 
       // If we haven't moved more than 0.2 meters, skip this update
       if (distance < 0.2) {
@@ -173,7 +174,8 @@ class LocationService {
   // Modified method to process proximity and calculate panning
   void _checkProximityToPoints(Position position) {
     // Get all potentially relevant grid cells
-    List<String> cells = _getNeighboringCells(position.latitude, position.longitude);
+    List<String> cells =
+        _getNeighboringCells(position.latitude, position.longitude);
 
     // Create a set of observations we've checked to avoid duplicates
     Set<int> checkedObservations = {};
@@ -198,27 +200,26 @@ class LocationService {
         // User is inside the observation area
         if (distance <= _maxAudioDistance) {
           // Calculate panning and volume based on position
-          final double pan = _calculatePanning(
-            position.latitude, 
-            position.longitude,
-            obs["latitude"],
-            obs["longitude"]
-          );
-          
+          final double pan = _calculatePanning(position.latitude,
+              position.longitude, obs["latitude"], obs["longitude"]);
+
           // Calculate volume based on distance (closer = louder)
           final double volume = _calculateVolume(distance);
-          
-          if (!_activeObservations.containsKey(id) || !_activeObservations[id]!) {
+
+          if (!_activeObservations.containsKey(id) ||
+              !_activeObservations[id]!) {
             // Start playing sequential random sounds with panning
-            _startSequentialSoundsWithPanning(obs["sound_directory"], id, pan, volume);
+            _startSequentialSoundsWithPanning(
+                obs["sound_directory"], id, pan, volume);
             _activeObservations[id] = true;
           } else {
             // Update panning and volume for already playing sounds
             _updatePanningAndVolume(id, pan, volume);
           }
-        } 
+        }
         // User left the observation area
-        else if (_activeObservations.containsKey(id) && _activeObservations[id]!) {
+        else if (_activeObservations.containsKey(id) &&
+            _activeObservations[id]!) {
           // Stop playing sounds
           _stopSounds(id);
           _activeObservations[id] = false;
@@ -236,7 +237,8 @@ class LocationService {
     // For any active observations that weren't checked, verify if they should still be active
     for (int id in uncheckedActiveIds) {
       // Find the observation in our main list
-      var obs = _observations.firstWhere((o) => o["id"] == id, orElse: () => {});
+      var obs =
+          _observations.firstWhere((o) => o["id"] == id, orElse: () => {});
       if (obs.isEmpty) continue;
 
       final distance = Distance().as(
@@ -250,12 +252,8 @@ class LocationService {
         _activeObservations[id] = false;
       } else {
         // Update panning and volume
-        final double pan = _calculatePanning(
-          position.latitude, 
-          position.longitude,
-          obs["latitude"],
-          obs["longitude"]
-        );
+        final double pan = _calculatePanning(position.latitude,
+            position.longitude, obs["latitude"], obs["longitude"]);
         final double volume = _calculateVolume(distance);
         _updatePanningAndVolume(id, pan, volume);
       }
@@ -263,7 +261,9 @@ class LocationService {
   }
 
   // If you have access to user heading (compass direction)
-  double _calculatePanning(double userLat, double userLng, double soundLat, double soundLng, [double userHeading = 0.0]) {
+  double _calculatePanning(
+      double userLat, double userLng, double soundLat, double soundLng,
+      [double userHeading = 0.0]) {
     double bearing = _calculateBearing(userLat, userLng, soundLat, soundLng);
 
     // Calculate relative bearing by considering user's heading
@@ -312,28 +312,21 @@ class LocationService {
   }
 
   // Start sequential sounds with panning
-  Future<void> _startSequentialSoundsWithPanning(
-    String soundDirectory, 
-    int observationId, 
-    double pan, 
-    double volume
-  ) async {
+  Future<void> _startSequentialSoundsWithPanning(String soundDirectory,
+      int observationId, double pan, double volume) async {
     try {
       await _birdSoundPlayer.startSequentialRandomSoundsWithPanning(
-        soundDirectory, 
-        observationId, 
-        pan, 
-        volume
-      );
-       _activeBirdSounds[observationId] = _observations.firstWhere((obs) => obs["id"] == observationId);
-    }
-     catch (e) {
+          soundDirectory, observationId, pan, volume);
+      _activeBirdSounds[observationId] =
+          _observations.firstWhere((obs) => obs["id"] == observationId);
+    } catch (e) {
       debugPrint('Error starting bird sounds with panning: $e');
     }
   }
 
   // Update panning and volume for already playing sounds
-  Future<void> _updatePanningAndVolume(int observationId, double pan, double volume) async {
+  Future<void> _updatePanningAndVolume(
+      int observationId, double pan, double volume) async {
     try {
       await _birdSoundPlayer.updatePanningAndVolume(observationId, pan, volume);
     } catch (e) {
@@ -342,9 +335,11 @@ class LocationService {
   }
 
   // The original methods can stay as they are but should be updated to use the new panning methods
-  Future<void> _startSequentialSounds(String soundDirectory, int observationId) async {
+  Future<void> _startSequentialSounds(
+      String soundDirectory, int observationId) async {
     // Now calls the panning version with neutral panning (center)
-    await _startSequentialSoundsWithPanning(soundDirectory, observationId, 0.0, 1.0);
+    await _startSequentialSoundsWithPanning(
+        soundDirectory, observationId, 0.0, 1.0);
   }
 
   // Other methods remain unchanged

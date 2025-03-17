@@ -18,7 +18,8 @@ class _MapPageState extends State<MapPage> {
   List<Map<String, dynamic>> observations = [];
   List<CircleMarker> circles = [];
   double _zoomLevel = AppConstants.defaultZoom;
-  LatLng _userLocation = LatLng(56.171812, 10.187769); // Default location until we get user's position
+  LatLng _userLocation = LatLng(
+      56.171812, 10.187769); // Default location until we get user's position
   final MapController _mapController = MapController();
   bool _isLocationLoaded = false;
 
@@ -43,24 +44,25 @@ class _MapPageState extends State<MapPage> {
           return;
         }
       }
-      
+
       if (permission == LocationPermission.deniedForever) {
         // Permissions are permanently denied, handle accordingly
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Location permissions are permanently denied')),
+          const SnackBar(
+              content: Text('Location permissions are permanently denied')),
         );
         return;
       }
-      
+
       // Get current position
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
-      
+
       setState(() {
         _userLocation = LatLng(position.latitude, position.longitude);
         _isLocationLoaded = true;
-        
+
         // Center map on user location if this is initial load
         if (_mapController.camera.zoom != 0) {
           _mapController.move(_userLocation, _zoomLevel);
@@ -181,7 +183,7 @@ class _MapPageState extends State<MapPage> {
   @override
   Widget build(BuildContext context) {
     final locationService = Provider.of<LocationService>(context);
-    final activeBirdSound = locationService.getActiveBirdSound();
+    final activeBirdSounds = locationService.getActiveBirdSounds();
 
     return Scaffold(
       body: Stack(
@@ -258,7 +260,7 @@ class _MapPageState extends State<MapPage> {
             ),
           ),
           // Active bird sound information
-          if (activeBirdSound != null)
+          if (activeBirdSounds.isNotEmpty)
             Positioned(
               top: 16,
               left: 16,
@@ -286,12 +288,13 @@ class _MapPageState extends State<MapPage> {
                         fontSize: 16.0,
                       ),
                     ),
-                    Text(
-                      '${activeBirdSound["bird_name"]} (${activeBirdSound["scientific_name"]})',
-                      style: TextStyle(
-                        fontSize: 14.0,
+                    for (var birdSound in activeBirdSounds)
+                      Text(
+                        '${birdSound["bird_name"]} (${birdSound["scientific_name"]})',
+                        style: TextStyle(
+                          fontSize: 14.0,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),
