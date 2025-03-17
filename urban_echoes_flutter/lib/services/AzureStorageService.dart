@@ -100,6 +100,7 @@ class AzureStorageService {
         }
 
         debugPrint('Found ${fileUrls.length} files in $folderPath');
+        debugPrint('Found $fileUrls in $folderPath');
         return fileUrls;
       } catch (xmlError) {
         debugPrint('Error parsing XML response: $xmlError');
