@@ -24,7 +24,9 @@ class LocationService {
 
   // Store last position to avoid redundant checks
   Position? _lastPosition;
-  String? _lastGridCell;
+
+  // Remove the lastGridCell check to ensure we process all observations
+  // String? _lastGridCell;
 
   static const int _locationUpdateIntervalSeconds = 5;
 
@@ -105,8 +107,9 @@ class LocationService {
     int latIndex = (lat * 111319 / _gridSize).floor();
     int lngIndex = (lng * 111319 * cos(lat * pi / 180) / _gridSize).floor();
 
-    for (int i = -1; i <= 1; i++) {
-      for (int j = -1; j <= 1; j++) {
+    // Increase the grid search radius to ensure we catch all nearby points
+    for (int i = -2; i <= 2; i++) {
+      for (int j = -2; j <= 2; j++) {
         if (i == 0 && j == 0) continue; // Skip center cell (already added)
         cells.add('${latIndex + i}:${lngIndex + j}');
       }
@@ -137,7 +140,7 @@ class LocationService {
   void _startTrackingLocation() {
     const LocationSettings locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 10, // Update when user moves 10 meters
+      distanceFilter: 5, // Update when user moves 5 meters instead of 10
       timeLimit: Duration(seconds: _locationUpdateIntervalSeconds),
     );
 
@@ -149,25 +152,9 @@ class LocationService {
   }
 
   void _processLocationUpdate(Position position) {
-    // Check if we've moved to a new grid cell
-    String currentGridCell =
-        _getGridCellKey(position.latitude, position.longitude);
-
-    // Skip processing if we're in the same grid cell and haven't moved significantly
-    if (_lastPosition != null && _lastGridCell == currentGridCell) {
-      double distance = Geolocator.distanceBetween(_lastPosition!.latitude,
-          _lastPosition!.longitude, position.latitude, position.longitude);
-
-      // If we haven't moved more than 0.2 meters, skip this update
-      if (distance < 0.2) {
-        return;
-      }
-    }
-
+    // Always process the location update regardless of grid cell
+    // This ensures we don't miss any observations
     _lastPosition = position;
-    _lastGridCell = currentGridCell;
-
-    // Check points only in relevant grid cells
     _checkProximityToPoints(position);
   }
 
@@ -179,6 +166,7 @@ class LocationService {
 
     // Create a set of observations we've checked to avoid duplicates
     Set<int> checkedObservations = {};
+    Set<int> activeObservationsThisUpdate = {};
 
     // First, check observations in current and neighboring cells
     for (String cell in cells) {
@@ -199,6 +187,8 @@ class LocationService {
 
         // User is inside the observation area
         if (distance <= _maxAudioDistance) {
+          activeObservationsThisUpdate.add(id);
+
           // Calculate panning and volume based on position
           final double pan = _calculatePanning(position.latitude,
               position.longitude, obs["latitude"], obs["longitude"]);
@@ -212,50 +202,26 @@ class LocationService {
             _startSequentialSoundsWithPanning(
                 obs["sound_directory"], id, pan, volume);
             _activeObservations[id] = true;
+            _activeBirdSounds[id] = obs;
           } else {
             // Update panning and volume for already playing sounds
             _updatePanningAndVolume(id, pan, volume);
           }
         }
-        // User left the observation area
-        else if (_activeObservations.containsKey(id) &&
-            _activeObservations[id]!) {
-          // Stop playing sounds
-          _stopSounds(id);
-          _activeObservations[id] = false;
-        }
       }
     }
 
-    // Handle any active observations that weren't in checked grid cells
+    // Now check all active observations to see if any should be stopped
     Set<int> activeIds = Set.from(_activeObservations.keys
         .where((id) => _activeObservations[id]!)
         .toList());
 
-    Set<int> uncheckedActiveIds = activeIds.difference(checkedObservations);
-
-    // For any active observations that weren't checked, verify if they should still be active
-    for (int id in uncheckedActiveIds) {
-      // Find the observation in our main list
-      var obs =
-          _observations.firstWhere((o) => o["id"] == id, orElse: () => {});
-      if (obs.isEmpty) continue;
-
-      final distance = Distance().as(
-        LengthUnit.Meter,
-        LatLng(position.latitude, position.longitude),
-        LatLng(obs["latitude"], obs["longitude"]),
-      );
-
-      if (distance > _maxAudioDistance) {
+    for (int id in activeIds) {
+      // If this observation isn't in our active set for this update, stop it
+      if (!activeObservationsThisUpdate.contains(id)) {
         _stopSounds(id);
         _activeObservations[id] = false;
-      } else {
-        // Update panning and volume
-        final double pan = _calculatePanning(position.latitude,
-            position.longitude, obs["latitude"], obs["longitude"]);
-        final double volume = _calculateVolume(distance);
-        _updatePanningAndVolume(id, pan, volume);
+        _activeBirdSounds.remove(id);
       }
     }
   }
@@ -346,6 +312,7 @@ class LocationService {
   Future<void> _stopSounds(int observationId) async {
     try {
       await _birdSoundPlayer.stopSounds(observationId);
+      _activeBirdSounds.remove(observationId);
     } catch (e) {
       debugPrint('Error stopping bird sounds: $e');
     }
