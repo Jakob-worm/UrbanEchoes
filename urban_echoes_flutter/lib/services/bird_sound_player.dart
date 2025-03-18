@@ -12,10 +12,17 @@ class BirdSoundPlayer {
   final AzureStorageService _storageService = AzureStorageService();
   final Random _random = Random();
   
+  // Track player initialization state
+  final Map<String, bool> _isPlayerInitialized = {};
+  
   // Cache for sound files with expiration
   final Map<String, List<String>> _soundFileCache = {};
   final Map<String, DateTime> _cacheTimestamps = {}; // Track when cache was populated
   final Duration _cacheExpiration = Duration(hours: 1); // Expire cache after 1 hour
+  
+  // Track volume settings
+  final Map<String, double> _volumeSettings = {};
+  final Map<String, double> _panSettings = {};
   
   // Spatial audio configuration
   final double _panningExponent = 0.5;
@@ -27,6 +34,12 @@ class BirdSoundPlayer {
   // Retry mechanism
   final Map<String, int> _retryCount = {};
   final int _maxRetries = 3;
+
+  // Track player usage
+  final Map<String, bool> _playerInUse = {};
+  
+  // Mutex to prevent concurrent access
+  final Map<String, bool> _playerLock = {};
   
   // Debug info
   int get activePlayerCount => _players.length;
@@ -41,21 +54,34 @@ class BirdSoundPlayer {
       return;
     }
 
-    debugPrint('🔊 Starting sound for observation $observationId');
+    debugPrint('🔊 Starting sound for observation $observationId with volume=$volume, pan=$pan');
+    
+    // Store the volume/pan settings even before player is initialized
+    _volumeSettings[observationId] = volume;
+    _panSettings[observationId] = pan;
+    
     _isActive[observationId] = true;
     _activeFolders[observationId] = folderPath;
     _retryCount[observationId] = 0;
 
     await _cacheSoundFiles(folderPath);
     await _initializePlayer(observationId);
-    await _applyPanningAndVolume(_players[observationId]!, pan, volume);
-    await _playRandomSound(folderPath, observationId, pan, volume);
+    
+    if (_players.containsKey(observationId) && _isPlayerInitialized[observationId] == true) {
+      await _applyPanningAndVolume(_players[observationId]!, pan, volume, observationId);
+      await _playRandomSound(folderPath, observationId, pan, volume);
+    } else {
+      debugPrint('❌ Failed to initialize player for $observationId');
+    }
     
     _logActivePlayers();
   }
 
   void _logActivePlayers() {
     debugPrint('🎵 Active players: ${_players.length}, IDs: ${_players.keys.join(", ")}');
+    for (var id in _players.keys) {
+      debugPrint('  - Player $id: volume=${_volumeSettings[id] ?? "unknown"}, pan=${_panSettings[id] ?? "unknown"}');
+    }
   }
 
   // Cache sound files with expiration check
@@ -91,46 +117,99 @@ class BirdSoundPlayer {
 
   // Initialize audio player with better error handling
   Future<void> _initializePlayer(String observationId) async {
-    if (_players.containsKey(observationId)) {
-      try {
-        await _players[observationId]!.stop();
-        await _players[observationId]!.dispose();
-      } catch (e) {
-        debugPrint('❌ Error cleaning up existing player: $e');
-      }
+    // Acquire lock
+    if (_playerLock[observationId] == true) {
+      debugPrint('⚠️ Player initialization already in progress for $observationId');
+      return;
     }
     
-    // Create new audio player with specific settings
-    AudioPlayer player = AudioPlayer();
+    _playerLock[observationId] = true;
     
     try {
-      // Use low latency mode for better performance with ambient sounds
-      await player.setPlayerMode(PlayerMode.lowLatency);
-      await player.setReleaseMode(ReleaseMode.stop);
+      // Clean up any existing player
+      if (_players.containsKey(observationId)) {
+        try {
+          _isPlayerInitialized[observationId] = false;
+          _playerInUse[observationId] = false;
+          
+          // Try to stop
+          if (_players[observationId]!.state != PlayerState.disposed) {
+            await _players[observationId]!.stop().catchError((e) {
+              debugPrint('❌ Error stopping player (cleanup): $e');
+            });
+          }
+          
+          // Try to dispose
+          if (_players[observationId]!.state != PlayerState.disposed) {
+            await _players[observationId]!.dispose().catchError((e) {
+              debugPrint('❌ Error disposing player (cleanup): $e');
+            });
+          }
+          
+          _players.remove(observationId);
+        } catch (e) {
+          debugPrint('❌ Error cleaning up existing player: $e');
+        }
+      }
       
-      // Try to set mixing options if supported
+      // Create new audio player with specific settings
+      debugPrint('Creating new AudioPlayer instance for $observationId');
+      AudioPlayer player = AudioPlayer();
+      _players[observationId] = player;
+      _playerInUse[observationId] = true;
+      
       try {
-        // Attempt to set mix mode through alternate API if available
-        // ignore: unnecessary_cast
-        final playerInstance = player as dynamic;
-        if (playerInstance.setMixWithOthers != null) {
-          await playerInstance.setMixWithOthers(true);
+        // Use low latency mode for better performance with ambient sounds
+        await player.setPlayerMode(PlayerMode.lowLatency).catchError((e) {
+          debugPrint('❌ Error setting player mode: $e');
+        });
+        
+        await player.setReleaseMode(ReleaseMode.stop).catchError((e) {
+          debugPrint('❌ Error setting release mode: $e');
+        });
+        
+        // Try to set mixing options if supported
+        try {
+          // Attempt to set mix mode through alternate API if available
+          // ignore: unnecessary_cast
+          final playerInstance = player as dynamic;
+          if (playerInstance.setMixWithOthers != null) {
+            await playerInstance.setMixWithOthers(true);
+          }
+        } catch (e) {
+          // Ignore if method not available
         }
       } catch (e) {
-        // Ignore if method not available
+        debugPrint('⚠️ Error setting audio options: $e');
       }
+      
+      // Set up completion listener once during initialization
+      player.onPlayerComplete.listen((event) {
+        if (_isActive[observationId] == true) {
+          _handlePlaybackComplete(observationId);
+        }
+      });
+      
+      // Mark as initialized
+      _isPlayerInitialized[observationId] = true;
+      
+      // Apply volume settings if they were already set
+      if (_volumeSettings.containsKey(observationId) && _panSettings.containsKey(observationId)) {
+        await _applyPanningAndVolume(
+          player, 
+          _panSettings[observationId]!, 
+          _volumeSettings[observationId]!,
+          observationId
+        );
+      }
+      
+      debugPrint('🎵 Initialized player for $observationId');
     } catch (e) {
-      debugPrint('⚠️ Error setting audio options: $e');
+      debugPrint('❌ Error initializing audio player: $e');
+    } finally {
+      // Release lock
+      _playerLock[observationId] = false;
     }
-    
-    _players[observationId] = player;
-    
-    // Set up completion listener once during initialization
-    player.onPlayerComplete.listen((_) {
-      _handlePlaybackComplete(observationId);
-    });
-    
-    debugPrint('🎵 Initialized player for $observationId');
   }
 
   // Handle playback completion
@@ -150,17 +229,9 @@ class BirdSoundPlayer {
         
         Future.delayed(Duration(milliseconds: delay), () {
           if (_isActive[observationId] == true) {
-            // Get the last known panning and volume values
-            double pan = 0.0;
-            double volume = 1.0;
-            try {
-              if (_players.containsKey(observationId)) {
-                pan = _players[observationId]!.balance;
-                volume = _players[observationId]!.volume;
-              }
-            } catch (e) {
-              // Use defaults if unable to retrieve
-            }
+            // Get the stored volume/pan values
+            double pan = _panSettings[observationId] ?? 0.0;
+            double volume = _volumeSettings[observationId] ?? 1.0;
             
             _playRandomSound(folderPath, observationId, pan, volume);
           }
@@ -187,15 +258,31 @@ class BirdSoundPlayer {
         }
       }
       
-      if (!_players.containsKey(observationId)) {
+      // Ensure player is initialized
+      if (!_players.containsKey(observationId) || 
+          _isPlayerInitialized[observationId] != true || 
+          _playerInUse[observationId] != true) {
         await _initializePlayer(observationId);
-        await _applyPanningAndVolume(_players[observationId]!, pan, volume);
+        if (!_players.containsKey(observationId) || 
+            _isPlayerInitialized[observationId] != true || 
+            _playerInUse[observationId] != true) {
+          debugPrint('❌ Failed to initialize player for $observationId');
+          return;
+        }
+        await _applyPanningAndVolume(_players[observationId]!, pan, volume, observationId);
       }
       
       AudioPlayer player = _players[observationId]!;
       
       // Select random file
-      String randomFile = files[_random.nextInt(files.length)];
+      String randomFile;
+      try {
+        randomFile = files[_random.nextInt(files.length)];
+      } catch (e) {
+        debugPrint('❌ Error selecting random file: $e');
+        _handlePlaybackError(folderPath, observationId, pan, volume);
+        return;
+      }
       
       // Start buffering timeout
       _startBufferingTimeout(observationId);
@@ -203,7 +290,23 @@ class BirdSoundPlayer {
       debugPrint('🎵 Playing sound for $observationId: $randomFile');
       
       try {
-        await player.play(UrlSource(randomFile));
+        // Force set volume again right before playing
+        await _applyPanningAndVolume(player, pan, volume, observationId);
+        
+        // Safe play with error handling
+        await player.play(UrlSource(randomFile)).catchError((e) {
+          debugPrint('❌ Error playing sound: $e');
+          _handlePlaybackError(folderPath, observationId, pan, volume);
+        });
+        
+        // Check volume setting after playing
+        try {
+          double actualVolume = player.volume;
+          double actualBalance = player.balance;
+          debugPrint('Volume check for $observationId - Target: $volume, Actual: $actualVolume, Pan - Target: $pan, Actual: $actualBalance');
+        } catch (e) {
+          debugPrint('❌ Error checking volume: $e');
+        }
       } catch (e) {
         debugPrint('❌ Error playing sound: $e');
         _handlePlaybackError(folderPath, observationId, pan, volume);
@@ -230,7 +333,9 @@ class BirdSoundPlayer {
         
         String? folderPath = _activeFolders[observationId];
         if (folderPath != null) {
-          _handlePlaybackError(folderPath, observationId, 0.0, 1.0);
+          double pan = _panSettings[observationId] ?? 0.0;
+          double volume = _volumeSettings[observationId] ?? 1.0;
+          _handlePlaybackError(folderPath, observationId, pan, volume);
         }
       }
     });
@@ -254,15 +359,31 @@ class BirdSoundPlayer {
     
     debugPrint('🔄 Handling playback error for $observationId (retry $retries/$_maxRetries)');
     
-    // Clean up existing player
+    // Clean up existing player safely
     if (_players.containsKey(observationId)) {
       try {
-        _players[observationId]!.stop();
-        _players[observationId]!.dispose();
-        _players.remove(observationId);
+        if (_players[observationId]!.state != PlayerState.disposed) {
+          _players[observationId]!.stop().catchError((e) {
+            debugPrint('❌ Error stopping player (error handler): $e');
+          });
+        }
       } catch (e) {
-        debugPrint('❌ Error cleaning up player: $e');
+        debugPrint('❌ Error stopping player: $e');
       }
+      
+      try {
+        if (_players[observationId]!.state != PlayerState.disposed) {
+          _players[observationId]!.dispose().catchError((e) {
+            debugPrint('❌ Error disposing player (error handler): $e');
+          });
+        }
+      } catch (e) {
+        debugPrint('❌ Error disposing player: $e');
+      }
+      
+      _players.remove(observationId);
+      _isPlayerInitialized[observationId] = false;
+      _playerInUse[observationId] = false;
     }
     
     // If exceed max retries, give up
@@ -279,21 +400,69 @@ class BirdSoundPlayer {
       if (_isActive[observationId] == true) {
         debugPrint('🔄 Retrying sound for $observationId after $delayMs ms');
         _initializePlayer(observationId).then((_) {
-          _applyPanningAndVolume(_players[observationId]!, pan, volume).then((_) {
-            _playRandomSound(folderPath, observationId, pan, volume);
-          });
+          if (_players.containsKey(observationId) && 
+              _isPlayerInitialized[observationId] == true && 
+              _playerInUse[observationId] == true) {
+            _applyPanningAndVolume(
+              _players[observationId]!, 
+              pan, 
+              volume,
+              observationId
+            ).then((_) {
+              _playRandomSound(folderPath, observationId, pan, volume);
+            });
+          }
         });
       }
     });
   }
 
-  // Apply panning and volume with error handling
-  Future<void> _applyPanningAndVolume(AudioPlayer player, double pan, double volume) async {
+  // Apply panning and volume with error handling and better verification
+  Future<void> _applyPanningAndVolume(AudioPlayer player, double pan, double volume, String observationId) async {
     double adjustedPan = _applyPanningLaw(pan);
     
+    // Store the requested values
+    _panSettings[observationId] = pan;
+    _volumeSettings[observationId] = volume;
+    
+    debugPrint('Setting volume=$volume, pan=$pan for $observationId');
+    
     try {
-      await player.setBalance(adjustedPan);
-      await player.setVolume(volume);
+      // Try to set balance
+      await player.setBalance(adjustedPan).catchError((e) {
+        debugPrint('❌ Error setting balance: $e');
+      });
+      
+      // Try to set volume
+      await player.setVolume(volume).catchError((e) {
+        debugPrint('❌ Error setting volume: $e');
+      });
+      
+      // Verify the settings took effect
+      try {
+        double actualVolume = player.volume;
+        double actualBalance = player.balance;
+        
+        debugPrint('Volume verification for $observationId - requested: $volume, actual: $actualVolume');
+        debugPrint('Balance verification for $observationId - requested: $adjustedPan, actual: $actualBalance');
+        
+        // If values are significantly different, try one more time
+        if ((actualVolume - volume).abs() > 0.01 || (actualBalance - adjustedPan).abs() > 0.01) {
+          debugPrint('⚠️ Volume/balance mismatch detected, trying again');
+          
+          // Try to set balance again
+          await player.setBalance(adjustedPan).catchError((e) {
+            debugPrint('❌ Error setting balance (retry): $e');
+          });
+          
+          // Try to set volume again
+          await player.setVolume(volume).catchError((e) {
+            debugPrint('❌ Error setting volume (retry): $e');
+          });
+        }
+      } catch (e) {
+        debugPrint('❌ Error verifying volume/balance: $e');
+      }
     } catch (e) {
       debugPrint('❌ Error applying panning/volume: $e');
     }
@@ -310,13 +479,19 @@ class BirdSoundPlayer {
 
   // Update panning and volume for active sound
   Future<void> updatePanningAndVolume(String observationId, double pan, double volume) async {
-    if (!_players.containsKey(observationId)) {
+    // Store the requested values regardless of player status
+    _panSettings[observationId] = pan;
+    _volumeSettings[observationId] = volume;
+    
+    if (!_players.containsKey(observationId) || 
+        _isPlayerInitialized[observationId] != true || 
+        _playerInUse[observationId] != true) {
       debugPrint('⚠️ Cannot update panning: player not found for $observationId');
       return;
     }
     
     try {
-      await _applyPanningAndVolume(_players[observationId]!, pan, volume);
+      await _applyPanningAndVolume(_players[observationId]!, pan, volume, observationId);
     } catch (e) {
       debugPrint('❌ Error updating panning/volume: $e');
     }
@@ -331,23 +506,43 @@ class BirdSoundPlayer {
     
     if (_players.containsKey(observationId)) {
       try {
-        await _players[observationId]!.stop();
-        await _players[observationId]!.dispose();
-        _players.remove(observationId);
-        
-        debugPrint('🎵 Removed player for $observationId, remaining: ${_players.length}');
+        // Only attempt to stop if the player is not disposed
+        if (_players[observationId]!.state != PlayerState.disposed) {
+          await _players[observationId]!.stop().catchError((e) {
+            debugPrint('❌ Error stopping sound: $e');
+          });
+        }
       } catch (e) {
         debugPrint('❌ Error stopping sound: $e');
       }
+      
+      try {
+        // Only attempt to dispose if the player is not already disposed
+        if (_players[observationId]!.state != PlayerState.disposed) {
+          await _players[observationId]!.dispose().catchError((e) {
+            debugPrint('❌ Error disposing player: $e');
+          });
+        }
+      } catch (e) {
+        debugPrint('❌ Error disposing player: $e');
+      }
+      
+      _players.remove(observationId);
+      _isPlayerInitialized[observationId] = false;
+      _playerInUse[observationId] = false;
+      
+      debugPrint('🎵 Removed player for $observationId, remaining: ${_players.length}');
     }
   }
 
   // Play a one-shot sound (for UI feedback, etc.)
   Future<void> playRandomSoundFromFolder(String folderPath, double volume) async {
     AudioPlayer oneTimePlayer = AudioPlayer();
+    bool playerInitialized = false;
 
     try {
       await oneTimePlayer.setPlayerMode(PlayerMode.lowLatency);
+      playerInitialized = true;
       
       // Try to set mixing options if available
       try {
@@ -371,7 +566,11 @@ class BirdSoundPlayer {
           _cacheTimestamps[folderPath] = DateTime.now();
         } else {
           debugPrint('❌ No sound files found');
-          oneTimePlayer.dispose();
+          if (playerInitialized && oneTimePlayer.state != PlayerState.disposed) {
+            await oneTimePlayer.dispose().catchError((e) {
+              // Ignore cleanup errors
+            });
+          }
           return;
         }
       }
@@ -379,24 +578,53 @@ class BirdSoundPlayer {
       List<String> files = _soundFileCache[folderPath] ?? [];
       if (files.isEmpty) {
         debugPrint('❌ No cached sound files');
-        oneTimePlayer.dispose();
+        if (playerInitialized && oneTimePlayer.state != PlayerState.disposed) {
+          await oneTimePlayer.dispose().catchError((e) {
+            // Ignore cleanup errors
+          });
+        }
         return;
       }
       
       String randomFile = files[_random.nextInt(files.length)];
 
+      // Setup completion listener
       oneTimePlayer.onPlayerComplete.listen((_) {
-        oneTimePlayer.dispose();
+        if (playerInitialized && oneTimePlayer.state != PlayerState.disposed) {
+          oneTimePlayer.dispose().catchError((e) {
+            // Ignore cleanup errors
+          });
+        }
       });
       
-      debugPrint('🎵 Playing one-shot sound: $randomFile');
-      await oneTimePlayer.setVolume(volume);
+      debugPrint('🎵 Playing one-shot sound: $randomFile with volume=$volume');
+      
+      // Apply volume explicitly
+      await oneTimePlayer.setVolume(volume).catchError((e) {
+        debugPrint('❌ Error setting volume for one-shot sound: $e');
+      });
+      
+      // Verify volume set correctly
+      try {
+        debugPrint('One-shot sound volume verification - requested: $volume, actual: ${oneTimePlayer.volume}');
+      } catch (e) {
+        debugPrint('❌ Error verifying volume: $e');
+      }
+      
       await oneTimePlayer.play(UrlSource(randomFile));
       
       // Safety cleanup
       Timer(Duration(minutes: 2), () {
         try {
-          oneTimePlayer.stop().then((_) => oneTimePlayer.dispose());
+          if (playerInitialized && oneTimePlayer.state != PlayerState.disposed) {
+            oneTimePlayer.stop().then((_) {
+              oneTimePlayer.dispose().catchError((e) {
+                // Ignore cleanup errors
+              });
+            }).catchError((e) {
+              // Ignore cleanup errors
+            });
+          }
         } catch (e) {
           // Player might already be disposed
         }
@@ -404,7 +632,11 @@ class BirdSoundPlayer {
       
     } catch (e) {
       debugPrint('❌ Failed to play one-shot sound: $e');
-      oneTimePlayer.dispose();
+      if (playerInitialized && oneTimePlayer.state != PlayerState.disposed) {
+        oneTimePlayer.dispose().catchError((e) {
+          // Ignore cleanup errors
+        });
+      }
     }
   }
 
@@ -416,10 +648,28 @@ class BirdSoundPlayer {
       timer?.cancel();
     }
     
-    for (var observationId in _players.keys) {
+    // Make a copy of keys to avoid concurrent modification
+    final playerKeys = List<String>.from(_players.keys);
+    
+    for (var observationId in playerKeys) {
       try {
-        _players[observationId]!.stop();
-        _players[observationId]!.dispose();
+        // Only attempt to stop and dispose if player isn't already disposed
+        if (_players[observationId]!.state != PlayerState.disposed) {
+          _players[observationId]!.stop().then((_) {
+            if (_players[observationId]!.state != PlayerState.disposed) {
+              _players[observationId]!.dispose().catchError((e) {
+                // Ignore cleanup errors
+              });
+            }
+          }).catchError((e) {
+            // Ignore cleanup errors
+            if (_players[observationId]!.state != PlayerState.disposed) {
+              _players[observationId]!.dispose().catchError((e) {
+                // Ignore cleanup errors
+              });
+            }
+          });
+        }
       } catch (e) {
         debugPrint('❌ Error disposing player: $e');
       }
@@ -432,6 +682,11 @@ class BirdSoundPlayer {
     _bufferingTimers.clear();
     _retryCount.clear();
     _cacheTimestamps.clear();
+    _isPlayerInitialized.clear();
+    _playerInUse.clear();
+    _playerLock.clear();
+    _volumeSettings.clear();
+    _panSettings.clear();
     onBufferingTimeout = null;
   }
 }

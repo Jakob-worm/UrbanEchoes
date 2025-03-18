@@ -14,18 +14,26 @@ class LocationService extends ChangeNotifier {
   bool _isInitialized = false;
   Position? _lastKnownPosition;
   bool _isLocationTrackingEnabled = true;
-  String? _errorMessage;
 
   final LocationSettings locationSettings = LocationSettings(
     accuracy: LocationAccuracy.high,
     distanceFilter: 100,
   );
 
+  // Active bird sounds that widgets can observe
   final Map<String, Map<String, dynamic>> _activeBirdSounds = {};
   final Map<String, bool> _activeObservations = {};
   final Map<String, List<Map<String, dynamic>>> _spatialGrid = {};
   final int _gridSize = AppConstants.gridSize;
+  
+  // Audio spatial parameters
   final double _maxAudioDistance = AppConstants.defaultPointRadius;
+  final double _falloffExponent = 2.0; // Quadratic falloff (2.0) sounds more natural than linear (1.0)
+  final double _minVolume = 0.05; // Minimum volume at max distance
+  final double _maxVolume = 1.0; // Maximum volume at center
+  
+  // Volume debug info
+  final Map<String, double> _lastCalculatedVolumes = {};
 
   // Getters
   List<Map<String, dynamic>> getActiveBirdSounds() {
@@ -35,7 +43,22 @@ class LocationService extends ChangeNotifier {
   bool get isInitialized => _isInitialized;
   bool get isLocationTrackingEnabled => _isLocationTrackingEnabled;
   Position? get lastKnownPosition => _lastKnownPosition;
-  String? get errorMessage => _errorMessage;
+  
+  // Get volume debug info for a specific observation
+  Map<String, dynamic> getVolumeInfo(String observationId) {
+    if (!_lastCalculatedVolumes.containsKey(observationId)) {
+      return {"volume": 0.0, "distance": double.infinity};
+    }
+    
+    return {
+      "volume": _lastCalculatedVolumes[observationId],
+      "distance": _lastCalculatedDistances[observationId],
+      "maxDistance": _maxAudioDistance,
+    };
+  }
+  
+  // Map to track distances for debugging
+  final Map<String, double> _lastCalculatedDistances = {};
 
   // Toggle location tracking
   void toggleLocationTracking(bool enabled) {
@@ -61,30 +84,29 @@ class LocationService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Modified to handle context safely
   Future<void> initialize(BuildContext context) async {
     if (_isInitialized) {
       debugPrint('LocationService already initialized, skipping...');
       return;
     }
 
-    // Instead of using context directly, extract what we need before async operations
+    // Force reinitialize any existing audio resources
+    _birdSoundPlayer.dispose();
+    _activeBirdSounds.clear();
+    _activeObservations.clear();
+    
+    // Extract what we need from context before async operations
     final bool debugMode = Provider.of<bool>(context, listen: false);
     final String apiUrl = debugMode
         ? 'http://10.0.2.2:8000/observations'
         : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
     
-    // Store the build context's navigator state to avoid using context later
+    // Store the messenger for later use
     final scaffoldMessenger = ScaffoldMessenger.of(context);
 
-    // Force reinitialize any existing audio resources
-    _birdSoundPlayer.dispose();
-    _activeBirdSounds.clear();
-    _activeObservations.clear();
-    _birdSoundPlayer.onBufferingTimeout = handleBufferingTimeout;
-
     try {
-      _observations = await ObservationService(apiUrl: apiUrl).fetchObservations();
+      _observations =
+          await ObservationService(apiUrl: apiUrl).fetchObservations();
 
       // Initialize active observations map
       for (var obs in _observations) {
@@ -97,20 +119,19 @@ class LocationService extends ChangeNotifier {
       await _requestLocationPermission();
       _startTrackingLocation();
       _isInitialized = true;
-      _errorMessage = null;
       notifyListeners();
 
-      debugPrint('LocationService initialized with ${_observations.length} observations');
+      debugPrint(
+          'LocationService initialized with ${_observations.length} observations');
     } catch (e) {
       debugPrint('Failed to initialize LocationService: $e');
-      _errorMessage = 'Failed to load bird observations. Please check your internet connection.';
       
-      // Instead of using context directly after await, we use the captured messenger
-      scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text(_errorMessage!)),
-      );
-      
-      notifyListeners();
+      // Use the messenger we cached earlier
+      if (context.mounted) {
+        scaffoldMessenger.showSnackBar(
+          SnackBar(content: Text('Failed to load bird observations. Please check your internet connection.')),
+        );
+      }
     }
   }
 
@@ -201,8 +222,8 @@ class LocationService extends ChangeNotifier {
     // Use a less frequent update interval to save battery
     const LocationSettings locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 5, // Update when user moves 5 meters
-      timeLimit: Duration(seconds: 5), // Less frequent updates
+      distanceFilter: 5, // Update when user moves 5 meters (less frequent)
+      timeLimit: Duration(seconds: 5), // Less frequent updates (5 seconds)
     );
 
     _geolocatorPlatform
@@ -291,7 +312,10 @@ class LocationService extends ChangeNotifier {
         LatLng(position.latitude, position.longitude),
         LatLng(obs["latitude"], obs["longitude"]),
       );
-      final double volume = _calculateVolume(distance);
+      final double volume = _calculateVolume(distance, uniqueId);
+      
+      // Store distance for debugging
+      _lastCalculatedDistances[uniqueId] = distance;
 
       if (!_activeObservations.containsKey(uniqueId) || !_activeObservations[uniqueId]!) {
         // Start playing sound (for this observation)
@@ -322,6 +346,8 @@ class LocationService extends ChangeNotifier {
       _stopSounds(uniqueId);
       _activeObservations[uniqueId] = false;
       _activeBirdSounds.remove(uniqueId);
+      _lastCalculatedVolumes.remove(uniqueId);
+      _lastCalculatedDistances.remove(uniqueId);
       activeSoundsChanged = true;
     }
     
@@ -368,14 +394,26 @@ class LocationService extends ChangeNotifier {
     return (bearingDeg + 360) % 360; // Ensure result is between 0 and 360
   }
 
-  double _calculateVolume(double distance) {
-    // Linear falloff with distance
-    double volume = 1.0 - (distance / _maxAudioDistance);
-
-    // Ensure volume is between 0.0 and 1.0
-    if (volume < 0.0) volume = 0.0;
-    if (volume > 1.0) volume = 1.0;
-
+  // Improved volume calculation with nonlinear falloff
+  double _calculateVolume(double distance, String observationId) {
+    // Normalize distance to 0-1 range
+    double normalizedDistance = distance / _maxAudioDistance;
+    
+    // Apply non-linear falloff (quadratic)
+    // The formula is: volume = maxVolume * (1 - (distance/maxDistance)^exponent) + minVolume
+    // This gives a more natural falloff curve
+    double volumeRange = _maxVolume - _minVolume;
+    double volumeFactor = pow(1.0 - normalizedDistance.clamp(0.0, 1.0), _falloffExponent).toDouble();
+    double volume = (_maxVolume - volumeRange) + (volumeRange * volumeFactor);
+    
+    // Ensure volume is within bounds
+    volume = volume.clamp(_minVolume, _maxVolume);
+    
+    // Store for debugging
+    _lastCalculatedVolumes[observationId] = volume;
+    
+    debugPrint('🔊 Volume calculation for $observationId: distance=$distance, normalized=$normalizedDistance, volume=$volume');
+    
     return volume;
   }
 
@@ -398,7 +436,7 @@ class LocationService extends ChangeNotifier {
     try {
       await _birdSoundPlayer.updatePanningAndVolume(observationId, pan, volume);
     } catch (e) {
-      debugPrint('Error updating panning and volume: $e');
+      debugPrint('Error updating panning/volume: $e');
     }
   }
 
@@ -411,40 +449,40 @@ class LocationService extends ChangeNotifier {
     }
   }
 
-  void handleBufferingTimeout(String observationId) {
-    // If we get a buffering timeout for an observation, try another sound
-    if (_activeObservations.containsKey(observationId) && _activeObservations[observationId]!) {
-      final observation = _activeBirdSounds[observationId];
-      if (observation != null) {
-        try {
-          // Use cached position instead of getting a new one
-          _getPosition().then((position) {
-            if (_isLocationTrackingEnabled && _activeObservations[observationId]!) {
-              // Calculate new panning and volume
-              final double pan = _calculatePanning(position.latitude,
-                  position.longitude, observation["latitude"], observation["longitude"]);
-              
-              final distance = Distance().as(
-                LengthUnit.Meter,
-                LatLng(position.latitude, position.longitude),
-                LatLng(observation["latitude"], observation["longitude"]),
-              );
-              final double volume = _calculateVolume(distance);
-              
-              // Stop current sound and start a new one
-              _birdSoundPlayer.stopSounds(observationId).then((_) {
-                if (_isLocationTrackingEnabled && _activeObservations[observationId]!) {
-                  _startSound(observation["sound_directory"], observationId, pan, volume);
-                }
-              });
-            }
-          });
-        } catch (e) {
-          debugPrint('Error handling buffering timeout: $e');
-        }
+ void handleBufferingTimeout(String observationId) {
+  // If we get a buffering timeout for an observation, try another sound
+  if (_activeObservations.containsKey(observationId) && _activeObservations[observationId]!) {
+    final observation = _activeBirdSounds[observationId];
+    if (observation != null) {
+      try {
+        // Use cached position instead of getting a new one
+        _getPosition().then((position) {
+          if (_isLocationTrackingEnabled && _activeObservations[observationId]!) {
+            // Calculate new panning and volume
+            final double pan = _calculatePanning(position.latitude,
+                position.longitude, observation["latitude"], observation["longitude"]);
+            
+            final distance = Distance().as(
+              LengthUnit.Meter,
+              LatLng(position.latitude, position.longitude),
+              LatLng(observation["latitude"], observation["longitude"]),
+            );
+            final double volume = _calculateVolume(distance, observationId);
+            
+            // Stop current sound and start a new one
+            _birdSoundPlayer.stopSounds(observationId).then((_) {
+              if (_isLocationTrackingEnabled && _activeObservations[observationId]!) {
+                _startSound(observation["sound_directory"], observationId, pan, volume);
+              }
+            });
+          }
+        });
+      } catch (e) {
+        debugPrint('Error handling buffering timeout: $e');
       }
     }
   }
+ }
 
   @override
   void dispose() {
@@ -460,6 +498,8 @@ class LocationService extends ChangeNotifier {
     _activeBirdSounds.clear();
     _spatialGrid.clear();
     _observations.clear();
+    _lastCalculatedVolumes.clear();
+    _lastCalculatedDistances.clear();
     _isInitialized = false;
     super.dispose();
   }

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -15,23 +16,113 @@ class MapPage extends StatefulWidget {
 }
 
 class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
+  // Map state
   List<Map<String, dynamic>> observations = [];
   List<CircleMarker> circles = [];
   double _zoomLevel = AppConstants.defaultZoom;
   LatLng _userLocation = LatLng(56.171812, 10.187769);
-  final MapController _mapController = MapController();
+  MapController? _mapController;
+  
+  // Loading state
   bool _isLocationLoaded = false;
   bool _dataLoaded = false;
-  bool _isLoading = true; // Track overall loading state
+  bool _isLoading = true;
+  bool _mapReady = false;
   String? _errorMessage;
+  
+  // Services
   LocationService? _locationService;
   bool _isInitialized = false;
+  bool _locationServiceInitialized = false;
+  
+  // Loading timeout
+  Timer? _loadingTimeoutTimer;
+  bool _forcedLoad = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    
+    // Create map controller but don't use it until the map is ready
+    _mapController = MapController();
+    
+    // Set a timeout for loading to prevent infinite loading
+    _loadingTimeoutTimer = Timer(Duration(seconds: 15), () {
+      if (mounted && _isLoading) {
+        print('⚠️ Loading timeout reached, forcing map display');
+        setState(() {
+          _forcedLoad = true;
+          _isLoading = false;
+          if (_errorMessage == null) {
+            _errorMessage = 'Some resources are still loading. The map may have limited functionality.';
+          }
+        });
+      }
+    });
+    
+    // Defer initialization until after the widget is properly built
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _initializeAfterBuild();
+      }
+    });
+  }
+  
+  void _initializeAfterBuild() {
+    print('Initializing map after build');
+    
+    // Initialize LocationService with proper error handling
+    _initializeLocationService();
+    
+    // Load observations
+    _loadObservations();
+    
+    // Get user location (with proper permission handling)
     _getUserLocation();
+    
+    // Force map ready if it hasn't happened in a reasonable time
+    Timer(Duration(seconds: 5), () {
+      if (mounted && !_mapReady) {
+        print('⚠️ Map ready timeout reached, forcing map ready state');
+        setState(() {
+          _mapReady = true;
+          _checkIfFullyLoaded();
+        });
+      }
+    });
+  }
+
+  void _initializeLocationService() {
+    if (_locationServiceInitialized) return;
+    
+    print('Initializing location service');
+    
+    try {
+      if (!mounted) return;
+      
+      final locationService = Provider.of<LocationService>(context, listen: false);
+      _locationService = locationService;
+      
+      if (!locationService.isInitialized) {
+        locationService.initialize(context);
+      }
+      
+      _locationServiceInitialized = true;
+      print('Location service initialized successfully');
+      
+      if (locationService.lastKnownPosition != null && !_isLocationLoaded) {
+        print('Using position from LocationService: ${locationService.lastKnownPosition!.latitude}, ${locationService.lastKnownPosition!.longitude}');
+        _updateUserLocation(locationService.lastKnownPosition!);
+      }
+    } catch (e) {
+      print('❌ Error initializing LocationService: $e');
+      setState(() {
+        _errorMessage = 'Could not access location services. Please restart the app.';
+        _isLocationLoaded = true; // Mark as loaded so we can continue
+        _checkIfFullyLoaded();
+      });
+    }
   }
 
   @override
@@ -40,68 +131,24 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
     
     // Only initialize once to avoid multiple initializations
     if (!_isInitialized) {
-      _initializeServices();
       _isInitialized = true;
     }
   }
   
-  void _initializeServices() {
-    setState(() {
-      _isLoading = true; // Start loading
-    });
-    
-    // Load observations after we have the context
-    if (!_dataLoaded) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _loadObservations();
-        }
-      });
-    }
-    
-    // Safely initialize the location service
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        try {
-          // Try to access the LocationService
-          final locationService = Provider.of<LocationService>(context, listen: false);
-          _locationService = locationService;
-          
-          // Initialize if needed
-          if (!locationService.isInitialized) {
-            locationService.initialize(context);
-          }
-          
-          // Update location if available
-          if (locationService.lastKnownPosition != null && !_isLocationLoaded) {
-            _updateUserLocation(locationService.lastKnownPosition!);
-          }
-        } catch (e) {
-          print('Error accessing LocationService: $e');
-          setState(() {
-            _errorMessage = 'Could not access location service. Please restart the app.';
-            _isLoading = false; // Stop loading even if there's an error
-          });
-        }
-      }
-    });
-  }
-
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!mounted) return;
     
-    // Use a try-catch block to safely access the service
     try {
-      final locationService = Provider.of<LocationService>(context, listen: false);
-      
-      if (state == AppLifecycleState.resumed) {
-        if (!locationService.isLocationTrackingEnabled) {
-          locationService.toggleLocationTracking(true);
-        }
-      } else if (state == AppLifecycleState.paused) {
-        if (locationService.isLocationTrackingEnabled) {
-          locationService.toggleLocationTracking(false);
+      if (_locationService != null) {
+        if (state == AppLifecycleState.resumed) {
+          if (!_locationService!.isLocationTrackingEnabled) {
+            _locationService!.toggleLocationTracking(true);
+          }
+        } else if (state == AppLifecycleState.paused) {
+          if (_locationService!.isLocationTrackingEnabled) {
+            _locationService!.toggleLocationTracking(false);
+          }
         }
       }
     } catch (e) {
@@ -112,6 +159,8 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _loadingTimeoutTimer?.cancel();
+    _mapController = null;
     super.dispose();
   }
 
@@ -119,13 +168,19 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   void _updateUserLocation(Position position) {
     if (!mounted) return;
     
+    print('Updating user location: ${position.latitude}, ${position.longitude}');
+    
     setState(() {
       _userLocation = LatLng(position.latitude, position.longitude);
       _isLocationLoaded = true;
 
-      // Center map on user location if this is initial load
-      if (_mapController.camera.zoom != 0) {
-        _mapController.move(_userLocation, _zoomLevel);
+      // Only move map if it's ready and initialized
+      if (_mapReady && _mapController != null) {
+        try {
+          _mapController!.move(_userLocation, _zoomLevel);
+        } catch (e) {
+          print('Error moving map to user location: $e');
+        }
       }
       
       // Check if we're fully loaded
@@ -135,75 +190,119 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
 
   // Check if all necessary data is loaded
   void _checkIfFullyLoaded() {
-    if (_isLocationLoaded && _dataLoaded) {
-      setState(() {
-        _isLoading = false;
-      });
+    print('Checking if fully loaded: locationLoaded=$_isLocationLoaded, dataLoaded=$_dataLoaded, mapReady=$_mapReady, forcedLoad=$_forcedLoad');
+    
+    if (_forcedLoad || (_isLocationLoaded && _dataLoaded && _mapReady)) {
+      print('All conditions satisfied (or forced load), map should now be displayed');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
+  // Safe method to show a snackbar
+  void _showSnackBar(String message) {
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
   Future<void> _getUserLocation() async {
+    print('Getting user location');
     try {
-      // Store ScaffoldMessenger before async gap
-      final scaffoldMessenger = ScaffoldMessenger.of(context);
-      
-      // Check for location permission
+      // Check if we already have location permission
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
+        print('Location permission denied, requesting...');
         permission = await Geolocator.requestPermission();
         
-        // Check if still mounted after async operations
         if (!mounted) return;
         
         if (permission == LocationPermission.denied) {
-          scaffoldMessenger.showSnackBar(
-            const SnackBar(content: Text('Location permissions are denied')),
-          );
+          print('Location permission still denied after request');
           setState(() {
-            _isLoading = false; // Stop loading if permissions denied
+            _errorMessage = 'Location permission denied';
+            _isLocationLoaded = true; // Mark as loaded so we can continue
+            _checkIfFullyLoaded();
           });
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        // Check if still mounted after async operations
+        print('Location permission permanently denied');
         if (!mounted) return;
         
-        scaffoldMessenger.showSnackBar(
-          const SnackBar(
-              content: Text('Location permissions are permanently denied')),
-        );
         setState(() {
-          _isLoading = false; // Stop loading if permissions denied
+          _errorMessage = 'Location permission permanently denied. Please enable in settings.';
+          _isLocationLoaded = true; // Mark as loaded so we can continue
+          _checkIfFullyLoaded();
         });
         return;
       }
 
-      // Get current position
-      Position position = await Geolocator.getCurrentPosition();
-      
-      // Check if still mounted after async operations
-      if (!mounted) return;
-      
-      _updateUserLocation(position);
+      print('Getting current position with timeout of 10 seconds');
+      try {
+        // Add timeout to getCurrentPosition
+        Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 10), // Add a reasonable timeout
+        );
+        
+        print('Got current position: ${position.latitude}, ${position.longitude}');
+        
+        if (!mounted) return;
+        
+        _updateUserLocation(position);
+      } catch (timeoutError) {
+        print('❌ Timeout getting location: $timeoutError');
+        
+        if (!mounted) return;
+        
+        // Try with last known position as fallback
+        print('Trying to get last known position as fallback');
+        try {
+          Position? lastPosition = await Geolocator.getLastKnownPosition();
+          if (lastPosition != null) {
+            print('Using last known position: ${lastPosition.latitude}, ${lastPosition.longitude}');
+            _updateUserLocation(lastPosition);
+          } else {
+            print('No last known position available');
+            setState(() {
+              _errorMessage = 'Could not get your location. Please try again.';
+              _isLocationLoaded = true; // Mark as loaded so we can continue
+              _checkIfFullyLoaded();
+            });
+          }
+        } catch (e) {
+          print('❌ Error getting last known position: $e');
+          setState(() {
+            _errorMessage = 'Could not access location services. Please restart the app.';
+            _isLocationLoaded = true; // Mark as loaded so we can continue
+            _checkIfFullyLoaded();
+          });
+        }
+      }
     } catch (e) {
-      // Check if still mounted after async operations
+      print('❌ General error getting location: $e');
       if (!mounted) return;
       
       setState(() {
-        _errorMessage = 'Error getting location: $e';
-        _isLoading = false; // Stop loading if there's an error
+        _errorMessage = 'Error accessing location: $e';
+        _isLocationLoaded = true; // Mark as loaded so we can continue
+        _checkIfFullyLoaded();
       });
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(_errorMessage!)),
-      );
     }
   }
 
   void _loadObservations() {
     if (_dataLoaded || !mounted) return;
+    
+    print('Loading observations');
     
     bool debugMode = false;
     try {
@@ -216,13 +315,11 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
         ? 'http://10.0.2.2:8000/observations'
         : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
 
-    // Store a reference to ScaffoldMessenger before async gap
-    final scaffoldMessenger = ScaffoldMessenger.of(context);
-
+    print('Fetching observations from: $apiUrl');
     ObservationService(apiUrl: apiUrl).fetchObservations().then((data) {
-      // Check if widget is still mounted before updating state
       if (!mounted) return;
       
+      print('Received ${data.length} observations');
       setState(() {
         observations = data.map((obs) {
           return {
@@ -244,26 +341,22 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
 
         _updateCircles();
         _dataLoaded = true;
-        
-        // Check if we're fully loaded
         _checkIfFullyLoaded();
       });
     }).catchError((error) {
-      // Check if widget is still mounted before showing error
+      print('❌ Error loading observations: $error');
       if (!mounted) return;
       
       setState(() {
         _errorMessage = 'Failed to load observations: $error';
-        _isLoading = false; // Stop loading if there's an error
+        _dataLoaded = true; // Mark as loaded so we can continue
+        _checkIfFullyLoaded();
       });
-      
-      scaffoldMessenger.showSnackBar(
-        SnackBar(content: Text(_errorMessage!)),
-      );
     });
   }
 
   void _updateCircles() {
+    print('Updating observation circles on map');
     circles = observations.map((obs) {
       return CircleMarker(
         point: LatLng(obs["latitude"], obs["longitude"]),
@@ -274,6 +367,7 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
         borderStrokeWidth: 2,
       );
     }).toList();
+    print('Created ${circles.length} circle markers');
   }
 
   Color getObservationColor(Map<String, dynamic> obs) {
@@ -290,7 +384,6 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   }
 
   void _onMapTap(LatLng tappedPoint) {
-    // Don't process taps while loading or if observations are empty
     if (_isLoading || observations.isEmpty) return;
     
     double minDistance = double.infinity;
@@ -340,22 +433,29 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
       },
     );
   }
+  
+  // Called when the map is ready to be used
+  void _onMapCreated(MapController controller) {
+    print('Map is now ready!');
+    setState(() {
+      _mapReady = true;
+      
+      // If we already have user location, center the map on it
+      if (_isLocationLoaded && _mapController != null) {
+        try {
+          print('Centering map on user location: $_userLocation');
+          _mapController!.move(_userLocation, _zoomLevel);
+        } catch (e) {
+          print('Error moving map on creation: $e');
+        }
+      }
+      
+      _checkIfFullyLoaded();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Try to safely get the LocationService for this render
-    try {
-      if (_locationService == null) {
-        _locationService = Provider.of<LocationService>(context, listen: false);
-        
-        if (_locationService != null && !_locationService!.isInitialized) {
-          _locationService!.initialize(context);
-        }
-      }
-    } catch (e) {
-      print('Error accessing LocationService in build: $e');
-    }
-    
     // First check if we're loading
     if (_isLoading) {
       return Scaffold(
@@ -366,31 +466,64 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
               CircularProgressIndicator(),
               SizedBox(height: 16),
               Text("Loading map data..."),
+              if (_errorMessage != null) ...[
+                SizedBox(height: 16),
+                Container(
+                  padding: EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _errorMessage!,
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
+              SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  // Force display the map even if not all conditions are met
+                  setState(() {
+                    _forcedLoad = true;
+                    _isLoading = false;
+                  });
+                },
+                child: Text("Show Map Anyway"),
+              ),
             ],
           ),
         ),
       );
     }
     
-    // If not loading, show the map
-    // Use try-catch to safely handle potential provider errors
+    // Now try to get the LocationService if we don't have it yet
+    if (_locationService == null && !_locationServiceInitialized) {
+      _initializeLocationService();
+    }
+    
+    // Build the map content
     Widget content;
     
     try {
-      content = Consumer<LocationService>(
-        builder: (context, locationService, child) {
-          _locationService = locationService;
-          
-          // Update position from service if available
-          if (locationService.lastKnownPosition != null && !_isLocationLoaded) {
-            _updateUserLocation(locationService.lastKnownPosition!);
-          }
-          
-          final activeBirdSounds = locationService.getActiveBirdSounds();
-          
-          return _buildMapContent(activeBirdSounds);
-        },
-      );
+      // Only use Consumer if we have a valid LocationService
+      if (_locationService != null) {
+        content = Consumer<LocationService>(
+          builder: (context, locationService, child) {
+            // Update position from service if available
+            if (locationService.lastKnownPosition != null && !_isLocationLoaded) {
+              _updateUserLocation(locationService.lastKnownPosition!);
+            }
+            
+            final activeBirdSounds = locationService.getActiveBirdSounds();
+            
+            return _buildMapContent(activeBirdSounds);
+          },
+        );
+      } else {
+        // Fallback if no LocationService is available
+        content = _buildMapContent([]);
+      }
     } catch (e) {
       print('Error with Consumer in build: $e');
       // Fallback UI if the Consumer fails
@@ -413,8 +546,14 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
               initialZoom: _zoomLevel,
               maxZoom: AppConstants.maxZoom,
               onTap: (_, tappedPoint) => _onMapTap(tappedPoint),
+              onMapReady: () {
+                print('FlutterMap.onMapReady called!');
+                if (_mapController != null) {
+                  _onMapCreated(_mapController!);
+                }
+              },
               onPositionChanged: (position, bool hasGesture) {
-                if (hasGesture) {
+                if (hasGesture && mounted) {
                   setState(() {
                     _zoomLevel = position.zoom;
                   });
