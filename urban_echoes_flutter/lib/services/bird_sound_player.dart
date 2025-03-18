@@ -4,10 +4,9 @@ import 'package:flutter/foundation.dart';
 import 'package:urban_echoes/services/AzureStorageService.dart';
 
 class BirdSoundPlayer {
-  final Map<int, AudioPlayer> _players = {};
-  final Map<int, bool> _isActive = {};
-  final Map<int, String> _activeFolders =
-      {}; // Track the folder for each observation
+  final Map<String, AudioPlayer> _players = {};
+  final Map<String, bool> _isActive = {};
+  final Map<String, String> _activeFolders = {}; // Track the folder for each observation
   final AzureStorageService _storageService = AzureStorageService();
   final Random _random = Random();
 
@@ -19,14 +18,14 @@ class BirdSoundPlayer {
 
   // Public method that LocationService will call
   Future<void> startSound(
-      String folderPath, int observationId, double pan, double volume) async {
+      String folderPath, String observationId, double pan, double volume) async {
     return startSequentialRandomSoundsWithPanning(
         folderPath, observationId, pan, volume);
   }
 
   // Start playing random sounds in sequence for an observation with panning
   Future<void> startSequentialRandomSoundsWithPanning(
-      String folderPath, int observationId, double pan, double volume) async {
+      String folderPath, String observationId, double pan, double volume) async {
     // If already active, just update panning and volume
     if (_isActive[observationId] == true) {
       await updatePanningAndVolume(observationId, pan, volume);
@@ -84,7 +83,7 @@ class BirdSoundPlayer {
 
   // For backward compatibility
   Future<void> startSequentialRandomSounds(
-      String folderPath, int observationId) async {
+      String folderPath, String observationId) async {
     // Default to center panning (0.0) and full volume (1.0)
     await startSequentialRandomSoundsWithPanning(
         folderPath, observationId, 0.0, 1.0);
@@ -121,7 +120,7 @@ class BirdSoundPlayer {
 
   // Update panning and volume for an existing player
   Future<void> updatePanningAndVolume(
-      int observationId, double pan, double volume) async {
+      String observationId, double pan, double volume) async {
     if (_players.containsKey(observationId)) {
       try {
         await _applyPanningAndVolume(_players[observationId]!, pan, volume);
@@ -134,7 +133,7 @@ class BirdSoundPlayer {
 
   // Play the next random sound with panning from the folder
   Future<void> _playNextRandomSoundWithPanning(
-      String folderPath, int observationId, double pan, double volume) async {
+      String folderPath, String observationId, double pan, double volume) async {
     try {
       // Check if still active
       if (_isActive[observationId] != true) {
@@ -174,7 +173,10 @@ class BirdSoundPlayer {
       try {
         // Ensure player isn't already playing something
         if (_players[observationId]!.state == PlayerState.playing) {
-          await _players[observationId]!.stop();
+          // Don't stop the current sound, just wait for it to finish
+          // This is where we modified the behavior
+          debugPrint('Player for observation $observationId is already playing, will wait for completion');
+          return;
         }
 
         await _players[observationId]!.play(UrlSource(randomFile));
@@ -205,7 +207,7 @@ class BirdSoundPlayer {
   }
 
   // Stop playing sounds for an observation
-  Future<void> stopSounds(int observationId) async {
+  Future<void> stopSounds(String observationId) async {
     // Mark as inactive first to prevent new sounds from starting
     debugPrint('Stopping sounds for observation $observationId');
     _isActive[observationId] = false;
@@ -219,6 +221,42 @@ class BirdSoundPlayer {
       }
     }
   }
+
+ Future<void> playRandomSoundFromFolder(String folderPath, double volume) async {
+  AudioPlayer player = AudioPlayer();
+
+  try {
+    // Ensure sound files are cached
+    if (!_soundFileCache.containsKey(folderPath)) {
+      debugPrint("Fetching sound files for folder: $folderPath");
+      List<String> files = await _storageService.listFiles(folderPath);
+      if (files.isNotEmpty) {
+        _soundFileCache[folderPath] = files;
+      } else {
+        debugPrint('No sound files found in folder: $folderPath');
+        return;
+      }
+    }
+
+    // Select a random file
+    List<String> files = _soundFileCache[folderPath]!;
+    if (files.isEmpty) {
+      debugPrint('No cached sound files available for folder: $folderPath');
+      return;
+    }
+    String randomFile = files[_random.nextInt(files.length)];
+
+    debugPrint('Playing random sound from folder: $folderPath, file: $randomFile');
+
+    // Set volume and play
+    await player.setVolume(volume);
+    await player.play(UrlSource(randomFile));
+  } catch (e) {
+    debugPrint('Failed to play random sound from folder $folderPath: $e');
+  }
+}
+
+
 
   // Clean up resources
   void dispose() {
