@@ -19,17 +19,29 @@ class PageStateManager extends ChangeNotifier {
   NavRailPageType selectedNavRailPage = NavRailPageType.home;
   ButtonPageType? selectedButtonPage;
 
-  final Map<NavRailPageType, Widget> navRailPages = {
-    NavRailPageType.home: HomePage(),
-    NavRailPageType.map: MapPage(),
-    // Add more pages as needed
-  };
+  // Instead of storing widget instances directly, use builder functions
+  // that will create the widgets with the current context when needed
+  Widget getNavRailPage(BuildContext context) {
+    switch (selectedNavRailPage) {
+      case NavRailPageType.home:
+        return HomePage();
+      case NavRailPageType.map:
+        return MapPage();
+      default:
+        return HomePage();
+    }
+  }
 
-  final Map<ButtonPageType, Widget> buttonPages = {
-    ButtonPageType.observation: MakeObservationPage(),
-    ButtonPageType.profile: Placeholder(),
-    // Add more pages as needed
-  };
+  Widget getButtonPage(BuildContext context) {
+    switch (selectedButtonPage) {
+      case ButtonPageType.observation:
+        return MakeObservationPage();
+      case ButtonPageType.profile:
+        return Placeholder();
+      default:
+        return Placeholder();
+    }
+  }
 
   void setNavRailPage(NavRailPageType page) {
     selectedNavRailPage = page;
@@ -42,10 +54,10 @@ class PageStateManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  Widget get currentPage {
+  Widget getCurrentPage(BuildContext context) {
     if (selectedButtonPage != null) {
-      return buttonPages[selectedButtonPage]!;
+      return getButtonPage(context);
     }
-    return navRailPages[selectedNavRailPage]!;
+    return getNavRailPage(context);
   }
 }

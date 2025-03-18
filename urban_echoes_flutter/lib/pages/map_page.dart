@@ -22,49 +22,90 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   final MapController _mapController = MapController();
   bool _isLocationLoaded = false;
   bool _dataLoaded = false;
+  bool _isLoading = true; // Track overall loading state
   String? _errorMessage;
+  LocationService? _locationService;
+  bool _isInitialized = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _getUserLocation();
-    _loadObservations();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Access LocationService to ensure it's initialized
-    final locationService = Provider.of<LocationService>(context, listen: false);
-    if (!locationService.isInitialized) {
-      locationService.initialize(context);
+    
+    // Only initialize once to avoid multiple initializations
+    if (!_isInitialized) {
+      _initializeServices();
+      _isInitialized = true;
+    }
+  }
+  
+  void _initializeServices() {
+    setState(() {
+      _isLoading = true; // Start loading
+    });
+    
+    // Load observations after we have the context
+    if (!_dataLoaded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _loadObservations();
+        }
+      });
     }
     
-    // If we already have a position from the service, use it
-    if (locationService.lastKnownPosition != null && !_isLocationLoaded) {
-      _updateUserLocation(locationService.lastKnownPosition!);
-    }
+    // Safely initialize the location service
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        try {
+          // Try to access the LocationService
+          final locationService = Provider.of<LocationService>(context, listen: false);
+          _locationService = locationService;
+          
+          // Initialize if needed
+          if (!locationService.isInitialized) {
+            locationService.initialize(context);
+          }
+          
+          // Update location if available
+          if (locationService.lastKnownPosition != null && !_isLocationLoaded) {
+            _updateUserLocation(locationService.lastKnownPosition!);
+          }
+        } catch (e) {
+          print('Error accessing LocationService: $e');
+          setState(() {
+            _errorMessage = 'Could not access location service. Please restart the app.';
+            _isLoading = false; // Stop loading even if there's an error
+          });
+        }
+      }
+    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Don't use context inside this method as it might cross async gaps
     if (!mounted) return;
     
-    // Handle app lifecycle changes to manage location tracking
-    final locationService = Provider.of<LocationService>(context, listen: false);
-    
-    if (state == AppLifecycleState.resumed) {
-      // App is in the foreground
-      if (!locationService.isLocationTrackingEnabled) {
-        locationService.toggleLocationTracking(true);
+    // Use a try-catch block to safely access the service
+    try {
+      final locationService = Provider.of<LocationService>(context, listen: false);
+      
+      if (state == AppLifecycleState.resumed) {
+        if (!locationService.isLocationTrackingEnabled) {
+          locationService.toggleLocationTracking(true);
+        }
+      } else if (state == AppLifecycleState.paused) {
+        if (locationService.isLocationTrackingEnabled) {
+          locationService.toggleLocationTracking(false);
+        }
       }
-    } else if (state == AppLifecycleState.paused) {
-      // App is in the background
-      if (locationService.isLocationTrackingEnabled) {
-        locationService.toggleLocationTracking(false);
-      }
+    } catch (e) {
+      print('Error in lifecycle: $e');
     }
   }
 
@@ -86,7 +127,19 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
       if (_mapController.camera.zoom != 0) {
         _mapController.move(_userLocation, _zoomLevel);
       }
+      
+      // Check if we're fully loaded
+      _checkIfFullyLoaded();
     });
+  }
+
+  // Check if all necessary data is loaded
+  void _checkIfFullyLoaded() {
+    if (_isLocationLoaded && _dataLoaded) {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _getUserLocation() async {
@@ -106,6 +159,9 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
           scaffoldMessenger.showSnackBar(
             const SnackBar(content: Text('Location permissions are denied')),
           );
+          setState(() {
+            _isLoading = false; // Stop loading if permissions denied
+          });
           return;
         }
       }
@@ -118,6 +174,9 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
           const SnackBar(
               content: Text('Location permissions are permanently denied')),
         );
+        setState(() {
+          _isLoading = false; // Stop loading if permissions denied
+        });
         return;
       }
 
@@ -134,6 +193,7 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
       
       setState(() {
         _errorMessage = 'Error getting location: $e';
+        _isLoading = false; // Stop loading if there's an error
       });
       
       ScaffoldMessenger.of(context).showSnackBar(
@@ -145,7 +205,13 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   void _loadObservations() {
     if (_dataLoaded || !mounted) return;
     
-    final bool debugMode = Provider.of<bool>(context, listen: false);
+    bool debugMode = false;
+    try {
+      debugMode = Provider.of<bool>(context, listen: false);
+    } catch (e) {
+      print('Error accessing debug mode: $e');
+    }
+    
     final String apiUrl = debugMode
         ? 'http://10.0.2.2:8000/observations'
         : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
@@ -178,6 +244,9 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
 
         _updateCircles();
         _dataLoaded = true;
+        
+        // Check if we're fully loaded
+        _checkIfFullyLoaded();
       });
     }).catchError((error) {
       // Check if widget is still mounted before showing error
@@ -185,6 +254,7 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
       
       setState(() {
         _errorMessage = 'Failed to load observations: $error';
+        _isLoading = false; // Stop loading if there's an error
       });
       
       scaffoldMessenger.showSnackBar(
@@ -220,6 +290,9 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   }
 
   void _onMapTap(LatLng tappedPoint) {
+    // Don't process taps while loading or if observations are empty
+    if (_isLoading || observations.isEmpty) return;
+    
     double minDistance = double.infinity;
     Map<String, dynamic>? nearestObservation;
 
@@ -270,152 +343,199 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    // Use Consumer to rebuild when LocationService updates
-    return Consumer<LocationService>(
-      builder: (context, locationService, child) {
-        // Update position from service if available
-        if (locationService.lastKnownPosition != null && !_isLocationLoaded) {
-          _updateUserLocation(locationService.lastKnownPosition!);
+    // Try to safely get the LocationService for this render
+    try {
+      if (_locationService == null) {
+        _locationService = Provider.of<LocationService>(context, listen: false);
+        
+        if (_locationService != null && !_locationService!.isInitialized) {
+          _locationService!.initialize(context);
         }
-        
-        final activeBirdSounds = locationService.getActiveBirdSounds();
-        
-        return Scaffold(
-          body: Stack(
+      }
+    } catch (e) {
+      print('Error accessing LocationService in build: $e');
+    }
+    
+    // First check if we're loading
+    if (_isLoading) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              FlutterMap(
-                mapController: _mapController,
-                options: MapOptions(
-                  initialCenter: _userLocation,
-                  minZoom: AppConstants.minZoom,
-                  initialZoom: _zoomLevel,
-                  maxZoom: AppConstants.maxZoom,
-                  onTap: (_, tappedPoint) => _onMapTap(tappedPoint),
-                  onPositionChanged: (position, bool hasGesture) {
-                    if (hasGesture) {
-                      setState(() {
-                        _zoomLevel = position.zoom;
-                      });
-                    }
-                  },
-                ),
-                children: [
-                  TileLayer(
-                    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                    userAgentPackageName: 'com.example.app',
-                  ),
-                  CircleLayer(circles: circles),
-                  // User location marker
-                  MarkerLayer(
-                    markers: [
-                      if (_isLocationLoaded)
-                        Marker(
-                          point: _userLocation,
-                          width: 30,
-                          height: 30,
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              // Outer blue circle
-                              Container(
-                                width: 30,
-                                height: 30,
-                                decoration: BoxDecoration(
-                                  color: Colors.blue.withOpacity(0.3),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                              // Inner blue circle
-                              Container(
-                                width: 12,
-                                height: 12,
-                                decoration: const BoxDecoration(
-                                  color: Colors.blue,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-              // Location recenter button
-              Positioned(
-                right: 16,
-                bottom: 160,
-                child: FloatingActionButton(
-                  heroTag: "locationButton",
-                  onPressed: () {
-                    _getUserLocation(); // Update and recenter to user location
-                  },
-                  backgroundColor: Colors.white,
-                  child: const Icon(Icons.my_location, color: Colors.blue),
-                ),
-              ),
-              // Active bird sound information - will update when activeBirdSounds changes
-              if (activeBirdSounds.isNotEmpty)
-                Positioned(
-                  top: 16,
-                  left: 16,
-                  right: 16,
-                  child: Container(
-                    padding: const EdgeInsets.all(8.0),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.9),
-                      borderRadius: BorderRadius.circular(8.0),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.1),
-                          blurRadius: 4.0,
-                          spreadRadius: 2.0,
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Listening to:',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16.0,
-                          ),
-                        ),
-                        for (var birdSound in activeBirdSounds)
-                          Text(
-                            '${birdSound["bird_name"]} (${birdSound["scientific_name"]})',
-                            style: TextStyle(
-                              fontSize: 14.0,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              // Show error message if exists
-              if (_errorMessage != null)
-                Positioned(
-                  bottom: 100,
-                  left: 16,
-                  right: 16,
-                  child: Container(
-                    padding: const EdgeInsets.all(8.0),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.8),
-                      borderRadius: BorderRadius.circular(8.0),
-                    ),
-                    child: Text(
-                      _errorMessage!,
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  ),
-                ),
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text("Loading map data..."),
             ],
           ),
-        );
-      },
+        ),
+      );
+    }
+    
+    // If not loading, show the map
+    // Use try-catch to safely handle potential provider errors
+    Widget content;
+    
+    try {
+      content = Consumer<LocationService>(
+        builder: (context, locationService, child) {
+          _locationService = locationService;
+          
+          // Update position from service if available
+          if (locationService.lastKnownPosition != null && !_isLocationLoaded) {
+            _updateUserLocation(locationService.lastKnownPosition!);
+          }
+          
+          final activeBirdSounds = locationService.getActiveBirdSounds();
+          
+          return _buildMapContent(activeBirdSounds);
+        },
+      );
+    } catch (e) {
+      print('Error with Consumer in build: $e');
+      // Fallback UI if the Consumer fails
+      content = _buildMapContent([]);
+    }
+    
+    return content;
+  }
+  
+  // Extract the map building logic to a separate method
+  Widget _buildMapContent(List<Map<String, dynamic>> activeBirdSounds) {
+    return Scaffold(
+      body: Stack(
+        children: [
+          FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: _userLocation,
+              minZoom: AppConstants.minZoom,
+              initialZoom: _zoomLevel,
+              maxZoom: AppConstants.maxZoom,
+              onTap: (_, tappedPoint) => _onMapTap(tappedPoint),
+              onPositionChanged: (position, bool hasGesture) {
+                if (hasGesture) {
+                  setState(() {
+                    _zoomLevel = position.zoom;
+                  });
+                }
+              },
+            ),
+            children: [
+              TileLayer(
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.example.app',
+              ),
+              CircleLayer(circles: circles),
+              // User location marker
+              MarkerLayer(
+                markers: [
+                  if (_isLocationLoaded)
+                    Marker(
+                      point: _userLocation,
+                      width: 30,
+                      height: 30,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          // Outer blue circle
+                          Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.3),
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                          // Inner blue circle
+                          Container(
+                            width: 12,
+                            height: 12,
+                            decoration: const BoxDecoration(
+                              color: Colors.blue,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          // Location recenter button
+          Positioned(
+            right: 16,
+            bottom: 160,
+            child: FloatingActionButton(
+              heroTag: "locationButton",
+              onPressed: () {
+                _getUserLocation(); // Update and recenter to user location
+              },
+              backgroundColor: Colors.white,
+              child: const Icon(Icons.my_location, color: Colors.blue),
+            ),
+          ),
+          // Active bird sound information - will update when activeBirdSounds changes
+          if (activeBirdSounds.isNotEmpty)
+            Positioned(
+              top: 16,
+              left: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(8.0),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4.0,
+                      spreadRadius: 2.0,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Listening to:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16.0,
+                      ),
+                    ),
+                    for (var birdSound in activeBirdSounds)
+                      Text(
+                        '${birdSound["bird_name"]} (${birdSound["scientific_name"]})',
+                        style: TextStyle(
+                          fontSize: 14.0,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          // Show error message if exists
+          if (_errorMessage != null)
+            Positioned(
+              bottom: 100,
+              left: 16,
+              right: 16,
+              child: Container(
+                padding: const EdgeInsets.all(8.0),
+                decoration: BoxDecoration(
+                  color: Colors.red.withOpacity(0.8),
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
+                child: Text(
+                  _errorMessage!,
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
