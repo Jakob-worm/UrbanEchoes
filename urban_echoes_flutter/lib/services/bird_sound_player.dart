@@ -4,7 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:urban_echoes/services/AzureStorageService.dart';
 
 class BirdSoundPlayer {
-  final Map<String, AudioPlayer> _players = {};
+  // Main player map - now we'll have multiple players per observation
+  final Map<String, List<AudioPlayer>> _playerPools = {};
   final Map<String, bool> _isActive = {};
   final Map<String, String> _activeFolders = {}; // Track the folder for each observation
   final AzureStorageService _storageService = AzureStorageService();
@@ -15,6 +16,15 @@ class BirdSoundPlayer {
 
   // Parameters for panning calculation
   final double _panningExponent = 0.5; // Square root for constant power pan law
+  
+  // Number of players to create per observation (for overlapping sounds)
+  final int _playersPerObservation = 3;
+  
+  // Pool index tracking
+  final Map<String, int> _currentPlayerIndex = {};
+  
+  // Track scheduled sound timers to prevent conflicts
+  final Map<String, List<Future<void>>> _scheduledSounds = {};
 
   // Public method that LocationService will call
   Future<void> startSound(
@@ -32,26 +42,23 @@ class BirdSoundPlayer {
       return;
     }
 
-    debugPrint('Starting new sound player for observation $observationId');
+    debugPrint('Starting new sound player pool for observation $observationId');
 
     _isActive[observationId] = true;
     _activeFolders[observationId] = folderPath;
+    _scheduledSounds[observationId] = [];
 
-    // Create a dedicated player for this observation if it doesn't exist
-    if (!_players.containsKey(observationId)) {
-      _players[observationId] = AudioPlayer();
-
-      // Configure for multiple streams
-      await _players[observationId]!.setReleaseMode(ReleaseMode.stop);
-
-      // Set up completion listener to play the next sound
-      _players[observationId]!.onPlayerComplete.listen((_) {
-        // When sound finishes, play another if still active
-        if (_isActive[observationId] == true) {
-          _playNextRandomSoundWithPanning(
-              _activeFolders[observationId]!, observationId, pan, volume);
-        }
-      });
+    // Create a pool of players for this observation if it doesn't exist
+    if (!_playerPools.containsKey(observationId)) {
+      _playerPools[observationId] = [];
+      _currentPlayerIndex[observationId] = 0;
+      
+      // Create multiple players for this observation
+      for (int i = 0; i < _playersPerObservation; i++) {
+        AudioPlayer player = AudioPlayer();
+        await player.setReleaseMode(ReleaseMode.stop);
+        _playerPools[observationId]!.add(player);
+      }
     }
 
     // Pre-cache sound files if not already cached
@@ -73,12 +80,33 @@ class BirdSoundPlayer {
       }
     }
 
-    // Apply panning and volume
-    await _applyPanningAndVolume(_players[observationId]!, pan, volume);
+    // Apply panning and volume to all players in the pool
+    for (var player in _playerPools[observationId]!) {
+      await _applyPanningAndVolume(player, pan, volume);
+    }
 
-    // Start playing the first sound
-    await _playNextRandomSoundWithPanning(
-        folderPath, observationId, pan, volume);
+    // Schedule first sounds with slight delays to create more natural soundscape
+    _scheduleNextSounds(folderPath, observationId, pan, volume);
+  }
+
+  // Schedule multiple sounds to create an overlapping soundscape
+  void _scheduleNextSounds(String folderPath, String observationId, double pan, double volume) {
+    // Schedule first sound immediately
+    _playNextRandomSoundWithPanning(folderPath, observationId, pan, volume);
+    
+    // Schedule more sounds with delays for natural effect
+    if (_isActive[observationId] == true) {
+      // Create random delays between 2-8 seconds for next sounds
+      int delaySeconds = _random.nextInt(6) + 2;
+      var scheduledSound = Future.delayed(Duration(seconds: delaySeconds), () {
+        if (_isActive[observationId] == true) {
+          _playNextRandomSoundWithPanning(folderPath, observationId, pan, volume);
+        }
+      });
+      
+      // Keep track of scheduled sounds
+      _scheduledSounds[observationId]?.add(scheduledSound);
+    }
   }
 
   // For backward compatibility
@@ -101,8 +129,6 @@ class BirdSoundPlayer {
 
     // Set volume (0.0 to 1.0)
     await player.setVolume(volume);
-
-    debugPrint('Applied pan=$adjustedPan, volume=$volume to player');
   }
 
   // Apply constant power panning law
@@ -118,17 +144,32 @@ class BirdSoundPlayer {
         : pow(rawPan, _panningExponent).toDouble();
   }
 
-  // Update panning and volume for an existing player
+  // Update panning and volume for all players in a pool
   Future<void> updatePanningAndVolume(
       String observationId, double pan, double volume) async {
-    if (_players.containsKey(observationId)) {
+    if (_playerPools.containsKey(observationId)) {
       try {
-        await _applyPanningAndVolume(_players[observationId]!, pan, volume);
+        for (var player in _playerPools[observationId]!) {
+          await _applyPanningAndVolume(player, pan, volume);
+        }
       } catch (e) {
         debugPrint(
             'Error updating panning/volume for observation $observationId: $e');
       }
     }
+  }
+
+  // Get the next available player from the pool using round-robin
+  AudioPlayer _getNextPlayer(String observationId) {
+    if (!_currentPlayerIndex.containsKey(observationId)) {
+      _currentPlayerIndex[observationId] = 0;
+    }
+    
+    int index = _currentPlayerIndex[observationId]!;
+    // Move to next player for next time
+    _currentPlayerIndex[observationId] = (index + 1) % _playersPerObservation;
+    
+    return _playerPools[observationId]![index];
   }
 
   // Play the next random sound with panning from the folder
@@ -163,32 +204,31 @@ class BirdSoundPlayer {
 
       // Pick a random file
       String randomFile = files[_random.nextInt(files.length)];
-      debugPrint(
-          'Playing sound file: $randomFile for observation $observationId');
-
+      
+      // Get next available player from the pool
+      AudioPlayer player = _getNextPlayer(observationId);
+      
       // Apply current panning and volume settings
-      await _applyPanningAndVolume(_players[observationId]!, pan, volume);
+      await _applyPanningAndVolume(player, pan, volume);
 
       // Try to play the selected file
       try {
-        // FIXED: removed the check for PlayerState.playing since each observation
-        // has its own dedicated player and we want multiple sounds to play simultaneously
-
-        // Play the sound for this observation regardless of other observations
-        await _players[observationId]!.play(UrlSource(randomFile));
-        debugPrint('Sound playing for observation $observationId');
-
-        // Add some randomness to when the next sound will play (after this one completes)
-        // This is optional but makes the soundscape more natural by avoiding synchronization
-        _players[observationId]!.onPlayerComplete.first.then((_) {
+        await player.play(UrlSource(randomFile));
+        debugPrint('Playing sound file: $randomFile for observation $observationId');
+        
+        // Schedule the next sound after this one finishes
+        player.onPlayerComplete.first.then((_) {
           if (_isActive[observationId] == true) {
-            // Add a small random delay between sounds
-            int delayMs = _random.nextInt(1000) + 500; // 0.5 to 1.5 seconds
-            Future.delayed(Duration(milliseconds: delayMs), () {
+            // Schedule with a random delay
+            int delayMs = _random.nextInt(4000) + 1000; // 1-5 seconds
+            var scheduledSound = Future.delayed(Duration(milliseconds: delayMs), () {
               if (_isActive[observationId] == true) {
                 _playNextRandomSoundWithPanning(folderPath, observationId, pan, volume);
               }
             });
+            
+            // Keep track of scheduled sounds
+            _scheduledSounds[observationId]?.add(scheduledSound);
           }
         });
       } catch (e) {
@@ -196,10 +236,13 @@ class BirdSoundPlayer {
 
         // If there was an error, attempt to play another sound after a delay
         if (_isActive[observationId] == true) {
-          Future.delayed(Duration(seconds: 1), () {
+          var scheduledSound = Future.delayed(Duration(seconds: 1), () {
             _playNextRandomSoundWithPanning(
                 folderPath, observationId, pan, volume);
           });
+          
+          // Keep track of scheduled sounds
+          _scheduledSounds[observationId]?.add(scheduledSound);
         }
       }
     } catch (e) {
@@ -208,10 +251,13 @@ class BirdSoundPlayer {
 
       // If there was an error, attempt to play another sound after a delay
       if (_isActive[observationId] == true) {
-        Future.delayed(Duration(seconds: 3), () {
+        var scheduledSound = Future.delayed(Duration(seconds: 3), () {
           _playNextRandomSoundWithPanning(
               folderPath, observationId, pan, volume);
         });
+        
+        // Keep track of scheduled sounds
+        _scheduledSounds[observationId]?.add(scheduledSound);
       }
     }
   }
@@ -222,14 +268,19 @@ class BirdSoundPlayer {
     debugPrint('Stopping sounds for observation $observationId');
     _isActive[observationId] = false;
 
-    // Stop the player if it exists
-    if (_players.containsKey(observationId)) {
-      try {
-        await _players[observationId]!.stop();
-      } catch (e) {
-        debugPrint('Error stopping sound for observation $observationId: $e');
+    // Stop all players for this observation
+    if (_playerPools.containsKey(observationId)) {
+      for (var player in _playerPools[observationId]!) {
+        try {
+          await player.stop();
+        } catch (e) {
+          debugPrint('Error stopping sound for observation $observationId: $e');
+        }
       }
     }
+    
+    // Clear any scheduled sounds for this observation
+    _scheduledSounds.remove(observationId);
   }
 
   Future<void> playRandomSoundFromFolder(String folderPath, double volume) async {
@@ -269,17 +320,21 @@ class BirdSoundPlayer {
   // Clean up resources
   void dispose() {
     debugPrint('Disposing all sound players');
-    for (var id in _players.keys) {
-      try {
-        _players[id]!.stop();
-        _players[id]!.dispose();
-      } catch (e) {
-        debugPrint('Error disposing player for observation $id: $e');
+    for (var observationId in _playerPools.keys) {
+      for (var player in _playerPools[observationId]!) {
+        try {
+          player.stop();
+          player.dispose();
+        } catch (e) {
+          debugPrint('Error disposing player for observation $observationId: $e');
+        }
       }
     }
-    _players.clear();
+    _playerPools.clear();
     _isActive.clear();
     _activeFolders.clear();
     _soundFileCache.clear();
+    _currentPlayerIndex.clear();
+    _scheduledSounds.clear();
   }
 }
