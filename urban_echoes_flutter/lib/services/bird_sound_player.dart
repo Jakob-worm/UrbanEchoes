@@ -171,16 +171,26 @@ class BirdSoundPlayer {
 
       // Try to play the selected file
       try {
-        // Ensure player isn't already playing something
-        if (_players[observationId]!.state == PlayerState.playing) {
-          // Don't stop the current sound, just wait for it to finish
-          // This is where we modified the behavior
-          debugPrint('Player for observation $observationId is already playing, will wait for completion');
-          return;
-        }
+        // FIXED: removed the check for PlayerState.playing since each observation
+        // has its own dedicated player and we want multiple sounds to play simultaneously
 
+        // Play the sound for this observation regardless of other observations
         await _players[observationId]!.play(UrlSource(randomFile));
         debugPrint('Sound playing for observation $observationId');
+
+        // Add some randomness to when the next sound will play (after this one completes)
+        // This is optional but makes the soundscape more natural by avoiding synchronization
+        _players[observationId]!.onPlayerComplete.first.then((_) {
+          if (_isActive[observationId] == true) {
+            // Add a small random delay between sounds
+            int delayMs = _random.nextInt(1000) + 500; // 0.5 to 1.5 seconds
+            Future.delayed(Duration(milliseconds: delayMs), () {
+              if (_isActive[observationId] == true) {
+                _playNextRandomSoundWithPanning(folderPath, observationId, pan, volume);
+              }
+            });
+          }
+        });
       } catch (e) {
         debugPrint('Failed to play sound file $randomFile: $e');
 
@@ -222,41 +232,39 @@ class BirdSoundPlayer {
     }
   }
 
- Future<void> playRandomSoundFromFolder(String folderPath, double volume) async {
-  AudioPlayer player = AudioPlayer();
+  Future<void> playRandomSoundFromFolder(String folderPath, double volume) async {
+    AudioPlayer player = AudioPlayer();
 
-  try {
-    // Ensure sound files are cached
-    if (!_soundFileCache.containsKey(folderPath)) {
-      debugPrint("Fetching sound files for folder: $folderPath");
-      List<String> files = await _storageService.listFiles(folderPath);
-      if (files.isNotEmpty) {
-        _soundFileCache[folderPath] = files;
-      } else {
-        debugPrint('No sound files found in folder: $folderPath');
+    try {
+      // Ensure sound files are cached
+      if (!_soundFileCache.containsKey(folderPath)) {
+        debugPrint("Fetching sound files for folder: $folderPath");
+        List<String> files = await _storageService.listFiles(folderPath);
+        if (files.isNotEmpty) {
+          _soundFileCache[folderPath] = files;
+        } else {
+          debugPrint('No sound files found in folder: $folderPath');
+          return;
+        }
+      }
+
+      // Select a random file
+      List<String> files = _soundFileCache[folderPath]!;
+      if (files.isEmpty) {
+        debugPrint('No cached sound files available for folder: $folderPath');
         return;
       }
+      String randomFile = files[_random.nextInt(files.length)];
+
+      debugPrint('Playing random sound from folder: $folderPath, file: $randomFile');
+
+      // Set volume and play
+      await player.setVolume(volume);
+      await player.play(UrlSource(randomFile));
+    } catch (e) {
+      debugPrint('Failed to play random sound from folder $folderPath: $e');
     }
-
-    // Select a random file
-    List<String> files = _soundFileCache[folderPath]!;
-    if (files.isEmpty) {
-      debugPrint('No cached sound files available for folder: $folderPath');
-      return;
-    }
-    String randomFile = files[_random.nextInt(files.length)];
-
-    debugPrint('Playing random sound from folder: $folderPath, file: $randomFile');
-
-    // Set volume and play
-    await player.setVolume(volume);
-    await player.play(UrlSource(randomFile));
-  } catch (e) {
-    debugPrint('Failed to play random sound from folder $folderPath: $e');
   }
-}
-
-
 
   // Clean up resources
   void dispose() {
