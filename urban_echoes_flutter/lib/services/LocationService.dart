@@ -7,54 +7,47 @@ import 'package:urban_echoes/consants.dart';
 import 'package:urban_echoes/services/bird_sound_player.dart';
 import 'ObservationService.dart';
 
-class LocationService {
+class LocationService extends ChangeNotifier {
   final GeolocatorPlatform _geolocatorPlatform = GeolocatorPlatform.instance;
   final BirdSoundPlayer _birdSoundPlayer = BirdSoundPlayer();
   List<Map<String, dynamic>> _observations = [];
   bool _isInitialized = false;
-
-  // 1. Store the last position to reduce getCurrentPosition calls
   Position? _lastKnownPosition;
-
-  // Added a flag to check if location tracking is enabled
   bool _isLocationTrackingEnabled = true;
+  String? _errorMessage;
 
   final LocationSettings locationSettings = LocationSettings(
     accuracy: LocationAccuracy.high,
     distanceFilter: 100,
   );
 
-  // Track the active bird sound information
   final Map<String, Map<String, dynamic>> _activeBirdSounds = {};
-
-  // Track which observations are currently active
   final Map<String, bool> _activeObservations = {};
-
-  // Spatial grid for quick lookups (using 1km grid cells)
   final Map<String, List<Map<String, dynamic>>> _spatialGrid = {};
   final int _gridSize = AppConstants.gridSize;
-
-  // Parameters for spatial audio
   final double _maxAudioDistance = AppConstants.defaultPointRadius;
 
-  // Getter for active sounds
+  // Getters
   List<Map<String, dynamic>> getActiveBirdSounds() {
     return _activeBirdSounds.values.toList();
   }
 
-  // Getters for tracking state
   bool get isInitialized => _isInitialized;
   bool get isLocationTrackingEnabled => _isLocationTrackingEnabled;
+  Position? get lastKnownPosition => _lastKnownPosition;
+  String? get errorMessage => _errorMessage;
 
   // Toggle location tracking
   void toggleLocationTracking(bool enabled) {
+    if (_isLocationTrackingEnabled == enabled) return;
+    
     _isLocationTrackingEnabled = enabled;
     if (enabled) {
       _startTrackingLocation();
     } else {
-      // Stop all active sounds when tracking is disabled
       _stopAllSounds();
     }
+    notifyListeners();
   }
 
   // Stop all active sounds
@@ -65,52 +58,59 @@ class LocationService {
       _activeObservations[id] = false;
       _activeBirdSounds.remove(id);
     }
+    notifyListeners();
   }
 
+  // Modified to handle context safely
   Future<void> initialize(BuildContext context) async {
     if (_isInitialized) {
       debugPrint('LocationService already initialized, skipping...');
       return;
     }
 
-    // Force reinitialize any existing audio resources
-    _birdSoundPlayer.dispose();
-    _activeBirdSounds.clear();
-    _activeObservations.clear();
-
+    // Instead of using context directly, extract what we need before async operations
     final bool debugMode = Provider.of<bool>(context, listen: false);
     final String apiUrl = debugMode
         ? 'http://10.0.2.2:8000/observations'
         : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
+    
+    // Store the build context's navigator state to avoid using context later
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
+    // Force reinitialize any existing audio resources
+    _birdSoundPlayer.dispose();
+    _activeBirdSounds.clear();
+    _activeObservations.clear();
+    _birdSoundPlayer.onBufferingTimeout = handleBufferingTimeout;
 
     try {
-      _observations =
-          await ObservationService(apiUrl: apiUrl).fetchObservations();
+      _observations = await ObservationService(apiUrl: apiUrl).fetchObservations();
 
       // Initialize active observations map
-      // Generate a unique ID for each observation
       for (var obs in _observations) {
-        // Create a unique ID combining coordinates and other unique values
         String uniqueId = "${obs["latitude"]}_${obs["longitude"]}_${obs["sound_directory"]}";
-        obs["uniqueId"] = uniqueId;  // Add uniqueId to observation
+        obs["uniqueId"] = uniqueId;
         _activeObservations[uniqueId] = false;
       }
 
-      // Build spatial grid for efficient lookups
       _buildSpatialGrid();
-
       await _requestLocationPermission();
       _startTrackingLocation();
       _isInitialized = true;
+      _errorMessage = null;
+      notifyListeners();
 
-      debugPrint(
-          'LocationService initialized with ${_observations.length} observations');
+      debugPrint('LocationService initialized with ${_observations.length} observations');
     } catch (e) {
       debugPrint('Failed to initialize LocationService: $e');
-      // Show error message to user
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load bird observations. Please check your internet connection.')),
+      _errorMessage = 'Failed to load bird observations. Please check your internet connection.';
+      
+      // Instead of using context directly after await, we use the captured messenger
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text(_errorMessage!)),
       );
+      
+      notifyListeners();
     }
   }
 
@@ -183,44 +183,44 @@ class LocationService {
   }
 
   Future<Position> _getPosition() async {
-  if (_lastKnownPosition != null) {
-    return _lastKnownPosition!;
+    if (_lastKnownPosition != null) {
+      return _lastKnownPosition!;
+    }
+    return await _geolocatorPlatform.getCurrentPosition();
   }
-  return await _geolocatorPlatform.getCurrentPosition();
-}
 
   void _startTrackingLocation() {
-  if (!_isLocationTrackingEnabled) {
-    debugPrint('Location tracking is disabled, not starting');
-    return;
+    if (!_isLocationTrackingEnabled) {
+      debugPrint('Location tracking is disabled, not starting');
+      return;
+    }
+
+    // First cancel any previous streams
+    _geolocatorPlatform.getPositionStream().listen(null).cancel();
+
+    // Use a less frequent update interval to save battery
+    const LocationSettings locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high,
+      distanceFilter: 5, // Update when user moves 5 meters
+      timeLimit: Duration(seconds: 5), // Less frequent updates
+    );
+
+    _geolocatorPlatform
+        .getPositionStream(locationSettings: locationSettings)
+        .listen((Position position) {
+      // Cache the position
+      _lastKnownPosition = position;
+      _processLocationUpdate(position);
+    });
+
+    // Get initial position
+    _geolocatorPlatform.getCurrentPosition().then((position) {
+      _lastKnownPosition = position;
+      _processLocationUpdate(position);
+    });
+
+    debugPrint('Started location tracking with optimized settings');
   }
-
-  // First cancel any previous streams
-  _geolocatorPlatform.getPositionStream().listen(null).cancel();
-
-  // Use a less frequent update interval to save battery
-  const LocationSettings locationSettings = LocationSettings(
-    accuracy: LocationAccuracy.high,
-    distanceFilter: 5, // Update when user moves 5 meters (less frequent)
-    timeLimit: Duration(seconds: 5), // Less frequent updates (5 seconds)
-  );
-
-  _geolocatorPlatform
-      .getPositionStream(locationSettings: locationSettings)
-      .listen((Position position) {
-    // Cache the position
-    _lastKnownPosition = position;
-    _processLocationUpdate(position);
-  });
-
-  // Get initial position
-  _geolocatorPlatform.getCurrentPosition().then((position) {
-    _lastKnownPosition = position;
-    _processLocationUpdate(position);
-  });
-
-  debugPrint('Started location tracking with optimized settings');
-}
 
   void _processLocationUpdate(Position position) {
     if (!_isLocationTrackingEnabled) {
@@ -228,96 +228,108 @@ class LocationService {
       return;
     }
 
+    // Update the last known position
+    _lastKnownPosition = position;
+    
     // Debug position updates
     debugPrint('Position update: ${position.latitude}, ${position.longitude}');
 
     // Process all nearby observations
     _checkProximityToPoints(position);
+    
+    // Notify listeners about position update
+    notifyListeners();
   }
 
- void _checkProximityToPoints(Position position) {
-  debugPrint('Checking proximity to observation points...');
+  void _checkProximityToPoints(Position position) {
+    debugPrint('Checking proximity to observation points...');
 
-  // Get all potentially relevant grid cells
-  List<String> cells =
-      _getNeighboringCells(position.latitude, position.longitude);
+    // Get all potentially relevant grid cells
+    List<String> cells =
+        _getNeighboringCells(position.latitude, position.longitude);
 
-  // Track which observations should be active
-  Set<String> observationsInRange = {};
+    // Track which observations should be active
+    Set<String> observationsInRange = {};
+    bool activeSoundsChanged = false;
 
-  // First pass: find all observations in range
-  for (String cell in cells) {
-    if (!_spatialGrid.containsKey(cell)) continue;
+    // First pass: find all observations in range
+    for (String cell in cells) {
+      if (!_spatialGrid.containsKey(cell)) continue;
 
-    for (var obs in _spatialGrid[cell]!) {
-      final String uniqueId = obs["uniqueId"];
+      for (var obs in _spatialGrid[cell]!) {
+        final String uniqueId = obs["uniqueId"];
 
-      // Skip if already checked
-      if (observationsInRange.contains(uniqueId)) continue;
+        // Skip if already checked
+        if (observationsInRange.contains(uniqueId)) continue;
 
+        final distance = Distance().as(
+          LengthUnit.Meter,
+          LatLng(position.latitude, position.longitude),
+          LatLng(obs["latitude"], obs["longitude"]),
+        );
+
+        // User is inside the observation area
+        if (distance <= _maxAudioDistance) {
+          observationsInRange.add(uniqueId);
+        }
+      }
+    }
+
+    debugPrint('Found ${observationsInRange.length} observations in range');
+
+    // Process all observations in range
+    for (String uniqueId in observationsInRange) {
+      var obs = _observations.firstWhere((o) => o["uniqueId"] == uniqueId);
+
+      // Calculate panning and volume
+      final double pan = _calculatePanning(position.latitude,
+          position.longitude, obs["latitude"], obs["longitude"]);
+
+      // Calculate volume based on distance
       final distance = Distance().as(
         LengthUnit.Meter,
         LatLng(position.latitude, position.longitude),
         LatLng(obs["latitude"], obs["longitude"]),
       );
+      final double volume = _calculateVolume(distance);
 
-      // User is inside the observation area
-      if (distance <= _maxAudioDistance) {
-        observationsInRange.add(uniqueId);
+      if (!_activeObservations.containsKey(uniqueId) || !_activeObservations[uniqueId]!) {
+        // Start playing sound (for this observation)
+        debugPrint(
+            'Starting sound for observation $uniqueId with pan=$pan, volume=$volume');
+        _startSound(obs["sound_directory"], uniqueId, pan, volume);
+        _activeObservations[uniqueId] = true;
+        _activeBirdSounds[uniqueId] = obs;
+        activeSoundsChanged = true;
+      } else {
+        // Update existing sound parameters
+        debugPrint(
+            'Updating sound for observation $uniqueId with pan=$pan, volume=$volume');
+        _updatePanningAndVolume(uniqueId, pan, volume);
       }
     }
-  }
 
-  debugPrint('Found ${observationsInRange.length} observations in range');
+    // Stop sounds for observations that are now out of range
+    List<String> toStop = [];
+    _activeObservations.forEach((uniqueId, isActive) {
+      if (isActive && !observationsInRange.contains(uniqueId)) {
+        toStop.add(uniqueId);
+      }
+    });
 
-  // Process all observations in range
-  // This is important: make sure we process ALL observations, not just one
-  for (String uniqueId in observationsInRange) {
-    var obs = _observations.firstWhere((o) => o["uniqueId"] == uniqueId);
-
-    // Calculate panning and volume
-    final double pan = _calculatePanning(position.latitude,
-        position.longitude, obs["latitude"], obs["longitude"]);
-
-    // Calculate volume based on distance
-    final distance = Distance().as(
-      LengthUnit.Meter,
-      LatLng(position.latitude, position.longitude),
-      LatLng(obs["latitude"], obs["longitude"]),
-    );
-    final double volume = _calculateVolume(distance);
-
-    if (!_activeObservations.containsKey(uniqueId) || !_activeObservations[uniqueId]!) {
-      // Start playing sound (for this observation)
-      debugPrint(
-          'Starting sound for observation $uniqueId with pan=$pan, volume=$volume');
-      _startSound(obs["sound_directory"], uniqueId, pan, volume);
-      _activeObservations[uniqueId] = true;
-      _activeBirdSounds[uniqueId] = obs;
-    } else {
-      // Update existing sound parameters
-      debugPrint(
-          'Updating sound for observation $uniqueId with pan=$pan, volume=$volume');
-      _updatePanningAndVolume(uniqueId, pan, volume);
+    for (String uniqueId in toStop) {
+      debugPrint('Stopping sound for observation $uniqueId (out of range)');
+      _stopSounds(uniqueId);
+      _activeObservations[uniqueId] = false;
+      _activeBirdSounds.remove(uniqueId);
+      activeSoundsChanged = true;
+    }
+    
+    // Only notify listeners if the active sounds changed
+    if (activeSoundsChanged) {
+      notifyListeners();
     }
   }
-
-  // Stop sounds for observations that are now out of range
-  List<String> toStop = [];
-  _activeObservations.forEach((uniqueId, isActive) {
-    if (isActive && !observationsInRange.contains(uniqueId)) {
-      toStop.add(uniqueId);
-    }
-  });
-
-  for (String uniqueId in toStop) {
-    debugPrint('Stopping sound for observation $uniqueId (out of range)');
-    _stopSounds(uniqueId);
-    _activeObservations[uniqueId] = false;
-    _activeBirdSounds.remove(uniqueId);
-  }
-}
-
 
   double _calculatePanning(
       double userLat, double userLng, double soundLat, double soundLng,
@@ -399,41 +411,42 @@ class LocationService {
     }
   }
 
- void handleBufferingTimeout(String observationId) {
-  // If we get a buffering timeout for an observation, try another sound
-  if (_activeObservations.containsKey(observationId) && _activeObservations[observationId]!) {
-    final observation = _activeBirdSounds[observationId];
-    if (observation != null) {
-      try {
-        // Use cached position instead of getting a new one
-        _getPosition().then((position) {
-          if (_isLocationTrackingEnabled && _activeObservations[observationId]!) {
-            // Calculate new panning and volume
-            final double pan = _calculatePanning(position.latitude,
-                position.longitude, observation["latitude"], observation["longitude"]);
-            
-            final distance = Distance().as(
-              LengthUnit.Meter,
-              LatLng(position.latitude, position.longitude),
-              LatLng(observation["latitude"], observation["longitude"]),
-            );
-            final double volume = _calculateVolume(distance);
-            
-            // Stop current sound and start a new one
-            _birdSoundPlayer.stopSounds(observationId).then((_) {
-              if (_isLocationTrackingEnabled && _activeObservations[observationId]!) {
-                _startSound(observation["sound_directory"], observationId, pan, volume);
-              }
-            });
-          }
-        });
-      } catch (e) {
-        debugPrint('Error handling buffering timeout: $e');
+  void handleBufferingTimeout(String observationId) {
+    // If we get a buffering timeout for an observation, try another sound
+    if (_activeObservations.containsKey(observationId) && _activeObservations[observationId]!) {
+      final observation = _activeBirdSounds[observationId];
+      if (observation != null) {
+        try {
+          // Use cached position instead of getting a new one
+          _getPosition().then((position) {
+            if (_isLocationTrackingEnabled && _activeObservations[observationId]!) {
+              // Calculate new panning and volume
+              final double pan = _calculatePanning(position.latitude,
+                  position.longitude, observation["latitude"], observation["longitude"]);
+              
+              final distance = Distance().as(
+                LengthUnit.Meter,
+                LatLng(position.latitude, position.longitude),
+                LatLng(observation["latitude"], observation["longitude"]),
+              );
+              final double volume = _calculateVolume(distance);
+              
+              // Stop current sound and start a new one
+              _birdSoundPlayer.stopSounds(observationId).then((_) {
+                if (_isLocationTrackingEnabled && _activeObservations[observationId]!) {
+                  _startSound(observation["sound_directory"], observationId, pan, volume);
+                }
+              });
+            }
+          });
+        } catch (e) {
+          debugPrint('Error handling buffering timeout: $e');
+        }
       }
     }
   }
-  }
 
+  @override
   void dispose() {
     // Stop all active sounds
     _activeObservations.forEach((id, isActive) {
@@ -448,5 +461,6 @@ class LocationService {
     _spatialGrid.clear();
     _observations.clear();
     _isInitialized = false;
+    super.dispose();
   }
 }

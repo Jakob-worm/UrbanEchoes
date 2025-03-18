@@ -5,15 +5,17 @@ import 'package:flutter/foundation.dart';
 import 'package:urban_echoes/services/AzureStorageService.dart';
 
 class BirdSoundPlayer {
-  // Core player management
+  // Core player management 
   final Map<String, AudioPlayer> _players = {};
   final Map<String, bool> _isActive = {};
   final Map<String, String> _activeFolders = {};
   final AzureStorageService _storageService = AzureStorageService();
   final Random _random = Random();
   
-  // Cache for sound files
+  // Cache for sound files with expiration
   final Map<String, List<String>> _soundFileCache = {};
+  final Map<String, DateTime> _cacheTimestamps = {}; // Track when cache was populated
+  final Duration _cacheExpiration = Duration(hours: 1); // Expire cache after 1 hour
   
   // Spatial audio configuration
   final double _panningExponent = 0.5;
@@ -22,10 +24,17 @@ class BirdSoundPlayer {
   final Map<String, Timer?> _bufferingTimers = {};
   final Duration _bufferingTimeout = Duration(seconds: 10);
   
+  // Retry mechanism
+  final Map<String, int> _retryCount = {};
+  final int _maxRetries = 3;
+  
   // Debug info
   int get activePlayerCount => _players.length;
 
-  // Start sound for an observation
+  // Event callback for buffering timeout
+  Function(String observationId)? onBufferingTimeout;
+
+  // Start sound for an observation with retry logic
   Future<void> startSound(String folderPath, String observationId, double pan, double volume) async {
     if (_isActive[observationId] == true) {
       await updatePanningAndVolume(observationId, pan, volume);
@@ -35,13 +44,13 @@ class BirdSoundPlayer {
     debugPrint('🔊 Starting sound for observation $observationId');
     _isActive[observationId] = true;
     _activeFolders[observationId] = folderPath;
+    _retryCount[observationId] = 0;
 
     await _cacheSoundFiles(folderPath);
     await _initializePlayer(observationId);
     await _applyPanningAndVolume(_players[observationId]!, pan, volume);
     await _playRandomSound(folderPath, observationId, pan, volume);
     
-    // Log active players for debugging
     _logActivePlayers();
   }
 
@@ -49,25 +58,38 @@ class BirdSoundPlayer {
     debugPrint('🎵 Active players: ${_players.length}, IDs: ${_players.keys.join(", ")}');
   }
 
-  // Cache sound files for a directory
+  // Cache sound files with expiration check
   Future<void> _cacheSoundFiles(String folderPath) async {
-    if (_soundFileCache.containsKey(folderPath)) return;
+    // Check if cache exists and is still valid
+    if (_soundFileCache.containsKey(folderPath)) {
+      DateTime? cacheTime = _cacheTimestamps[folderPath];
+      if (cacheTime != null && 
+          DateTime.now().difference(cacheTime) < _cacheExpiration) {
+        debugPrint("📁 Using cached sound files for folder: $folderPath");
+        return;
+      }
+    }
 
     try {
-      debugPrint("📁 Caching sound files for folder: $folderPath");
+      debugPrint("📁 Fetching sound files for folder: $folderPath");
       List<String> files = await _storageService.listFiles(folderPath);
       if (files.isNotEmpty) {
         _soundFileCache[folderPath] = files;
+        _cacheTimestamps[folderPath] = DateTime.now();
         debugPrint("📁 Cached ${files.length} files for $folderPath");
       } else {
         debugPrint('❌ No sound files found in folder: $folderPath');
       }
     } catch (e) {
       debugPrint('❌ Error caching sound files: $e');
+      // Keep old cache if it exists
+      if (!_soundFileCache.containsKey(folderPath)) {
+        _soundFileCache[folderPath] = [];
+      }
     }
   }
 
-  // Initialize audio player
+  // Initialize audio player with better error handling
   Future<void> _initializePlayer(String observationId) async {
     if (_players.containsKey(observationId)) {
       try {
@@ -81,14 +103,12 @@ class BirdSoundPlayer {
     // Create new audio player with specific settings
     AudioPlayer player = AudioPlayer();
     
-    // CRITICAL FIX: Disable audio focus handling to allow multiple sounds
     try {
-      // Use low latency mode which is more suitable for short ambient sounds
-      // and often doesn't cause audio focus stealing on Android
+      // Use low latency mode for better performance with ambient sounds
       await player.setPlayerMode(PlayerMode.lowLatency);
       await player.setReleaseMode(ReleaseMode.stop);
       
-      // On some versions, we can also set audio attributes directly
+      // Try to set mixing options if supported
       try {
         // Attempt to set mix mode through alternate API if available
         // ignore: unnecessary_cast
@@ -104,17 +124,69 @@ class BirdSoundPlayer {
     }
     
     _players[observationId] = player;
-    debugPrint('🎵 Initialized player for $observationId, total players: ${_players.length}');
+    
+    // Set up completion listener once during initialization
+    player.onPlayerComplete.listen((_) {
+      _handlePlaybackComplete(observationId);
+    });
+    
+    debugPrint('🎵 Initialized player for $observationId');
   }
 
-  // Play a random sound file
+  // Handle playback completion
+  void _handlePlaybackComplete(String observationId) {
+    debugPrint('✅ Sound completed for $observationId');
+    _cancelBufferingTimeout(observationId);
+    
+    if (_isActive[observationId] == true) {
+      String? folderPath = _activeFolders[observationId];
+      if (folderPath != null) {
+        // Reset retry count on successful playback
+        _retryCount[observationId] = 0;
+        
+        // Random delay between 3-8 seconds
+        int delay = _random.nextInt(5000) + 3000;
+        debugPrint('⏱️ Scheduling next sound for $observationId in $delay ms');
+        
+        Future.delayed(Duration(milliseconds: delay), () {
+          if (_isActive[observationId] == true) {
+            // Get the last known panning and volume values
+            double pan = 0.0;
+            double volume = 1.0;
+            try {
+              if (_players.containsKey(observationId)) {
+                pan = _players[observationId]!.balance;
+                volume = _players[observationId]!.volume;
+              }
+            } catch (e) {
+              // Use defaults if unable to retrieve
+            }
+            
+            _playRandomSound(folderPath, observationId, pan, volume);
+          }
+        });
+      }
+    }
+  }
+
+  // Play a random sound file with better retry logic
   Future<void> _playRandomSound(String folderPath, String observationId, double pan, double volume) async {
     if (_isActive[observationId] != true) return;
 
     try {
       List<String> files = _soundFileCache[folderPath] ?? [];
-      if (files.isEmpty) return;
-
+      if (files.isEmpty) {
+        debugPrint('❌ No sound files available for $folderPath, trying to refresh cache');
+        await _cacheSoundFiles(folderPath);
+        files = _soundFileCache[folderPath] ?? [];
+        
+        if (files.isEmpty) {
+          debugPrint('❌ Still no sound files after refresh, stopping sound for $observationId');
+          _isActive[observationId] = false;
+          return;
+        }
+      }
+      
       if (!_players.containsKey(observationId)) {
         await _initializePlayer(observationId);
         await _applyPanningAndVolume(_players[observationId]!, pan, volume);
@@ -137,32 +209,10 @@ class BirdSoundPlayer {
         _handlePlaybackError(folderPath, observationId, pan, volume);
         return;
       }
-
-      // Handle completion
-      player.onPlayerComplete.listen((_) {
-        debugPrint('✅ Sound completed for $observationId');
-        _cancelBufferingTimeout(observationId);
-        
-        if (_isActive[observationId] == true) {
-          // Random delay between 3-8 seconds
-          int delay = _random.nextInt(5000) + 3000;
-          debugPrint('⏱️ Scheduling next sound for $observationId in $delay ms');
-          
-          Future.delayed(Duration(milliseconds: delay), () {
-            if (_isActive[observationId] == true) {
-              _playRandomSound(folderPath, observationId, pan, volume);
-            }
-          });
-        }
-      });
       
     } catch (e) {
       debugPrint('❌ Error in _playRandomSound: $e');
-      Future.delayed(Duration(seconds: 2), () {
-        if (_isActive[observationId] == true) {
-          _playRandomSound(folderPath, observationId, pan, volume);
-        }
-      });
+      _handlePlaybackError(folderPath, observationId, pan, volume);
     }
   }
 
@@ -173,6 +223,11 @@ class BirdSoundPlayer {
     _bufferingTimers[observationId] = Timer(_bufferingTimeout, () {
       debugPrint('⏱️ Buffering timeout for $observationId');
       if (_isActive[observationId] == true) {
+        // Notify listener about buffering timeout
+        if (onBufferingTimeout != null) {
+          onBufferingTimeout!(observationId);
+        }
+        
         String? folderPath = _activeFolders[observationId];
         if (folderPath != null) {
           _handlePlaybackError(folderPath, observationId, 0.0, 1.0);
@@ -187,13 +242,19 @@ class BirdSoundPlayer {
     _bufferingTimers[observationId] = null;
   }
 
-  // Handle playback errors
+  // Handle playback errors with retry logic
   void _handlePlaybackError(String folderPath, String observationId, double pan, double volume) {
     if (_isActive[observationId] != true) return;
     
-    debugPrint('🔄 Handling playback error for $observationId');
     _cancelBufferingTimeout(observationId);
     
+    // Increment retry count
+    int retries = (_retryCount[observationId] ?? 0) + 1;
+    _retryCount[observationId] = retries;
+    
+    debugPrint('🔄 Handling playback error for $observationId (retry $retries/$_maxRetries)');
+    
+    // Clean up existing player
     if (_players.containsKey(observationId)) {
       try {
         _players[observationId]!.stop();
@@ -204,9 +265,19 @@ class BirdSoundPlayer {
       }
     }
     
-    Future.delayed(Duration(seconds: 2), () {
+    // If exceed max retries, give up
+    if (retries > _maxRetries) {
+      debugPrint('❌ Exceeded maximum retries for $observationId, stopping');
+      _isActive[observationId] = false;
+      return;
+    }
+    
+    // Exponential backoff for retries (1s, 2s, 4s)
+    int delayMs = 1000 * (1 << (retries - 1));
+    
+    Future.delayed(Duration(milliseconds: delayMs), () {
       if (_isActive[observationId] == true) {
-        debugPrint('🔄 Retrying sound for $observationId');
+        debugPrint('🔄 Retrying sound for $observationId after $delayMs ms');
         _initializePlayer(observationId).then((_) {
           _applyPanningAndVolume(_players[observationId]!, pan, volume).then((_) {
             _playRandomSound(folderPath, observationId, pan, volume);
@@ -216,7 +287,7 @@ class BirdSoundPlayer {
     });
   }
 
-  // Apply panning and volume
+  // Apply panning and volume with error handling
   Future<void> _applyPanningAndVolume(AudioPlayer player, double pan, double volume) async {
     double adjustedPan = _applyPanningLaw(pan);
     
@@ -228,7 +299,7 @@ class BirdSoundPlayer {
     }
   }
 
-  // Apply panning curve
+  // Apply panning curve for more natural spatial audio
   double _applyPanningLaw(double rawPan) {
     if (rawPan < -1.0) rawPan = -1.0;
     if (rawPan > 1.0) rawPan = 1.0;
@@ -237,7 +308,7 @@ class BirdSoundPlayer {
       pow(rawPan, _panningExponent).toDouble();
   }
 
-  // Update panning and volume
+  // Update panning and volume for active sound
   Future<void> updatePanningAndVolume(String observationId, double pan, double volume) async {
     if (!_players.containsKey(observationId)) {
       debugPrint('⚠️ Cannot update panning: player not found for $observationId');
@@ -256,6 +327,7 @@ class BirdSoundPlayer {
     debugPrint('🛑 Stopping sounds for $observationId');
     _isActive[observationId] = false;
     _cancelBufferingTimeout(observationId);
+    _retryCount.remove(observationId);
     
     if (_players.containsKey(observationId)) {
       try {
@@ -270,7 +342,7 @@ class BirdSoundPlayer {
     }
   }
 
-  // Play a one-shot sound
+  // Play a one-shot sound (for UI feedback, etc.)
   Future<void> playRandomSoundFromFolder(String folderPath, double volume) async {
     AudioPlayer oneTimePlayer = AudioPlayer();
 
@@ -289,11 +361,14 @@ class BirdSoundPlayer {
         // Ignore if method not available
       }
       
-      if (!_soundFileCache.containsKey(folderPath)) {
+      // Check cache or fetch files
+      if (!_soundFileCache.containsKey(folderPath) || 
+          DateTime.now().difference(_cacheTimestamps[folderPath] ?? DateTime(2000)) > _cacheExpiration) {
         debugPrint("📁 Fetching sound files for one-shot");
         List<String> files = await _storageService.listFiles(folderPath);
         if (files.isNotEmpty) {
           _soundFileCache[folderPath] = files;
+          _cacheTimestamps[folderPath] = DateTime.now();
         } else {
           debugPrint('❌ No sound files found');
           oneTimePlayer.dispose();
@@ -301,7 +376,7 @@ class BirdSoundPlayer {
         }
       }
 
-      List<String> files = _soundFileCache[folderPath]!;
+      List<String> files = _soundFileCache[folderPath] ?? [];
       if (files.isEmpty) {
         debugPrint('❌ No cached sound files');
         oneTimePlayer.dispose();
@@ -319,8 +394,12 @@ class BirdSoundPlayer {
       await oneTimePlayer.play(UrlSource(randomFile));
       
       // Safety cleanup
-      Timer(Duration(minutes: 5), () {
-        oneTimePlayer.stop().then((_) => oneTimePlayer.dispose());
+      Timer(Duration(minutes: 2), () {
+        try {
+          oneTimePlayer.stop().then((_) => oneTimePlayer.dispose());
+        } catch (e) {
+          // Player might already be disposed
+        }
       });
       
     } catch (e) {
@@ -351,5 +430,8 @@ class BirdSoundPlayer {
     _activeFolders.clear();
     _soundFileCache.clear();
     _bufferingTimers.clear();
+    _retryCount.clear();
+    _cacheTimestamps.clear();
+    onBufferingTimeout = null;
   }
 }

@@ -5,9 +5,7 @@ import 'package:urban_echoes/pages/nav_bars_page.dart';
 import 'package:urban_echoes/pages/intro_screen.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 import 'package:provider/provider.dart';
-import 'package:urban_echoes/pages/map_page.dart';
-
-import 'services/LocationService.dart';
+import 'package:urban_echoes/services/LocationService.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,26 +15,26 @@ void main() async {
 
 class MyApp extends StatelessWidget {
   final bool debugMode;
-  final LocationService _locationService = LocationService();
 
-  MyApp({super.key, required this.debugMode});
+  const MyApp({super.key, required this.debugMode});
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (context) => PageStateManager()),
-        Provider<bool>(create: (context) => debugMode),
-        Provider<LocationService>(create: (_) => _locationService),
+        Provider<bool>.value(value: debugMode),
+        // Make LocationService a ChangeNotifierProvider so widgets can listen to it
+        ChangeNotifierProvider(create: (context) => LocationService()),
       ],
       child: MaterialApp(
         title: 'Urban Echoes',
         theme: ThemeData(
           primarySwatch: Colors.blue,
           bottomNavigationBarTheme: BottomNavigationBarThemeData(
-            backgroundColor: Colors.black, // Change this to a visible color
-            selectedItemColor: Colors.white, // Selected icon color
-            unselectedItemColor: Colors.grey, // Unselected icon color
+            backgroundColor: Colors.black,
+            selectedItemColor: Colors.white,
+            unselectedItemColor: Colors.grey,
           ),
         ),
         home: InitialScreen(),
@@ -52,18 +50,54 @@ class InitialScreen extends StatefulWidget {
   InitialScreenState createState() => InitialScreenState();
 }
 
-class InitialScreenState extends State<InitialScreen> {
+class InitialScreenState extends State<InitialScreen> with WidgetsBindingObserver {
   bool _isFirstTime = true;
+  bool _isInitializing = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _checkFirstTime();
+  }
 
-    // Initialize the location service after the frame is built
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      Provider.of<LocationService>(context, listen: false).initialize(context);
-    });
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    if (_isInitializing) {
+      // Initialize the location service only once
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Provider.of<LocationService>(context, listen: false).initialize(context);
+        setState(() {
+          _isInitializing = false;
+        });
+      });
+    }
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Manage resource usage based on app lifecycle
+    final locationService = Provider.of<LocationService>(context, listen: false);
+    
+    if (state == AppLifecycleState.resumed) {
+      // App is in the foreground - enable tracking
+      if (!locationService.isLocationTrackingEnabled) {
+        locationService.toggleLocationTracking(true);
+      }
+    } else if (state == AppLifecycleState.paused) {
+      // App is in the background - disable tracking to save battery
+      if (locationService.isLocationTrackingEnabled) {
+        locationService.toggleLocationTracking(false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
   }
 
   Future<void> _checkFirstTime() async {
@@ -74,9 +108,11 @@ class InitialScreenState extends State<InitialScreen> {
       await prefs.setBool('isFirstTime', false);
     }
 
-    setState(() {
-      _isFirstTime = isFirstTime;
-    });
+    if (mounted) {
+      setState(() {
+        _isFirstTime = isFirstTime;
+      });
+    }
   }
 
   @override
@@ -92,24 +128,5 @@ class InitialScreenState extends State<InitialScreen> {
     } else {
       return NavBarsPage();
     }
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key});
-
-  @override
-  _MyHomePageState createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Urban Echoes'),
-      ),
-      body: MapPage(),
-    );
   }
 }
