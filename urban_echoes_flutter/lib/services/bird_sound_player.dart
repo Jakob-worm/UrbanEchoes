@@ -260,76 +260,92 @@ void _verifyPlayerPool() {
   return null;
 }
   
-  // Start sound for an observation
   Future<void> startSound(String folderPath, String observationId, double pan, double volume) async {
-    if (folderPath.isEmpty) {
-      _log('⚠️ Cannot play sound: empty folder path for $observationId');
-      return;
-    }
+  if (folderPath.isEmpty) {
+    _log('⚠️ Cannot play sound: empty folder path for $observationId');
+    return;
+  }
 
   _log('🔊 Starting sound for $observationId');
   _log('📂 Folder Path: $folderPath');
   _log('🎚️ Pan: $pan, Volume: $volume');
   
+  // Store settings regardless of whether we have an active player
+  _soundSettings[observationId] = _AudioSettings(pan: pan, volume: volume);
+  
+  // If already active, just update parameters and player
+  if (_activeRequests.containsKey(observationId)) {
+    final request = _activeRequests[observationId]!;
+    request.pan = pan;
+    request.volume = volume;
+    request.lastActivity = DateTime.now();
     
-    // Store settings regardless of whether we have an active player
-    _soundSettings[observationId] = _AudioSettings(pan: pan, volume: volume);
-    
-    // If already active, just update parameters
-    if (_activeRequests.containsKey(observationId)) {
-      final request = _activeRequests[observationId]!;
-      request.pan = pan;
-      request.volume = volume;
-      request.lastActivity = DateTime.now();
-      
-      if (request.player != null) {
-        await _applyAudioSettings(request.player!, pan, volume);
-        _lastPlayerActivity[request.player!] = DateTime.now();
-      }
-      return;
+    if (request.player != null) {
+      await _applyAudioSettings(request.player!, pan, volume);
+      _lastPlayerActivity[request.player!] = DateTime.now();
     }
-    
-    // Get sound files
-    List<String> soundFiles = _soundFileCache[folderPath] ?? [];
-    if (soundFiles.isEmpty) {
-      await _loadSoundFiles(folderPath);
-      soundFiles = _soundFileCache[folderPath] ?? [];
-    }
-    
-    if (soundFiles.isEmpty) {
-      _log('❌ No sound files available for $observationId');
-      return;
-    }
-    
-    // Get an available player
-    final player = _getAvailablePlayer();
-    if (player == null) {
-      _log('⚠️ No available players for $observationId, checking for lower priority sounds');
-      return;
-    }
-    
-    // Mark player as busy
-    _playerBusy[player] = true;
-    _lastPlayerActivity[player] = DateTime.now();
-    
-    // Create request
-    final request = _SoundRequest(
-      observationId: observationId,
-      folderPath: folderPath,
-      pan: pan,
-      volume: volume,
-      player: player,
-      lastActivity: DateTime.now(),
-    );
-    
-    // Add to active requests
-    _activeRequests[observationId] = request;
-
-    print('Make a requaset for $request');
-    
-    // Play sound
-    _playRandomSound(request);
+    return;
   }
+  
+  // Get sound files
+  List<String> soundFiles = _soundFileCache[folderPath] ?? [];
+  if (soundFiles.isEmpty) {
+    await _loadSoundFiles(folderPath);
+    soundFiles = _soundFileCache[folderPath] ?? [];
+  }
+  
+  if (soundFiles.isEmpty) {
+    _log('❌ No sound files available for $observationId');
+    return;
+  }
+  
+  // Get an available player
+  final player = _getAvailablePlayer();
+  if (player == null) {
+    _log('⚠️ No available players for $observationId, checking for lower priority sounds');
+    return;
+  }
+  
+  // Mark player as busy
+  _playerBusy[player] = true;
+  _lastPlayerActivity[player] = DateTime.now();
+  
+  // Create request
+  final request = _SoundRequest(
+    observationId: observationId,
+    folderPath: folderPath,
+    pan: pan,
+    volume: volume,
+    player: player,
+    lastActivity: DateTime.now(),
+  );
+  
+  // Check if this observation is already playing on a different player
+  // This shouldn't happen with proper accounting, but let's be safe
+  for (final entry in _activeRequests.entries) {
+    if (entry.key == observationId && entry.value.player != player) {
+      _log('⚠️ Found duplicate player for $observationId, stopping old one');
+      final oldPlayer = entry.value.player;
+      if (oldPlayer != null) {
+        try {
+          await oldPlayer.stop();
+          _playerBusy[oldPlayer] = false;
+        } catch (e) {
+          // Ignore errors when stopping the old player
+        }
+      }
+      // Remove the old request
+      _activeRequests.remove(observationId);
+      break;
+    }
+  }
+  
+  // Add to active requests
+  _activeRequests[observationId] = request;
+  
+  // Play sound
+  _playRandomSound(request);
+}
   
   // Apply audio settings with error handling
   Future<void> _applyAudioSettings(AudioPlayer player, double pan, double volume) async {
@@ -377,6 +393,23 @@ void _verifyPlayerPool() {
   Future<void> _playRandomSound(_SoundRequest request) async {
     final player = request.player;
     if (player == null) return;
+
+      // Check if this observation already has another player assigned
+  for (final entry in _activeRequests.entries) {
+    if (entry.key == request.observationId && entry.value.player != player) {
+      _log('⚠️ Found another player for ${request.observationId}, stopping it first');
+      final oldPlayer = entry.value.player;
+      if (oldPlayer != null) {
+        try {
+          await oldPlayer.stop();
+          _playerBusy[oldPlayer] = false;
+        } catch (e) {
+          // Ignore errors when stopping old player
+        }
+      }
+      break;
+    }
+  }
     
     try {
       final soundFiles = _soundFileCache[request.folderPath] ?? [];
@@ -428,7 +461,7 @@ void _verifyPlayerPool() {
   // Find which request this belongs to
   String? completedId;
   _SoundRequest? request;
-  for (final entry in _activeRequests.entries) {  // Changed from _activeObservations to _activeRequests
+  for (final entry in _activeRequests.entries) {
     if (entry.value.player == player) {
       completedId = entry.key;
       request = entry.value;
@@ -452,21 +485,35 @@ void _verifyPlayerPool() {
       if (_activeRequests.containsKey(completedId)) {
         _log('🔄 Replaying sound for ${request!.observationId}');
         
-        // Get an available player (may be the same or different one)
-        final availablePlayer = _getAvailablePlayer();
-        if (availablePlayer != null) {
-          // Update the request with the new player
-          request.player = availablePlayer;
-          _playerBusy[availablePlayer] = true;
-          
-          // Play the sound again
-          _playRandomSound(request);
-        } else {
-          _log('⚠️ No available players for replay, will try again later');
-          // Try again later if no players are available
-          Future.delayed(Duration(seconds: 3), () {
-            _onPlayerComplete(player); // Recursively try again
-          });
+        // Check if another player is already assigned to this observation
+        bool hasAnotherPlayer = false;
+        for (final entry in _activeRequests.entries) {
+          if (entry.key == completedId && entry.value.player != null && entry.value.player != player) {
+            hasAnotherPlayer = true;
+            _log('⚠️ Another player already assigned to ${request.observationId}');
+            break;
+          }
+        }
+        
+        if (!hasAnotherPlayer) {
+          // Get an available player
+          final availablePlayer = _getAvailablePlayer();
+          if (availablePlayer != null) {
+            // Update the request with the new player
+            request.player = availablePlayer;
+            _playerBusy[availablePlayer] = true;
+            
+            // Play the sound again
+            _playRandomSound(request);
+          } else {
+            _log('⚠️ No available players for replay, will try again later');
+            // Try again later if no players are available
+            Future.delayed(Duration(seconds: 3), () {
+              if (_activeRequests.containsKey(completedId)) {
+                _onPlayerComplete(player); // Recursively try again
+              }
+            });
+          }
         }
       } else {
         _log('❌ Observation ${request!.observationId} no longer active, not replaying');
