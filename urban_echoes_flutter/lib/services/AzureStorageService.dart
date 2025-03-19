@@ -13,6 +13,15 @@ class AzureStorageService {
   AzureStorage? _storage;
 
   bool _initialized = false;
+  
+  // Cache settings
+  static const int CACHE_EXPIRATION_MINUTES = 30;
+  
+  // Response caching
+  final Map<String, _CachedResponse> _responseCache = {};
+  
+  // File listing cache
+  final Map<String, _CachedFileList> _fileListCache = {};
 
   // Singleton pattern
   static final AzureStorageService _instance = AzureStorageService._internal();
@@ -50,11 +59,22 @@ class AzureStorageService {
 
   Future<List<String>> listFiles(String folderPath) async {
     try {
+      // Check cache first
+      if (_fileListCache.containsKey(folderPath)) {
+        final cachedData = _fileListCache[folderPath]!;
+        if (!cachedData.isExpired()) {
+          debugPrint('Using cached file list for $folderPath (${cachedData.files.length} files)');
+          return cachedData.files;
+        } else {
+          // Remove expired cache entry
+          _fileListCache.remove(folderPath);
+        }
+      }
+      
       // Ensure the service is initialized
       if (!_initialized || _storage == null) {
         if (!await initialize()) {
-          debugPrint(
-              'Cannot list files: Azure Storage Service initialization failed');
+          debugPrint('Cannot list files: Azure Storage Service initialization failed');
           return [];
         }
       }
@@ -76,37 +96,83 @@ class AzureStorageService {
 
       debugPrint('Listing files from: $listUrl');
 
-      // Make the HTTP request
-      final response = await http.get(listUrl);
+      // Check response cache
+      final cacheKey = listUrl.toString();
+      if (_responseCache.containsKey(cacheKey)) {
+        final cachedResponse = _responseCache[cacheKey]!;
+        if (!cachedResponse.isExpired()) {
+          debugPrint('Using cached HTTP response for $cacheKey');
+          return _parseFileListResponse(cachedResponse.data, containerName);
+        } else {
+          _responseCache.remove(cacheKey);
+        }
+      }
+
+      // Make the HTTP request with timeout
+      final response = await http.get(listUrl)
+          .timeout(Duration(seconds: 10), onTimeout: () {
+        throw Exception('Request timed out');
+      });
 
       if (response.statusCode != 200) {
         debugPrint('Failed to list blobs: HTTP ${response.statusCode}');
         return [];
       }
 
-      // Parse XML response
-      try {
-        final document = xml.XmlDocument.parse(response.body);
-        final blobs = document.findAllElements('Blob');
+      // Cache the response
+      _responseCache[cacheKey] = _CachedResponse(
+        data: response.body,
+        timestamp: DateTime.now(),
+      );
 
-        List<String> fileUrls = [];
-        for (final blob in blobs) {
-          final blobName = blob.findElements('Name').first.innerText;
+      // Parse and cache the file list
+      final fileUrls = _parseFileListResponse(response.body, containerName);
+      _fileListCache[folderPath] = _CachedFileList(
+        files: fileUrls,
+        timestamp: DateTime.now(),
+      );
 
-          if (!blobName.endsWith('/')) {
-            fileUrls.add(
-                'https://$_storageAccountName.blob.core.windows.net/$containerName/$blobName');
-          }
-        }
-
-        debugPrint('Found ${fileUrls.length} files in $folderPath');
-        return fileUrls;
-      } catch (xmlError) {
-        debugPrint('Error parsing XML response: $xmlError');
-        return [];
-      }
+      debugPrint('Found ${fileUrls.length} files in $folderPath');
+      return fileUrls;
     } catch (e) {
       debugPrint('Error listing files in $folderPath: $e');
+      return [];
+    }
+  }
+
+  // Extract file parsing into a separate method
+  List<String> _parseFileListResponse(String responseBody, String containerName) {
+    try {
+      final document = xml.XmlDocument.parse(responseBody);
+      final blobs = document.findAllElements('Blob');
+
+      List<String> fileUrls = [];
+      
+      // Keep track of directories we've seen to remove duplicates
+      final Set<String> processedDirectories = {};
+      
+      for (final blob in blobs) {
+        final blobName = blob.findElements('Name').first.innerText;
+
+        // Skip directories and files we've already processed
+        if (blobName.endsWith('/')) {
+          continue;
+        }
+        
+        // Skip if we've already processed this directory
+        final directory = path.dirname(blobName);
+        if (processedDirectories.contains(directory)) {
+          continue;
+        }
+        
+        // Add URL and mark directory as processed
+        fileUrls.add(
+            'https://$_storageAccountName.blob.core.windows.net/$containerName/$blobName');
+      }
+
+      return fileUrls;
+    } catch (xmlError) {
+      debugPrint('Error parsing XML response: $xmlError');
       return [];
     }
   }
@@ -150,6 +216,10 @@ class AzureStorageService {
       final url =
           'https://$_storageAccountName.blob.core.windows.net/$_containerName/$blobName';
       debugPrint('File uploaded: $url');
+      
+      // Clear caches for the affected folder path
+      _clearCacheForFolder(formattedFolder);
+      
       return url;
     } catch (e) {
       debugPrint('Error uploading file: $e');
@@ -157,46 +227,18 @@ class AzureStorageService {
     }
   }
 
-  // Upload audio data directly from memory
-  Future<String> uploadAudioData(Uint8List audioData, String fileName,
-      {String? folder}) async {
-    try {
-      // Ensure the service is initialized
-      if (!_initialized || _storage == null) {
-        bool success = await initialize();
-        if (!success || _storage == null) {
-          throw Exception('Azure Storage Service initialization failed');
-        }
-      }
-
-      // Format folder name - convert spaces to underscores
-      String? formattedFolder = folder;
-      if (folder != null) {
-        formattedFolder = folder.replaceAll(' ', '_');
-      }
-
-      // Create blob name with folder if provided
-      final String blobName = formattedFolder != null
-          ? '$formattedFolder/${DateTime.now().millisecondsSinceEpoch}_$fileName'
-          : '${DateTime.now().millisecondsSinceEpoch}_$fileName';
-
-      await _storage!.putBlob(
-        '/$_containerName/$blobName',
-        bodyBytes: audioData,
-        contentType: _getContentType(fileName),
-      );
-
-      final url =
-          'https://$_storageAccountName.blob.core.windows.net/$_containerName/$blobName';
-      debugPrint('Audio data uploaded: $url');
-      return url;
-    } catch (e) {
-      debugPrint('Error uploading audio data: $e');
-      throw Exception('Failed to upload audio data: $e');
-    }
+  // Clear cache for a specific folder
+  void _clearCacheForFolder(String? folder) {
+    if (folder == null) return;
+    
+    // Clear file list cache for this folder
+    _fileListCache.removeWhere((key, _) => key.contains(folder));
+    
+    // Clear response cache for this folder
+    _responseCache.removeWhere((key, _) => key.contains(folder));
   }
 
-  // Helper methods remain the same
+  // Helper methods
   String _getContentType(String fileName) {
     final ext = path.extension(fileName).toLowerCase();
     switch (ext) {
@@ -214,6 +256,36 @@ class AzureStorageService {
         return 'application/octet-stream';
     }
   }
+}
 
-  int min(int a, int b) => a < b ? a : b;
+// Helper class for caching HTTP responses
+class _CachedResponse {
+  final String data;
+  final DateTime timestamp;
+  
+  _CachedResponse({
+    required this.data,
+    required this.timestamp,
+  });
+  
+  bool isExpired() {
+    return DateTime.now().difference(timestamp).inMinutes > 
+      AzureStorageService.CACHE_EXPIRATION_MINUTES;
+  }
+}
+
+// Helper class for caching file listings
+class _CachedFileList {
+  final List<String> files;
+  final DateTime timestamp;
+  
+  _CachedFileList({
+    required this.files,
+    required this.timestamp,
+  });
+  
+  bool isExpired() {
+    return DateTime.now().difference(timestamp).inMinutes > 
+      AzureStorageService.CACHE_EXPIRATION_MINUTES;
+  }
 }

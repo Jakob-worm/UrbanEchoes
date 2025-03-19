@@ -1,7 +1,7 @@
 import 'dart:io';
 import 'dart:math';
 import 'package:azblob/azblob.dart';
-import 'package:urban_echoes/models/BirdObservation.dart';
+import 'package:urban_echoes/models/bird_observation.dart';
 import 'package:urban_echoes/services/DatabaseService.dart';
 import 'package:urban_echoes/services/bird_sound_player.dart';
 import 'package:location/location.dart';
@@ -13,12 +13,12 @@ import 'package:xml/xml.dart';
 class BirdObservationController {
   // Constants
   static const String _containerName = 'bird-sounds';
-  
+
   // Aarhus city center coordinates (for emulator)
   static const double _aarhusLatitude = 56.1629;
   static const double _aarhusLongitude = 10.2039;
   static const double _maxRandomDistance = 0.05; // ~5km radius
-  
+
   // Required environment variables
   static const List<String> _requiredEnvVars = [
     'AZURE_STORAGE_CONNECTION_STRING',
@@ -26,12 +26,12 @@ class BirdObservationController {
     'DB_USER',
     'DB_PASSWORD'
   ];
-  
+
   // Services
   final DatabaseService _databaseService = DatabaseService();
   final Location _location = Location();
   final BirdSoundPlayer _soundPlayer = BirdSoundPlayer();
-  
+
   // State
   bool _initialized = false;
 
@@ -64,7 +64,7 @@ class BirdObservationController {
   // Media playback
   Future<void> playBirdSound(String soundUrl) async {
     try {
-      await _soundPlayer.playRandomSound(soundUrl);
+      //await _soundPlayer.playRandomSoundFromFolder(soundUrl,100);
     } catch (e) {
       debugPrint('Error playing sound: $e');
     }
@@ -84,13 +84,15 @@ class BirdObservationController {
     final observation = BirdObservation(
       birdName: birdName,
       scientificName: scientificName,
-      soundUrl: soundUrl,
+      soundDirectory: soundUrl ?? '',
       latitude: locationData.latitude ?? 0.0,
       longitude: locationData.longitude ?? 0.0,
       observationDate: DateTime.now(),
       observationTime: DateFormat('HH:mm:ss').format(DateTime.now()),
       observerId: 1, // One observerID for now
       quantity: quantity,
+      isTestData: false,
+      testBatchId: 1, // Example test batch ID
     );
 
     final id = await _databaseService.addBirdObservation(observation);
@@ -131,7 +133,7 @@ class BirdObservationController {
     if (!kReleaseMode) {
       return _getEmulatorLocation();
     }
-    
+
     try {
       if (!await _location.serviceEnabled() &&
           !await _location.requestService()) {
@@ -149,49 +151,51 @@ class BirdObservationController {
       return _getEmulatorLocation();
     }
   }
-  
+
   LocationData _getEmulatorLocation() {
     // Generate random coordinates around Aarhus
     final random = Random();
     final latOffset = (random.nextDouble() * 2 - 1) * _maxRandomDistance;
     final longOffset = (random.nextDouble() * 2 - 1) * _maxRandomDistance;
-    
+
     final latitude = _aarhusLatitude + latOffset;
     final longitude = _aarhusLongitude + longOffset;
-    
+
     debugPrint('Using random location around Aarhus: $latitude, $longitude');
-    return LocationData.fromMap({
-      'latitude': latitude, 
-      'longitude': longitude
-    });
+    return LocationData.fromMap({'latitude': latitude, 'longitude': longitude});
   }
 
-  Future<String?> _handleSoundFile(String scientificName, File? soundFile) async {
+  Future<String?> _handleSoundFile(
+      String scientificName, File? soundFile) async {
     if (scientificName.isEmpty) return null;
 
     final String folderPath = _formatFolderPath(scientificName);
     debugPrint('Checking for existing sound files in $folderPath');
 
     try {
-      final connectionString = dotenv.env['AZURE_STORAGE_CONNECTION_STRING'] ?? '';
+      final connectionString =
+          dotenv.env['AZURE_STORAGE_CONNECTION_STRING'] ?? '';
       final storage = AzureStorage.parse(connectionString);
       final storageInfo = _extractAzureStorageInfo(connectionString);
-      
+
       return await _findExistingSoundFile(storage, folderPath, storageInfo);
     } catch (e) {
       debugPrint('Error handling sound files: $e');
       return null;
     }
   }
-  
+
   String _formatFolderPath(String scientificName) {
     return '$_containerName/${scientificName.toLowerCase().replaceAll(' ', '_')}';
   }
 
   Map<String, String> _extractAzureStorageInfo(String connectionString) {
-    final accountName = RegExp(r'AccountName=([^;]+)').firstMatch(connectionString)?.group(1) ?? '';
-    final baseUrl = 'https://$accountName.blob.core.windows.net/$_containerName';
-    
+    final accountName =
+        RegExp(r'AccountName=([^;]+)').firstMatch(connectionString)?.group(1) ??
+            '';
+    final baseUrl =
+        'https://$accountName.blob.core.windows.net/$_containerName';
+
     return {
       'accountName': accountName,
       'containerName': _containerName,
@@ -199,10 +203,8 @@ class BirdObservationController {
     };
   }
 
-  Future<String?> _findExistingSoundFile(
-      AzureStorage storage, 
-      String folderPath, 
-      Map<String, String> storageInfo) async {
+  Future<String?> _findExistingSoundFile(AzureStorage storage,
+      String folderPath, Map<String, String> storageInfo) async {
     try {
       // Fetch the raw blob list from Azure
       final response = await storage.listBlobsRaw(folderPath);

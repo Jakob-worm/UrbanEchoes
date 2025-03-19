@@ -2,7 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:postgres/postgres.dart';
 import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:urban_echoes/models/BirdObservation.dart';
+import 'package:urban_echoes/models/bird_observation.dart';
 
 class DatabaseService {
   PostgreSQLConnection? _connection; // Changed from late to nullable
@@ -41,7 +41,7 @@ class DatabaseService {
       }
 
       debugPrint('Creating database connection...');
-      _connection = PostgreSQLConnection(dbHost, 5432, 'urban_echoes_db ',
+      _connection = PostgreSQLConnection(dbHost, 5432, 'urban_echoes_db',
           username: dbUser, password: dbPassword, useSSL: true);
 
       await _connection!.open();
@@ -100,35 +100,41 @@ class DatabaseService {
         INSERT INTO bird_observations (
           bird_name, 
           scientific_name, 
-          sound_url, 
+          sound_directory, 
           latitude, 
           longitude, 
           observation_date, 
           observation_time, 
           observer_id, 
-          quantity
+          quantity, 
+          is_test_data, 
+          test_batch_id
         ) VALUES (
           @birdName, 
           @scientificName, 
-          @soundUrl, 
+          @soundDirectory, 
           @latitude, 
           @longitude, 
           @observationDate, 
           @observationTime, 
           @observerId, 
-          @quantity
+          @quantity, 
+          @isTestData, 
+          @testBatchId
         ) RETURNING id
         ''',
         substitutionValues: {
           'birdName': observation.birdName,
           'scientificName': observation.scientificName,
-          'soundUrl': observation.soundUrl,
+          'soundDirectory': observation.soundDirectory,
           'latitude': observation.latitude,
           'longitude': observation.longitude,
           'observationDate': observation.observationDate,
           'observationTime': observation.observationTime,
           'observerId': observation.observerId,
           'quantity': observation.quantity,
+          'isTestData': observation.isTestData,
+          'testBatchId': observation.testBatchId,
         },
       );
 
@@ -156,29 +162,32 @@ class DatabaseService {
           id, 
           bird_name, 
           scientific_name, 
-          sound_url, 
+          sound_directory, 
           latitude, 
           longitude, 
           observation_date, 
           observation_time, 
           observer_id, 
-          quantity 
+          quantity, 
+          is_test_data, 
+          test_batch_id
         FROM bird_observations 
         ORDER BY created_at DESC
         ''');
 
       return results
           .map((row) => BirdObservation(
-                id: row[0] as int,
                 birdName: row[1] as String,
                 scientificName: row[2] as String,
-                soundUrl: row[3] as String?,
+                soundDirectory: row[3] as String,
                 latitude: (row[4] as num).toDouble(),
                 longitude: (row[5] as num).toDouble(),
                 observationDate: row[6] as DateTime,
                 observationTime: row[7].toString(), // Convert TIME to String
-                observerId: row[8] as int?,
+                observerId: row[8] as int,
                 quantity: row[9] as int,
+                isTestData: row[10] as bool,
+                testBatchId: row[11] as int,
               ))
           .toList();
     } catch (e) {

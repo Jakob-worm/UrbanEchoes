@@ -56,6 +56,8 @@ dependencies:
   xml: ^6.3.0
   just_audio: ^0.9.46
   file_picker: ^9.0.2
+  audio_session: ^0.1.25
+  audio_service: ^0.18.17
 
 dev_dependencies:
   flutter_test:
