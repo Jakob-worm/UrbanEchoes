@@ -34,30 +34,6 @@ class NavBarsPage extends StatelessWidget {
           // Add more items as needed
         ],
       ),
-      
-      // Floating action buttons for additional functionality
-      floatingActionButton: Column(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: [
-          FloatingActionButton(
-            heroTag: "observationButton",
-            onPressed: () {
-              pageStateManager.setButtonPage(ButtonPageType.observation);
-            },
-            tooltip: 'Make Observation',
-            child: const Icon(Icons.add_location),
-          ),
-          const SizedBox(height: 16),
-          FloatingActionButton(
-            heroTag: "profileButton",
-            onPressed: () {
-              pageStateManager.setButtonPage(ButtonPageType.profile);
-            },
-            tooltip: 'Profile',
-            child: const Icon(Icons.person),
-          ),
-        ],
-      ),
     );
   }
 }

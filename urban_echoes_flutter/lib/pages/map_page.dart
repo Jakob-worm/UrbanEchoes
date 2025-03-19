@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -6,8 +7,62 @@ import 'package:provider/provider.dart';
 import 'package:urban_echoes/consants.dart';
 import 'package:urban_echoes/services/ObservationService.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:urban_echoes/services/LocationService.dart'; // Using the original service
-import 'package:urban_echoes/state%20manegers/MapStateManager.dart'; // Updated import
+import 'package:urban_echoes/services/LocationService.dart';
+import 'package:urban_echoes/state%20manegers/MapStateManager.dart';
+
+// Improved location marker that shows direction
+class DirectionalLocationMarker extends StatelessWidget {
+  final double heading; // In degrees, 0 = North, 90 = East, etc.
+  
+  const DirectionalLocationMarker({
+    Key? key, 
+    required this.heading,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // Outer blue circle
+        Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: Colors.blue.withOpacity(0.3),
+            shape: BoxShape.circle,
+          ),
+        ),
+        // Inner blue circle
+        Container(
+          width: 12,
+          height: 12,
+          decoration: const BoxDecoration(
+            color: Colors.blue,
+            shape: BoxShape.circle,
+          ),
+        ),
+        // Direction indicator
+        Transform.rotate(
+          angle: heading * (math.pi / 180),
+          child: Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.topCenter,
+            child: Container(
+              width: 10,
+              height: 15,
+              decoration: BoxDecoration(
+                color: Colors.blue,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(5)),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key});
@@ -18,28 +73,46 @@ class MapPage extends StatefulWidget {
 
 class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   // Map state
-  List<Map<String, dynamic>> observations = [];
-  List<CircleMarker> circles = [];
+  final List<Map<String, dynamic>> _observations = [];
+  final List<CircleMarker> _circles = [];
   double _zoomLevel = AppConstants.defaultZoom;
   LatLng _userLocation = LatLng(56.171812, 10.187769);
+  double _userHeading = 0.0; // Default heading (North)
   MapController? _mapController;
-  Position? _previousPosition;
+  
+  // Throttling state
+  DateTime _lastMapUpdate = DateTime.now();
+  Timer? _mapUpdateTimer;
   
   // Services
-  LocationService? _locationService; // Using the original service
+  LocationService? _locationService;
   
   // State manager
   late MapStateManager _stateManager;
   
   // Loading timeout
   Timer? _loadingTimeoutTimer;
+  Timer? _periodicStateCheck;
+
+  // Observation display
+  List<Map<String, dynamic>> _lastActiveObservations = [];
+  
+  // Follow user flag
+  bool _followUser = true;
+  
+  // Keep track of previous position for heading calculation
+  Position? _lastUserLocation;
+
+  // Added to track the latest position and update outside of build
+  Position? _pendingPositionUpdate;
+  Timer? _positionUpdateTimer;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     
-    // Create map controller
+    // Create map controller once
     _mapController = MapController();
     
     // Initialize state manager
@@ -50,10 +123,19 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
     _loadingTimeoutTimer = Timer(Duration(seconds: 15), () {
       if (mounted) {
         _stateManager.forceReady();
-        if (_stateManager.errorMessage == null) {
-          _stateManager.setError('Some resources are still loading. The map may have limited functionality.');
-        }
       }
+    });
+    
+    // Add periodic check to ensure UI components stay visible
+    _periodicStateCheck = Timer.periodic(Duration(seconds: 5), (_) {
+      if (mounted && _stateManager.state != MapState.ready && _locationService?.currentPosition != null) {
+        _stateManager.forceReady();
+      }
+    });
+    
+    // Start position update timer
+    _positionUpdateTimer = Timer.periodic(Duration(milliseconds: 500), (_) {
+      _processPendingPositionUpdate();
     });
     
     // Defer initialization until after the widget is properly built
@@ -64,33 +146,69 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
     });
   }
   
-  void _initializeAfterBuild() {
-    print('Initializing map after build');
+  // Process any pending position updates
+  void _processPendingPositionUpdate() {
+    if (_pendingPositionUpdate != null && mounted) {
+      _safelyUpdatePosition(_pendingPositionUpdate!);
+      _pendingPositionUpdate = null;
+    }
+  }
+  
+  // Safely update position outside of build method
+  void _safelyUpdatePosition(Position position) {
+    // Skip frequent updates
+    final now = DateTime.now();
+    if (now.difference(_lastMapUpdate).inMilliseconds < 300) {
+      return;
+    }
+    _lastMapUpdate = now;
     
+    // Calculate heading if we have previous position
+    if (_lastUserLocation != null) {
+      if (position.speed > 0.5) { // Only update heading if moving
+        _userHeading = position.heading;
+      }
+    }
+    _lastUserLocation = position;
+    
+    // Update state
+    if (mounted) {
+      setState(() {
+        _userLocation = LatLng(position.latitude, position.longitude);
+        _stateManager.setLocationLoaded(true);
+        
+        // Only move map if following user and it's ready
+        if (_followUser && _stateManager.isMapFullyLoaded && _mapController != null) {
+          try {
+            _mapController!.move(_userLocation, _zoomLevel);
+          } catch (e) {
+            debugPrint('Error moving map: $e');
+          }
+        }
+      });
+    }
+  }
+  
+  void _initializeAfterBuild() {
     // Transition to loading data state
     _stateManager.startLoadingData();
     
     // Initialize LocationService with proper error handling
     _initializeLocationService();
     
-    // Load observations
-    _loadObservations();
-    
-    // Get user location
-    _getUserLocation();
-    
-    // Force map ready if it hasn't happened in a reasonable time
-    Timer(Duration(seconds: 5), () {
+    // Load observations and get user location in parallel
+    Future.wait([
+      _loadObservations(),
+      _getUserLocation(),
+    ]).then((_) {
+      // Force map ready if it hasn't happened in a reasonable time
       if (mounted && !_stateManager.isMapFullyLoaded) {
-        print('⚠️ Map ready timeout reached, forcing map ready state');
         _stateManager.setMapReady(true);
       }
     });
   }
 
   void _initializeLocationService() {
-    print('Initializing location service');
-    
     try {
       if (!mounted) return;
       
@@ -98,45 +216,45 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
       _locationService = locationService;
       
       if (!locationService.isInitialized) {
-        locationService.initialize(context);
+        locationService.initialize(context).then((_) {
+          // Force another UI update when service is initialized
+          if (mounted) {
+            setState(() {});
+          }
+        });
       }
       
-      print('Location service initialized successfully');
-      
+      // Don't update position in initialization
       if (locationService.currentPosition != null) {
-        print('Using position from LocationService: ${locationService.currentPosition!.latitude}, ${locationService.currentPosition!.longitude}');
-        _updateUserLocation(locationService.currentPosition!);
+        _pendingPositionUpdate = locationService.currentPosition;
       }
     } catch (e) {
-      print('❌ Error initializing LocationService: $e');
+      debugPrint('❌ Error initializing LocationService: $e');
       _stateManager.setError('Could not access location services. Please restart the app.');
       _stateManager.setLocationLoaded(true); // Mark as loaded so we can continue
     }
   }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-  }
   
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (!mounted) return;
+    if (!mounted || _locationService == null) return;
     
     try {
-      if (_locationService != null) {
-        if (state == AppLifecycleState.resumed) {
-          if (!_locationService!.isLocationTrackingEnabled) {
-            _locationService!.toggleLocationTracking(true);
-          }
-        } else if (state == AppLifecycleState.paused) {
-          if (_locationService!.isLocationTrackingEnabled) {
-            _locationService!.toggleLocationTracking(false);
-          }
+      if (state == AppLifecycleState.resumed) {
+        if (!_locationService!.isLocationTrackingEnabled) {
+          _locationService!.toggleLocationTracking(true);
+        }
+        // Force UI refresh when app is resumed
+        if (mounted) {
+          setState(() {});
+        }
+      } else if (state == AppLifecycleState.paused) {
+        if (_locationService!.isLocationTrackingEnabled) {
+          _locationService!.toggleLocationTracking(false);
         }
       }
     } catch (e) {
-      print('Error in lifecycle: $e');
+      debugPrint('Error in lifecycle: $e');
     }
   }
 
@@ -144,79 +262,32 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _loadingTimeoutTimer?.cancel();
-    _mapController = null;
+    _mapUpdateTimer?.cancel();
+    _periodicStateCheck?.cancel();
+    _positionUpdateTimer?.cancel();
     super.dispose();
   }
 
- void _updateUserLocation(Position position) {
-  if (!mounted) return;
-  
-  // Skip updates if position hasn't changed significantly
-  if (_previousPosition != null) {
-    double distance = Geolocator.distanceBetween(
-      _previousPosition!.latitude, _previousPosition!.longitude,
-      position.latitude, position.longitude
-    );
-    
-    if (distance < 1.0) {  // Less than 1 meter change
-      return;  // Skip this update
-    }
-  }
-  
-  _previousPosition = position;
-  
-  // Use post-frame callback to avoid setState during build
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (mounted) {
-      setState(() {
-        _userLocation = LatLng(position.latitude, position.longitude);
-        _stateManager.setLocationLoaded(true);
-
-        // Only move map if it's ready and initialized
-        if (_stateManager.isMapFullyLoaded && _mapController != null) {
-          try {
-            _mapController!.move(_userLocation, _zoomLevel);
-          } catch (e) {
-            print('Error moving map to user location: $e');
-          }
-        }
-      });
-    }
-  });
-}
-
-  // Safe method to show a snackbar
-  void _showSnackBar(String message) {
-    if (!mounted) return;
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
-  }
-
   Future<void> _getUserLocation() async {
-    print('Getting user location');
+    debugPrint('Getting user location');
     _stateManager.waitForLocation();
     
     try {
       // Check if we already have location permission
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        print('Location permission denied, requesting...');
         permission = await Geolocator.requestPermission();
         
         if (!mounted) return;
         
         if (permission == LocationPermission.denied) {
-          print('Location permission still denied after request');
           _stateManager.setError('Location permission denied');
-          _stateManager.setLocationLoaded(true); // Mark as loaded so we can continue
+          _stateManager.setLocationLoaded(true);
           return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        print('Location permission permanently denied');
         if (!mounted) return;
         
         _stateManager.setError('Location permission permanently denied. Please enable in settings.');
@@ -224,44 +295,34 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
         return;
       }
 
-      print('Getting current position with timeout of 10 seconds');
+      // Add timeout to getCurrentPosition
       try {
-        // Add timeout to getCurrentPosition
+        // Use last known position first for immediate response
+        Position? lastPosition = await Geolocator.getLastKnownPosition();
+        if (lastPosition != null && mounted) {
+          _pendingPositionUpdate = lastPosition;
+        }
+        
+        // Then get accurate position with timeout
         Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 10),
+          desiredAccuracy: LocationAccuracy.medium, // Reduced from high
+          timeLimit: Duration(seconds: 8),
         );
         
-        print('Got current position: ${position.latitude}, ${position.longitude}');
-        
         if (!mounted) return;
         
-        _updateUserLocation(position);
+        _pendingPositionUpdate = position;
       } catch (timeoutError) {
-        print('❌ Timeout getting location: $timeoutError');
+        debugPrint('❌ Timeout getting location: $timeoutError');
         
         if (!mounted) return;
         
-        // Try with last known position as fallback
-        print('Trying to get last known position as fallback');
-        try {
-          Position? lastPosition = await Geolocator.getLastKnownPosition();
-          if (lastPosition != null) {
-            print('Using last known position: ${lastPosition.latitude}, ${lastPosition.longitude}');
-            _updateUserLocation(lastPosition);
-          } else {
-            print('No last known position available');
-            _stateManager.setError('Could not get your location. Please try again.');
-            _stateManager.setLocationLoaded(true);
-          }
-        } catch (e) {
-          print('❌ Error getting last known position: $e');
-          _stateManager.setError('Could not access location services. Please restart the app.');
-          _stateManager.setLocationLoaded(true);
-        }
+        // We already tried last known position above, so just show error
+        _stateManager.setError('Could not get your precise location. Using last known position.');
+        _stateManager.setLocationLoaded(true);
       }
     } catch (e) {
-      print('❌ General error getting location: $e');
+      debugPrint('❌ General error getting location: $e');
       if (!mounted) return;
       
       _stateManager.setError('Error accessing location: $e');
@@ -269,75 +330,106 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
     }
   }
 
-  void _loadObservations() {
+  Future<void> _loadObservations() async {
     if (!mounted) return;
     
-    print('Loading observations');
+    debugPrint('Loading observations');
     
     bool debugMode = false;
     try {
       debugMode = Provider.of<bool>(context, listen: false);
     } catch (e) {
-      print('Error accessing debug mode: $e');
+      debugPrint('Error accessing debug mode: $e');
     }
     
     final String apiUrl = debugMode
         ? 'http://10.0.2.2:8000/observations'
         : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
 
-    print('Fetching observations from: $apiUrl');
-    ObservationService(apiUrl: apiUrl).fetchObservations().then((data) {
+    try {
+      final data = await ObservationService(apiUrl: apiUrl).fetchObservations();
+      
       if (!mounted) return;
       
-      print('Received ${data.length} observations');
-      setState(() {
-        observations = data.map((obs) {
-          return {
-            "id": obs["id"],
-            "bird_name": obs["bird_name"],
-            "scientific_name": obs["scientific_name"],
-            "sound_directory": obs["sound_directory"],
-            "latitude": obs["latitude"],
-            "longitude": obs["longitude"],
-            "observation_date": obs["observation_date"],
-            "observation_time": obs["observation_time"],
-            "observer_id": obs["observer_id"],
-            "created_at": obs["created_at"],
-            "quantity": obs["quantity"],
-            "is_test_data": obs["is_test_data"],
-            "test_batch_id": obs["test_batch_id"],
-          };
-        }).toList();
-
-        _updateCircles();
-        _stateManager.setDataLoaded(true);
-      });
-    }).catchError((error) {
-      print('❌ Error loading observations: $error');
+      debugPrint('Received ${data.length} observations');
+      
+      // Process data in chunks to avoid UI blocking
+      _processObservationsInChunks(data);
+      
+      _stateManager.setDataLoaded(true);
+    } catch (error) {
+      debugPrint('❌ Error loading observations: $error');
       if (!mounted) return;
       
       _stateManager.setError('Failed to load observations: $error');
-      _stateManager.setDataLoaded(true); // Mark as loaded so we can continue
-    });
+      _stateManager.setDataLoaded(true);
+    }
   }
 
-  void _updateCircles() {
-    print('Updating observation circles on map');
-    circles = observations.map((obs) {
-      return CircleMarker(
-        point: LatLng(obs["latitude"], obs["longitude"]),
-        radius: AppConstants.defaultPointRadius,
-        useRadiusInMeter: true,
-        color: getObservationColor(obs).withOpacity(0.3),
-        borderColor: getObservationColor(obs).withOpacity(0.7),
-        borderStrokeWidth: 2,
-      );
-    }).toList();
-    print('Created ${circles.length} circle markers');
+  // Process observations in chunks to avoid UI freezing
+  void _processObservationsInChunks(List<Map<String, dynamic>> data) {
+    const int chunkSize = 50;
+    int processedCount = 0;
+    
+    Future<void> processChunk() async {
+      if (processedCount >= data.length || !mounted) return;
+      
+      int endIdx = (processedCount + chunkSize) < data.length 
+          ? processedCount + chunkSize 
+          : data.length;
+      
+      List<Map<String, dynamic>> chunk = data.sublist(processedCount, endIdx);
+      List<CircleMarker> newCircles = [];
+      
+      for (var obs in chunk) {
+        if (obs["latitude"] == null || obs["longitude"] == null) continue;
+        
+        // Add to observations list
+        _observations.add({
+          "id": obs["id"],
+          "bird_name": obs["bird_name"],
+          "scientific_name": obs["scientific_name"],
+          "sound_directory": obs["sound_directory"],
+          "latitude": obs["latitude"],
+          "longitude": obs["longitude"],
+          "observation_date": obs["observation_date"],
+          "observation_time": obs["observation_time"],
+          "observer_id": obs["observer_id"],
+          "is_test_data": obs["is_test_data"],
+        });
+        
+        // Create circle marker
+        newCircles.add(CircleMarker(
+          point: LatLng(obs["latitude"], obs["longitude"]),
+          radius: AppConstants.defaultPointRadius,
+          useRadiusInMeter: true,
+          color: getObservationColor(obs).withOpacity(0.3),
+          borderColor: getObservationColor(obs).withOpacity(0.7),
+          borderStrokeWidth: 2,
+        ));
+      }
+      
+      if (mounted) {
+        setState(() {
+          _circles.addAll(newCircles);
+        });
+      }
+      
+      processedCount = endIdx;
+      
+      if (processedCount < data.length) {
+        // Schedule next chunk with small delay
+        await Future.delayed(Duration(milliseconds: 10));
+        processChunk();
+      }
+    }
+    
+    // Start processing
+    processChunk();
   }
 
   Color getObservationColor(Map<String, dynamic> obs) {
-    bool isTestData = obs["is_test_data"];
+    bool isTestData = obs["is_test_data"] ?? false;
     int observerId = obs["observer_id"] ?? -1;
 
     if (observerId == 0) {
@@ -350,12 +442,12 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   }
 
   void _onMapTap(LatLng tappedPoint) {
-    if (_stateManager.isLoading || observations.isEmpty) return;
+    if (_stateManager.isLoading || _observations.isEmpty) return;
     
     double minDistance = double.infinity;
     Map<String, dynamic>? nearestObservation;
 
-    for (var obs in observations) {
+    for (var obs in _observations) {
       final distance = Distance().as(
         LengthUnit.Meter,
         tappedPoint,
@@ -378,14 +470,14 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: Text(observation["bird_name"]),
+          title: Text(observation["bird_name"] ?? "Unknown Bird"),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Scientific Name: ${observation["scientific_name"]}"),
-              Text("Date: ${observation["observation_date"]}"),
-              Text("Time: ${observation["observation_time"]}"),
+              Text("Scientific Name: ${observation["scientific_name"] ?? "Unknown"}"),
+              Text("Date: ${observation["observation_date"] ?? "Unknown"}"),
+              Text("Time: ${observation["observation_time"] ?? "Unknown"}"),
               const SizedBox(height: 10),
             ],
           ),
@@ -402,16 +494,15 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   
   // Called when the map is ready to be used
   void _onMapCreated(MapController controller) {
-    print('Map is now ready!');
+    debugPrint('Map is now ready!');
     _stateManager.setMapReady(true);
     
     // If we already have user location, center the map on it
     if (_stateManager.state == MapState.ready && _mapController != null) {
       try {
-        print('Centering map on user location: $_userLocation');
         _mapController!.move(_userLocation, _zoomLevel);
       } catch (e) {
-        print('Error moving map on creation: $e');
+        debugPrint('Error moving map on creation: $e');
       }
     }
   }
@@ -433,23 +524,27 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
             return _buildLoadingScreen(stateManager);
           }
 
-          // Check for errors
-          if (stateManager.hasError && stateManager.errorMessage != null) {
-            // We'll still show the map but with an error banner
-          }
-          
-          // Build the main map with active observations
+          // Build the main map
           return Consumer<LocationService>(
             builder: (context, locationService, child) {
-              // Update position from service if available
-              if (locationService.currentPosition != null && !_stateManager.state.toString().contains("ready")) {
-                _updateUserLocation(locationService.currentPosition!);
+              // FIXED: Store position update for later processing instead of updating here
+              if (locationService.currentPosition != null) {
+                _pendingPositionUpdate = locationService.currentPosition;
               }
               
               // Get active observations from the LocationService
               final activeObservations = locationService.activeObservations;
               
-              return _buildMapContent(activeObservations);
+              // Cache the active observations to prevent UI flicker
+              if (activeObservations.isNotEmpty) {
+                _lastActiveObservations = List.from(activeObservations);
+              }
+              
+              // Use cached observations if current is empty (prevents flicker)
+              final observationsToShow = activeObservations.isNotEmpty ? 
+                  activeObservations : _lastActiveObservations;
+              
+              return _buildMapContent(observationsToShow);
             },
           );
         },
@@ -522,15 +617,18 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
               maxZoom: AppConstants.maxZoom,
               onTap: (_, tappedPoint) => _onMapTap(tappedPoint),
               onMapReady: () {
-                print('FlutterMap.onMapReady called!');
                 if (_mapController != null) {
                   _onMapCreated(_mapController!);
                 }
               },
+              interactionOptions: InteractionOptions(
+                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+              ),
               onPositionChanged: (position, bool hasGesture) {
                 if (hasGesture && mounted) {
                   setState(() {
                     _zoomLevel = position.zoom;
+                    _followUser = false; // Stop following user when manually panning
                   });
                 }
               },
@@ -539,40 +637,22 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
               TileLayer(
                 urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
                 userAgentPackageName: 'com.example.app',
+                tileProvider: NetworkTileProvider(
+                  headers: {
+                    'User-Agent': 'urban_echoes_app/1.0',
+                  },
+                ),
               ),
-              CircleLayer(circles: circles),
-              // User location marker
+              CircleLayer(circles: _circles),
+              // User location marker with direction
               MarkerLayer(
                 markers: [
-                  if (_stateManager.state == MapState.ready)
-                    Marker(
-                      point: _userLocation,
-                      width: 30,
-                      height: 30,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          // Outer blue circle
-                          Container(
-                            width: 30,
-                            height: 30,
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.3),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          // Inner blue circle
-                          Container(
-                            width: 12,
-                            height: 12,
-                            decoration: const BoxDecoration(
-                              color: Colors.blue,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  Marker(
+                    point: _userLocation,
+                    width: 40,
+                    height: 40,
+                    child: DirectionalLocationMarker(heading: _userHeading),
+                  ),
                 ],
               ),
             ],
@@ -580,38 +660,29 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
           // Location recenter button
           Positioned(
             right: 16,
-            bottom: 160,
+            bottom: 50, // Moved lower on screen
             child: FloatingActionButton(
               heroTag: "locationButton",
+              mini: true, // Smaller button
               onPressed: () {
-                _getUserLocation(); // Update and recenter to user location
+                if (_locationService != null) {
+                  setState(() {
+                    _followUser = true;
+                  });
+                  
+                  if (_locationService!.currentPosition != null) {
+                    _pendingPositionUpdate = _locationService!.currentPosition;
+                  } else {
+                    // Try to get location again
+                    _getUserLocation();
+                  }
+                }
               },
               backgroundColor: Colors.white,
               child: const Icon(Icons.my_location, color: Colors.blue),
             ),
           ),
-          // Audio toggle button
-          Positioned(
-            right: 16,
-            bottom: 90,
-            child: FloatingActionButton(
-              heroTag: "audioButton",
-              onPressed: () {
-                if (_locationService != null) {
-                  // Toggle audio when button is pressed
-                  _locationService!.toggleAudio(!_locationService!.isAudioEnabled);
-                }
-              },
-              backgroundColor: Colors.white,
-              child: Icon(
-                _locationService?.isAudioEnabled ?? false 
-                    ? Icons.volume_up 
-                    : Icons.volume_off,
-                color: Colors.blue,
-              ),
-            ),
-          ),
-          // Active bird sound information
+          // Active bird sound information with all observations
           if (activeObservations.isNotEmpty)
             Positioned(
               top: 16,
@@ -633,20 +704,64 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'Listening to:',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16.0,
-                      ),
+                    Row(
+                      children: [
+                        Icon(Icons.volume_up, size: 16, color: Colors.blue),
+                        SizedBox(width: 4),
+                        Text(
+                          'Listening to:',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16.0,
+                          ),
+                        ),
+                        Spacer(),
+                        // Add audio toggle here
+                        GestureDetector(
+                          onTap: () {
+                            if (_locationService != null) {
+                              _locationService!.toggleAudio(!_locationService!.isAudioEnabled);
+                            }
+                          },
+                          child: Container(
+                            padding: EdgeInsets.all(4),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[200],
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Icon(
+                              _locationService?.isAudioEnabled ?? false 
+                                  ? Icons.volume_up 
+                                  : Icons.volume_off,
+                              size: 16,
+                              color: Colors.blue,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    for (var birdSound in activeObservations)
-                      Text(
-                        '${birdSound["bird_name"]} (${birdSound["scientific_name"]})',
-                        style: TextStyle(
-                          fontSize: 14.0,
+                    SizedBox(height: 4),
+                    // Show ALL active observations - wrapped in SingleChildScrollView for long lists
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxHeight: 120),
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            for (var obs in activeObservations)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 4.0),
+                                child: Text(
+                                  '${obs["bird_name"]} (${obs["scientific_name"]})',
+                                  style: TextStyle(
+                                    fontSize: 14.0,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                       ),
+                    ),
                   ],
                 ),
               ),
