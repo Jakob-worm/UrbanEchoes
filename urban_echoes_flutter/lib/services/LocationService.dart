@@ -12,6 +12,7 @@ class LocationService extends ChangeNotifier {
   final GeolocatorPlatform _geolocatorPlatform = GeolocatorPlatform.instance;
   final BirdSoundPlayer _soundPlayer = BirdSoundPlayer();
   final AzureStorageService _storageService = AzureStorageService();
+  final Set<String> _preloadedAudioFolders = {};
   
   // State
   bool _isInitialized = false;
@@ -302,27 +303,35 @@ void _handlePositionUpdate(Position position) {
     }
   }
 
-  Future<void> _prefetchNearbyAudio(Position position) async {
+ Future<void> _prefetchNearbyAudio(Position position) async {
   // Find observations just outside the active range
   final prefetchRange = _maxRange * 1.5;  // 50% further than activation range
   
   for (var obs in _observations) {
-    if (!_activeObservations.containsKey('${obs["id"]}')) {
+    final String? directory = obs["sound_directory"];
+    if (directory == null || _preloadedAudioFolders.contains(directory)) {
+      continue;
+    }
+    
+    if (obs["latitude"] != null && obs["longitude"] != null) {
       final double distance = Geolocator.distanceBetween(
         position.latitude, position.longitude,
         obs["latitude"], obs["longitude"]
       );
       
-      if (distance <= prefetchRange && distance > _maxRange) {
-        // Pre-fetch the audio files in background
-        final String? directory = obs["sound_directory"];
-        if (directory != null && directory.isNotEmpty) {
-          _getAudioFiles(directory); // Already caches the result
-        }
+      if (distance <= prefetchRange) {
+        // Pre-fetch in background
+        _log('Pre-fetching audio for ${obs["bird_name"]}');
+        _preloadedAudioFolders.add(directory);
+        
+        _getAudioFiles(directory).then((_) {
+          _log('Successfully pre-fetched ${obs["bird_name"]} audio');
+        });
       }
     }
   }
 }
+
   
   // Start sound for an observation
   Future<void> _startSound(Map<String, dynamic> observation, double pan, double volume) async {

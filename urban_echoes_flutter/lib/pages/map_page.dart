@@ -23,6 +23,7 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   double _zoomLevel = AppConstants.defaultZoom;
   LatLng _userLocation = LatLng(56.171812, 10.187769);
   MapController? _mapController;
+  Position? _previousPosition;
   
   // Services
   LocationService? _locationService; // Using the original service
@@ -150,7 +151,19 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
  void _updateUserLocation(Position position) {
   if (!mounted) return;
   
-  print('Updating user location: ${position.latitude}, ${position.longitude}');
+  // Skip updates if position hasn't changed significantly
+  if (_previousPosition != null) {
+    double distance = Geolocator.distanceBetween(
+      _previousPosition!.latitude, _previousPosition!.longitude,
+      position.latitude, position.longitude
+    );
+    
+    if (distance < 1.0) {  // Less than 1 meter change
+      return;  // Skip this update
+    }
+  }
+  
+  _previousPosition = position;
   
   // Use post-frame callback to avoid setState during build
   WidgetsBinding.instance.addPostFrameCallback((_) {

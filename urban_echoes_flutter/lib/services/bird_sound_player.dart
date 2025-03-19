@@ -22,7 +22,7 @@ class BirdSoundPlayer {
   
   // Buffering timeout
   final Map<String, Timer?> _bufferingTimers = {};
-  final Duration _bufferingTimeout = Duration(seconds: 10);
+  late Duration _bufferingTimeout = Duration(seconds: 10);
   
   // Retry mechanism
   final Map<String, int> _retryCount = {};
@@ -145,47 +145,77 @@ class BirdSoundPlayer {
     }
   }
 
-  // Play a random sound file
-  Future<void> _playRandomSound(String folderPath, String observationId, double pan, double volume) async {
-    if (_isActive[observationId] != true) return;
-
-    try {
-      // Check if we have sound files cached
-      List<String> files = _soundFileCache[folderPath] ?? [];
-      if (files.isEmpty) {
-        debugPrint('❌ No sound files available for $folderPath');
-        _isActive[observationId] = false;
-        return;
-      }
-      
-      // Get the player
-      if (!_players.containsKey(observationId)) {
-        await _initializePlayer(observationId);
-      }
-      
-      AudioPlayer player = _players[observationId]!;
-      
-      // Select random file
-      String randomFile = files[_random.nextInt(files.length)];
-      
-      // Start buffering timeout
-      _startBufferingTimeout(observationId);
-      
-      debugPrint('🎵 Playing sound for $observationId: $randomFile');
-      
-      // Set volume and pan
-      await _applyPanningAndVolume(player, pan, volume, observationId);
-      
-      // Play the sound
-      await player.play(UrlSource(randomFile)).catchError((e) {
-        debugPrint('❌ Error playing sound: $e');
-        _handlePlaybackError(folderPath, observationId, pan, volume);
-      });
-    } catch (e) {
-      debugPrint('❌ Error in _playRandomSound: $e');
-      _handlePlaybackError(folderPath, observationId, pan, volume);
-    }
+  Duration _getBufferingTimeout(String fileUrl) {
+  if (fileUrl.toLowerCase().endsWith('.wav')) {
+    return Duration(seconds: 20);  // Longer timeout for WAVs
+  } else {
+    return Duration(seconds: 10);  // Default for MP3s
   }
+}
+
+  // Modify BirdSoundPlayer to use a more efficient approach
+Future<void> _playRandomSound(String folderPath, String observationId, double pan, double volume) async {
+  if (_isActive[observationId] != true) return;
+
+  try {
+    // Prioritize MP3s over WAVs because they're smaller
+    List<String> files = _soundFileCache[folderPath] ?? [];
+    List<String> mp3Files = files.where((file) => file.toLowerCase().endsWith('.mp3')).toList();
+    
+    // Use only MP3 files if available, otherwise use all files
+    List<String> filesToUse = mp3Files.isNotEmpty ? mp3Files : files;
+    
+    if (filesToUse.isEmpty) {
+      debugPrint('❌ No suitable sound files available for $folderPath');
+      _isActive[observationId] = false;
+      return;
+    }
+    
+    // Get the player
+    if (!_players.containsKey(observationId)) {
+      await _initializePlayer(observationId);
+    }
+    
+    AudioPlayer player = _players[observationId]!;
+    
+    // Select random file
+    String randomFile = filesToUse[_random.nextInt(filesToUse.length)];
+    
+    // Increase buffering timeout for larger files (WAVs)
+    if (randomFile.toLowerCase().endsWith('.wav')) {
+      _bufferingTimeout = Duration(seconds: 20);  // Longer timeout for WAVs
+    } else {
+      _bufferingTimeout = Duration(seconds: 10);  // Default for MP3s
+    }
+    
+    // Start buffering timeout
+    _startBufferingTimeout(observationId);
+    
+    debugPrint('🎵 Playing sound for $observationId: $randomFile');
+    
+    // Set volume and pan
+    await _applyPanningAndVolume(player, pan, volume, observationId);
+    
+    // Configure the player for better mobile streaming
+    await player.setPlayerMode(PlayerMode.lowLatency);
+    
+    // Use a smaller buffer size for faster initial playback
+    int bufferSize = randomFile.toLowerCase().endsWith('.wav') ? 4096 * 4 : 4096;
+    
+    // Play the sound with source configuration
+    await player.play(
+      UrlSource(
+        randomFile,
+      ),
+    ).catchError((e) {
+      debugPrint('❌ Error playing sound: $e');
+      _handlePlaybackError(folderPath, observationId, pan, volume);
+    });
+  } catch (e) {
+    debugPrint('❌ Error in _playRandomSound: $e');
+    _handlePlaybackError(folderPath, observationId, pan, volume);
+  }
+}
 
   // Start buffering timeout
   void _startBufferingTimeout(String observationId) {
