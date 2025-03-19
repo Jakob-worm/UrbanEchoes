@@ -376,91 +376,145 @@ class LocationService extends ChangeNotifier {
     }
   }
   
-  // Update which observations are active based on proximity
   void _updateActiveObservations(Position position) {
-    Set<String> observationsInRange = {};
-    bool activeObservationsChanged = false;
+  Set<String> observationsInRange = {};
+  bool activeObservationsChanged = false;
+  List<Map<String, dynamic>> newObservations = [];
+  
+  // Calculate which observations are in range
+  for (var obs in _observations) {
+    // Skip observations without required fields
+    if (obs["latitude"] == null || obs["longitude"] == null || obs["sound_directory"] == null) {
+      continue;
+    }
     
-    // Calculate which observations are in range
-    for (var obs in _observations) {
-      // Skip observations without required fields
-      if (obs["latitude"] == null || obs["longitude"] == null || obs["sound_directory"] == null) {
-        continue;
-      }
+    final String id = '${obs["id"]}';
+    final double distance = Geolocator.distanceBetween(
+      position.latitude, position.longitude,
+      obs["latitude"], obs["longitude"]
+    );
+    
+    // Calculate audio settings based on distance
+    final double volume = _calculateVolume(distance);
+    final double pan = _calculatePan(
+      position.latitude, position.longitude,
+      obs["latitude"], obs["longitude"]
+    );
+    
+    // Check if in range
+    if (distance <= _maxRange) {
+      observationsInRange.add(id);
       
-      final String id = '${obs["id"]}';
-      final double distance = Geolocator.distanceBetween(
-        position.latitude, position.longitude,
-        obs["latitude"], obs["longitude"]
-      );
-      
-      // Calculate audio settings based on distance
-      final double volume = _calculateVolume(distance);
-      final double pan = _calculatePan(
-        position.latitude, position.longitude,
-        obs["latitude"], obs["longitude"]
-      );
-      
-      // Check if in range
-      if (distance <= _maxRange) {
-        observationsInRange.add(id);
+      // Add to active observations if not already active
+      if (!_activeObservations.containsKey(id)) {
+        _log('Adding observation to active list: ${obs["bird_name"]} (ID: $id)');
+        _activeObservations[id] = Map<String, dynamic>.from(obs);
+        _activeObservations[id]!["pan"] = pan;
+        _activeObservations[id]!["volume"] = volume;
+        activeObservationsChanged = true;
         
-        // Add to active observations if not already active
-        if (!_activeObservations.containsKey(id)) {
-          _log('Adding observation to active list: ${obs["bird_name"]} (ID: $id)');
-          _activeObservations[id] = Map<String, dynamic>.from(obs);
-          activeObservationsChanged = true;
+        // Collect new observations to start sounds with delay
+        if (_isAudioEnabled) {
+          newObservations.add({
+            'observation': obs,
+            'id': id,
+            'pan': pan,
+            'volume': volume
+          });
+        }
+      } else if (_isAudioEnabled) {
+        // Only update sound if significant change
+        final currentPan = _activeObservations[id]!["pan"] ?? 0.0;
+        final currentVolume = _activeObservations[id]!["volume"] ?? 0.5;
+        
+        if ((pan - currentPan).abs() > 0.1 || (volume - currentVolume).abs() > 0.1) {
+          _soundPlayer.updatePanningAndVolume(id, pan, volume);
           
-          // Add to audio manager if audio enabled
-          if (_isAudioEnabled) {
-            _startSound(obs, pan, volume);
-          }
-        } else if (_isAudioEnabled) {
-          // Only update sound if significant change
-          final currentPan = _activeObservations[id]!["pan"] ?? 0.0;
-          final currentVolume = _activeObservations[id]!["volume"] ?? 0.5;
-          
-          if ((pan - currentPan).abs() > 0.1 || (volume - currentVolume).abs() > 0.1) {
-            _soundPlayer.updatePanningAndVolume(id, pan, volume);
-            
-            // Update stored values
-            _activeObservations[id]!["pan"] = pan;
-            _activeObservations[id]!["volume"] = volume;
-          }
+          // Update stored values
+          _activeObservations[id]!["pan"] = pan;
+          _activeObservations[id]!["volume"] = volume;
         }
       }
     }
+  }
+  
+  // Remove observations that are no longer in range
+  List<String> toRemove = [];
+  _activeObservations.forEach((id, obs) {
+    if (!observationsInRange.contains(id)) {
+      toRemove.add(id);
+    }
+  });
+  
+  for (String id in toRemove) {
+    _log('Removing observation from active list: ${_activeObservations[id]?["bird_name"]} (ID: $id)');
+    _activeObservations.remove(id);
+    if (_isAudioEnabled) {
+      _soundPlayer.stopSounds(id);
+    }
+    activeObservationsChanged = true;
+  }
+  
+  // Start new sounds with randomized delays
+  if (newObservations.isNotEmpty) {
+    _startSoundsWithNaturalDelays(newObservations);
+  }
+  
+  if (activeObservationsChanged) {
+    _log('Active observations updated: ${_activeObservations.length} active');
     
-    // Remove observations that are no longer in range
-    List<String> toRemove = [];
-    _activeObservations.forEach((id, obs) {
-      if (!observationsInRange.contains(id)) {
-        toRemove.add(id);
+    // Log active observations only in debug
+    if (_debugMode) {
+      _activeObservations.forEach((id, obs) {
+        _log('Active: ${obs["bird_name"]} (ID: $id)');
+      });
+    }
+    
+    notifyListeners();
+  }
+}
+
+// Add this new method to start sounds with natural delays
+void _startSoundsWithNaturalDelays(List<Map<String, dynamic>> observations) {
+  // Use a more natural pattern for bird sounds starting
+  // Some birds start quickly, others wait a bit longer
+  
+  // Shuffle the observations for more randomness
+  observations.shuffle();
+  
+  // Add a base delay to avoid all sounds starting immediately
+  int baseDelay = 300 + Random().nextInt(700); // 300-1000ms base delay
+  
+  // Start each sound with an incremental delay
+  int currentDelay = baseDelay;
+  
+  for (var obsData in observations) {
+    // Apply some randomness to each increment
+    int increment = 800 + Random().nextInt(1200); // 800-2000ms between sounds
+    
+    // Start this sound after delay
+    Future.delayed(Duration(milliseconds: currentDelay), () {
+      // Check if observation is still active before starting
+      if (_activeObservations.containsKey(obsData['id'])) {
+        var obs = obsData['observation'];
+        var id = obsData['id'];
+        var pan = obsData['pan'];
+        var volume = obsData['volume'];
+        
+        // Start with additional random volume variation
+        // for more natural effect (80-100% of calculated volume)
+        double naturalVolume = volume * (0.8 + Random().nextDouble() * 0.2);
+        _startSound(obs, pan, naturalVolume);
+        
+        // Log with delay info
+        _log('🎵 Started sound for ${obs["bird_name"]} with ${currentDelay}ms delay');
       }
     });
     
-    for (String id in toRemove) {
-      _log('Removing observation from active list: ${_activeObservations[id]?["bird_name"]} (ID: $id)');
-      _activeObservations.remove(id);
-      if (_isAudioEnabled) {
-        _soundPlayer.stopSounds(id);
-      }
-      activeObservationsChanged = true;
-    }
-    
-    if (activeObservationsChanged) {
-      _log('Active observations updated: ${_activeObservations.length} active');
-      
-      // Log active observations only in debug
-      if (_debugMode) {
-        _activeObservations.forEach((id, obs) {
-          _log('Active: ${obs["bird_name"]} (ID: $id)');
-        });
-      }
-      
-      notifyListeners();
-    }
+    // Increase delay for next sound
+    currentDelay += increment;
   }
+}
   
   // Calculate volume based on distance with smoother falloff
   double _calculateVolume(double distance) {
