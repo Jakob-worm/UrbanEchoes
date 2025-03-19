@@ -12,7 +12,19 @@ import 'state manegers/page_state_maneger.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
-  
+
+ // Store the original function
+final originalDebugPrint = debugPrint;
+
+// Replace with filtered version
+debugPrint = (String? message, {int? wrapWidth}) {
+  if (message != null && 
+      !message.contains('getCurrentPosition') && 
+      !message.contains('MediaPlayer')) {
+    originalDebugPrint(message, wrapWidth: wrapWidth);
+  }
+};
+
   // Create service instances before the widget tree
   final locationService = LocationService();  // Use LocationService
   

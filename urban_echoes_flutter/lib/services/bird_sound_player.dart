@@ -49,41 +49,73 @@ class BirdSoundPlayer {
     _startPeriodicChecks();
   }
   
-  // Initialize all players upfront
   void _initializeAllPlayers() {
-    for (int i = 0; i < MAX_ACTIVE_PLAYERS; i++) {
-      _createAndAddPlayer();
-    }
-    _log('🎵 Created $MAX_ACTIVE_PLAYERS audio players in pool');
+  // Ensure we start with an empty pool
+  _playerPool.clear();
+  _playerBusy.clear();
+  _lastPlayerActivity.clear();
+  
+  for (int i = 0; i < MAX_ACTIVE_PLAYERS; i++) {
+    _createAndAddPlayer();
   }
   
-  void _createAndAddPlayer() {
-    try {
-      final player = AudioPlayer();
-      
-      // Configure player
-      player.setReleaseMode(ReleaseMode.release);
-      player.setPlayerMode(PlayerMode.mediaPlayer);
-      
-      // Initialize volume to a safe value
-      player.setVolume(0.5);
-      
-      // Setup completion listener
-      player.onPlayerComplete.listen((_) {
-        _onPlayerComplete(player);
-      });
-      
-      // Add to pool and initialize status
-      _playerPool.add(player);
-      _playerBusy[player] = false;
-      _lastPlayerActivity[player] = DateTime.now();
-      
-      _log('✅ Added new player to pool');
-    } catch (e) {
-      _log('❌ Error creating audio player: $e');
-    }
-  }
+  // Verify player pool after creation
+  _verifyPlayerPool();
   
+  _log('🎵 Created $MAX_ACTIVE_PLAYERS audio players in pool');
+}
+
+void _createAndAddPlayer() {
+  try {
+    final player = AudioPlayer();
+    
+    // Configure audio context to allow simultaneous playback
+    player.setAudioContext(
+      AudioContext(
+        android: AudioContextAndroid(
+          audioFocus: AndroidAudioFocus.none,
+          contentType: AndroidContentType.music,
+          usageType: AndroidUsageType.media,
+        ),
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,  // Changed from ambient to playback
+          options: {AVAudioSessionOptions.mixWithOthers},
+        ),
+      ),
+    );
+    
+    // Assign a unique name to the player for better debugging
+    final playerName = 'Player_${_playerPool.length + 1}';
+    
+    // Rest of your initialization code...
+    player.setReleaseMode(ReleaseMode.release);
+    player.setPlayerMode(PlayerMode.mediaPlayer);
+    
+    // Initialize volume to a safe value
+    player.setVolume(0.5);
+    
+    // Add to pool and initialize status
+    _playerPool.add(player);
+    _playerBusy[player] = false;
+    _lastPlayerActivity[player] = DateTime.now();
+    
+    _log('✅ Added $playerName to pool (Total: ${_playerPool.length})');
+  } catch (e) {
+    _log('❌ Error creating audio player: $e');
+  }
+}
+
+// Add a method to verify player pool
+void _verifyPlayerPool() {
+  _log('🔍 Player Pool Verification:');
+  _log('Total Players: ${_playerPool.length}');
+  _log('Busy Players: ${_playerBusy.values.where((busy) => busy).length}');
+  
+  for (int i = 0; i < _playerPool.length; i++) {
+    final player = _playerPool[i];
+    _log('Player ${i + 1}: Busy = ${_playerBusy[player]}, Last Activity = ${_lastPlayerActivity[player]}');
+  }
+}
   // Start periodic status checks
   void _startPeriodicChecks() {
     _periodicChecker = Timer.periodic(Duration(seconds: 5), (_) {
@@ -223,6 +255,11 @@ class BirdSoundPlayer {
       _log('⚠️ Cannot play sound: empty folder path for $observationId');
       return;
     }
+
+  _log('🔊 Starting sound for $observationId');
+  _log('📂 Folder Path: $folderPath');
+  _log('🎚️ Pan: $pan, Volume: $volume');
+  
     
     // Store settings regardless of whether we have an active player
     _soundSettings[observationId] = _AudioSettings(pan: pan, volume: volume);
