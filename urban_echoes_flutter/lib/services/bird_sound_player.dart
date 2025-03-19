@@ -78,7 +78,7 @@ void _createAndAddPlayer() {
           usageType: AndroidUsageType.media,
         ),
         iOS: AudioContextIOS(
-          category: AVAudioSessionCategory.playback,  // Changed from ambient to playback
+          category: AVAudioSessionCategory.playback,
           options: {AVAudioSessionOptions.mixWithOthers},
         ),
       ),
@@ -87,12 +87,22 @@ void _createAndAddPlayer() {
     // Assign a unique name to the player for better debugging
     final playerName = 'Player_${_playerPool.length + 1}';
     
-    // Rest of your initialization code...
+    // Configure player
     player.setReleaseMode(ReleaseMode.release);
     player.setPlayerMode(PlayerMode.mediaPlayer);
-    
-    // Initialize volume to a safe value
     player.setVolume(0.5);
+    
+    // THIS IS THE MISSING PART:
+    // Add the onPlayerComplete listener
+    player.onPlayerComplete.listen((_) {
+      _log('🎵 $playerName: Playback completed');
+      _onPlayerComplete(player);
+    });
+    
+    // Setup state change listener (which you already have)
+    player.onPlayerStateChanged.listen((state) {
+      _log('🔊 $playerName: State changed to $state');
+    });
     
     // Add to pool and initialize status
     _playerPool.add(player);
@@ -410,14 +420,14 @@ void _verifyPlayerPool() {
       }
     }
   }
-  
-void _onPlayerComplete(AudioPlayer player) {
+
+  void _onPlayerComplete(AudioPlayer player) {
   _lastPlayerActivity[player] = DateTime.now();
   
   // Find which request this belongs to
   String? completedId;
   _SoundRequest? request;
-  for (final entry in _activeRequests.entries) {
+  for (final entry in _activeRequests.entries) {  // Changed from _activeObservations to _activeRequests
     if (entry.value.player == player) {
       completedId = entry.key;
       request = entry.value;
@@ -431,35 +441,40 @@ void _onPlayerComplete(AudioPlayer player) {
     // Reset retry count
     request.retryCount = 0;
     
-    // Ensure player is marked as available BEFORE potential next playback
+    // Ensure player is marked as available for reuse
     _playerBusy[player] = false;
     
-    // Call external completion handler if set
-    if (onSoundComplete != null) {
-      onSoundComplete!(request.observationId);
-    } else {
-      // Default: try to play next sound with more robust logic
-      int delay = 3000 + _random.nextInt(3000); // 3-6 seconds
-      Future.delayed(Duration(milliseconds: delay), () {
-        if (_activeRequests.containsKey(completedId)) {
-          // Explicitly check if the player is still available
-          if (!_playerBusy[player]!) {
-            _playRandomSound(request!);
-          } else {
-            // If player is no longer available, find a new one
-            final availablePlayer = _getAvailablePlayer();
-            if (availablePlayer != null) {
-              request!.player = availablePlayer;
-              _playerBusy[availablePlayer] = true;
-              _playRandomSound(request);
-            }
-          }
+    // Schedule the next sound playback with delay
+    int delay = 2000 + _random.nextInt(2000); // 2-4 seconds delay
+    Future.delayed(Duration(milliseconds: delay), () {
+      // Check if the observation is still active before replaying
+      if (_activeRequests.containsKey(completedId)) {
+        _log('🔄 Replaying sound for ${request!.observationId}');
+        
+        // Get an available player (may be the same or different one)
+        final availablePlayer = _getAvailablePlayer();
+        if (availablePlayer != null) {
+          // Update the request with the new player
+          request.player = availablePlayer;
+          _playerBusy[availablePlayer] = true;
+          
+          // Play the sound again
+          _playRandomSound(request);
+        } else {
+          _log('⚠️ No available players for replay, will try again later');
+          // Try again later if no players are available
+          Future.delayed(Duration(seconds: 3), () {
+            _onPlayerComplete(player); // Recursively try again
+          });
         }
-      });
-    }
+      } else {
+        _log('❌ Observation ${request!.observationId} no longer active, not replaying');
+      }
+    });
   } else {
-    // Orphaned completion, mark player as available
+    // No matching request found, just mark player as available
     _playerBusy[player] = false;
+    _log('⚠️ Could not identify which sound completed');
   }
 }
 
