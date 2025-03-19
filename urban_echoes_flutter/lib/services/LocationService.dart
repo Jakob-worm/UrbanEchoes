@@ -516,35 +516,52 @@ void _startSoundsWithNaturalDelays(List<Map<String, dynamic>> observations) {
   }
 }
   
-  // Calculate volume based on distance with smoother falloff
-  double _calculateVolume(double distance) {
-    // Smoother logarithmic falloff
-    const double minVolume = 0.1;  // Increased minimum volume
-    const double maxVolume = 0.7;  // Reduced from 0.8 to avoid audio issues
-    
-    // Normalized distance (0-1)
-    final normalizedDistance = (distance / _maxRange).clamp(0.0, 1.0);
-    
-    // Logarithmic falloff (sounds more natural to human ears)
-    final falloff = 1.0 - (normalizedDistance * normalizedDistance);
-    final volume = minVolume + falloff * (maxVolume - minVolume);
-    
-    return volume.clamp(minVolume, maxVolume);
+ double _calculateVolume(double distance) {
+  // Steeper, more dramatic falloff
+  const double minVolume = 0.05;  // Lower minimum for more contrast
+  const double maxVolume = 0.9;   // Higher maximum for nearby sounds
+  
+  // Normalized distance (0-1)
+  final normalizedDistance = (distance / _maxRange).clamp(0.0, 1.0);
+  
+  // Cubic falloff (steeper than quadratic)
+  final falloff = 1.0 - (normalizedDistance * normalizedDistance * normalizedDistance);
+  
+  // Add a "close proximity boost" for very nearby sounds
+  double volumeBoost = 0.0;
+  if (distance < 5.0) {
+    // Extra boost when very close (within 5 meters)
+    volumeBoost = 0.1 * (1.0 - (distance / 5.0));
   }
   
-  // Calculate panning based on relative position
-  double _calculatePan(double userLat, double userLng, double soundLat, double soundLng) {
-    // Calculate bearing to sound
-    double bearing = _calculateBearing(userLat, userLng, soundLat, soundLng);
-    
-    // Normalize bearing to -180 to 180
-    if (bearing > 180) bearing -= 360;
-    if (bearing < -180) bearing += 360;
-    
-    // Map to -1 to 1 for audio pan (with softer effect)
-    double pan = bearing / 120.0;  // Changed from 90.0 for less aggressive panning
-    return pan.clamp(-0.7, 0.7);   // Limit extreme panning
-  }
+  final volume = minVolume + falloff * (maxVolume - minVolume) + volumeBoost;
+  
+  return volume.clamp(minVolume, maxVolume);
+}
+
+double _calculatePan(double userLat, double userLng, double soundLat, double soundLng) {
+  // Calculate distance
+  double distance = Geolocator.distanceBetween(userLat, userLng, soundLat, soundLng);
+  
+  // Calculate bearing to sound
+  double bearing = _calculateBearing(userLat, userLng, soundLat, soundLng);
+  
+  // Normalize bearing to -180 to 180
+  if (bearing > 180) bearing -= 360;
+  if (bearing < -180) bearing += 360;
+  
+  // Calculate base pan value
+  double basePan = bearing / 90.0;
+  
+  // Distance factor (closer = more pronounced panning)
+  double distanceFactor = 1.0 - (distance / _maxRange).clamp(0.0, 0.8);
+  
+  // Apply distance factor to make nearby sounds have stronger panning
+  double pan = basePan * (0.7 + (distanceFactor * 0.3));
+  
+  // Allow full stereo range
+  return pan.clamp(-1.0, 1.0);
+}
   
   // Calculate bearing between points
   double _calculateBearing(double lat1, double lng1, double lat2, double lng2) {
