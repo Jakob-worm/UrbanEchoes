@@ -4,6 +4,15 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:debuggable="false">
+
+        <service
+            android:name="com.ryanheise.audioservice.AudioService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
         
         <!-- Add these meta-data tags to reduce verbosity -->
         <meta-data

@@ -5,7 +5,7 @@ import 'package:urban_echoes/pages/nav_bars_page.dart';
 import 'package:urban_echoes/pages/intro_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:urban_echoes/services/LocationService.dart';
-
+import 'package:audio_session/audio_session.dart';
 import 'state manegers/MapStateManager.dart';
 import 'state manegers/page_state_maneger.dart';
 
@@ -15,6 +15,18 @@ void main() async {
 
  // Store the original function
 final originalDebugPrint = debugPrint;
+
+// Set up proper audio session
+  final session = await AudioSession.instance;
+  await session.configure(AudioSessionConfiguration(
+    avAudioSessionCategory: AVAudioSessionCategory.playback,
+    avAudioSessionCategoryOptions: AVAudioSessionCategoryOptions.mixWithOthers,
+    androidAudioAttributes: const AndroidAudioAttributes(
+      contentType: AndroidAudioContentType.music,
+      usage: AndroidAudioUsage.media,
+    ),
+    androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
+  ));
 
 // Replace with filtered version
 debugPrint = (String? message, {int? wrapWidth}) {

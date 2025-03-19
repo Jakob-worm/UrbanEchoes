@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
 import 'package:urban_echoes/services/AzureStorageService.dart';
+import 'package:urban_echoes/services/background_audio_service.dart';
 import 'package:urban_echoes/services/bird_sound_player.dart';
 import 'ObservationService.dart';
 
@@ -12,6 +13,7 @@ class LocationService extends ChangeNotifier {
   final GeolocatorPlatform _geolocatorPlatform = GeolocatorPlatform.instance;
   final BirdSoundPlayer _soundPlayer = BirdSoundPlayer();
   final AzureStorageService _storageService = AzureStorageService();
+  final BackgroundAudioService _backgroundAudioService = BackgroundAudioService();
   
   // State
   bool _isInitialized = false;
@@ -532,30 +534,37 @@ class LocationService extends ChangeNotifier {
     }
   }
   
-  // Toggle location tracking
-  void toggleLocationTracking(bool enabled) {
-    if (_isLocationTrackingEnabled == enabled) {
-      return;
-    }
-    
-    _isLocationTrackingEnabled = enabled;
-    
-    if (enabled) {
-      _startLocationTracking();
-    } else {
-      // Stop all sounds
-      for (var id in _activeObservations.keys) {
-        _soundPlayer.stopSounds(id);
-      }
-      _activeObservations.clear();
-      
-      // Cancel any pending updates
-      _batchUpdateTimer?.cancel();
-      _cleanupLocationResources();
-    }
-    
-    notifyListeners();
+  // In your LocationService
+void toggleLocationTracking(bool enabled) async {
+  if (_isLocationTrackingEnabled == enabled) {
+    return;
   }
+  
+  _isLocationTrackingEnabled = enabled;
+  
+  if (enabled) {
+    // Start background service first
+    await _backgroundAudioService.startService();
+    
+    // Then start location tracking
+    _startLocationTracking();
+  } else {
+    // Stop all sounds
+    for (var id in _activeObservations.keys) {
+      _soundPlayer.stopSounds(id);
+    }
+    _activeObservations.clear();
+    
+    // Stop background service
+    await _backgroundAudioService.stopService();
+    
+    // Cancel any pending updates
+    _batchUpdateTimer?.cancel();
+    _cleanupLocationResources();
+  }
+  
+  notifyListeners();
+}
   
   // Toggle audio
   void toggleAudio(bool enabled) {

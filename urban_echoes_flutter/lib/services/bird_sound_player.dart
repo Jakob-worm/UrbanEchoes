@@ -76,6 +76,7 @@ void _createAndAddPlayer() {
           audioFocus: AndroidAudioFocus.none,
           contentType: AndroidContentType.music,
           usageType: AndroidUsageType.media,
+          isSpeakerphoneOn: false,
         ),
         iOS: AudioContextIOS(
           category: AVAudioSessionCategory.playback,
