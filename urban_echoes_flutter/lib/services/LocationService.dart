@@ -36,7 +36,7 @@ class LocationService extends ChangeNotifier {
   bool _isAudioEnabled = true;
   
   // Configuration - more conservative defaults
-  final double _maxRange = 150.0;           // Reduced from 200m
+  final double _maxRange = 50;           
   final double _distanceFilter = 15.0;      // Increased from 5m
   final int _updateIntervalSeconds = 15;    // Increased from 10s to 15s to reduce timeouts
   final int _batchUpdateMs = 500;           // Batch UI updates
@@ -65,6 +65,38 @@ class LocationService extends ChangeNotifier {
     
     // Initialize Azure Storage Service
     await _storageService.initialize();
+
+    // Set up error handler for audio playback
+  _soundPlayer.onBufferingTimeout = (String observationId) {
+    _log('Audio buffering timeout for observation: $observationId');
+  };
+  
+  _soundPlayer.onSoundComplete = (String observationId) {
+  if (_isAudioEnabled && _activeObservations.containsKey(observationId)) {
+    final obs = _activeObservations[observationId]!;
+    
+    if (_currentPosition != null) {
+      final double distance = Geolocator.distanceBetween(
+        _currentPosition!.latitude, _currentPosition!.longitude,
+        obs["latitude"], obs["longitude"]
+      );
+      
+      // Only restart if still in range
+      if (distance <= _maxRange) {
+        final double volume = _calculateVolume(distance);
+        final double pan = _calculatePan(
+          _currentPosition!.latitude, _currentPosition!.longitude,
+          obs["latitude"], obs["longitude"]
+        );
+        
+        _log('Restarting sound for ${obs["bird_name"]} after completion');
+        _startSound(obs, pan, volume);
+      }
+    }
+    
+    notifyListeners();
+  }
+};
     
     // Set up error handler for audio playback
     _soundPlayer.onBufferingTimeout = (String observationId) {
@@ -125,6 +157,7 @@ class LocationService extends ChangeNotifier {
       _startLocationFallbackTimer();
       
       _isInitialized = true;
+      
       notifyListeners();
       
     } catch (e) {
@@ -460,21 +493,17 @@ class LocationService extends ChangeNotifier {
     }
   }
   
-  // Calculate volume based on distance with smoother falloff
   double _calculateVolume(double distance) {
-    // Smoother logarithmic falloff
-    const double minVolume = 0.1;  // Increased minimum volume
-    const double maxVolume = 0.7;  // Reduced from 0.8 to avoid audio issues
-    
-    // Normalized distance (0-1)
-    final normalizedDistance = (distance / _maxRange).clamp(0.0, 1.0);
-    
-    // Logarithmic falloff (sounds more natural to human ears)
-    final falloff = 1.0 - (normalizedDistance * normalizedDistance);
-    final volume = minVolume + falloff * (maxVolume - minVolume);
-    
-    return volume.clamp(minVolume, maxVolume);
-  }
+  const double minVolume = 0.1;  // Minimum audible volume
+  const double maxVolume = 0.7;
+  
+  // Less aggressive falloff
+  final normalizedDistance = (distance / _maxRange).clamp(0.0, 1.0);
+  final falloff = 1.0 - pow(normalizedDistance, 2);  // Quadratic instead of cubic
+  final volume = minVolume + falloff * (maxVolume - minVolume);
+  
+  return volume.clamp(minVolume, maxVolume);
+}
   
   // Calculate panning based on relative position
   double _calculatePan(double userLat, double userLng, double soundLat, double soundLng) {

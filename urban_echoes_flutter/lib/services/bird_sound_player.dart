@@ -249,7 +249,6 @@ class BirdSoundPlayer {
     final player = _getAvailablePlayer();
     if (player == null) {
       _log('⚠️ No available players for $observationId, checking for lower priority sounds');
-      _replaceLowerPrioritySound(observationId, folderPath, pan, volume);
       return;
     }
     
@@ -293,53 +292,6 @@ class BirdSoundPlayer {
       }
     } catch (e) {
       _log('❌ Error setting audio parameters: $e');
-    }
-  }
-  
-  // Replace a lower priority sound if needed
-  void _replaceLowerPrioritySound(String newId, String folderPath, double pan, double volume) {
-    // Find the lowest volume (lowest priority) active sound
-    String? lowestPriorityId;
-    double lowestVolume = volume; // Only replace if this one is louder
-    
-    for (final entry in _activeRequests.entries) {
-      if (entry.value.volume < lowestVolume) {
-        lowestVolume = entry.value.volume;
-        lowestPriorityId = entry.key;
-      }
-    }
-    
-    if (lowestPriorityId != null) {
-      _log('🔄 Replacing lower priority sound $lowestPriorityId with $newId');
-      
-      // Get the player from the lower priority sound
-      final player = _activeRequests[lowestPriorityId]!.player;
-      
-      // Stop the lower priority sound
-      stopSounds(lowestPriorityId);
-      
-      // If we have a valid player, use it for the new sound
-      if (player != null && _playerPool.contains(player)) {
-        // Mark as busy
-        _playerBusy[player] = true;
-        _lastPlayerActivity[player] = DateTime.now();
-        
-        // Create request
-        final request = _SoundRequest(
-          observationId: newId,
-          folderPath: folderPath,
-          pan: pan,
-          volume: volume,
-          player: player,
-          lastActivity: DateTime.now(),
-        );
-        
-        // Add to active requests
-        _activeRequests[newId] = request;
-        
-        // Play sound
-        _playRandomSound(request);
-      }
     }
   }
   
@@ -412,39 +364,50 @@ class BirdSoundPlayer {
     }
   }
   
-  // Handle playback completion
-  void _onPlayerComplete(AudioPlayer player) {
-    _lastPlayerActivity[player] = DateTime.now();
-    
-    // Find which request this belongs to
-    String? completedId;
-    for (final entry in _activeRequests.entries) {
-      if (entry.value.player == player) {
-        completedId = entry.key;
-        break;
-      }
+void _onPlayerComplete(AudioPlayer player) {
+  _lastPlayerActivity[player] = DateTime.now();
+  
+  // Find which request this belongs to
+  String? completedId;
+  _SoundRequest? request;
+  for (final entry in _activeRequests.entries) {
+    if (entry.value.player == player) {
+      completedId = entry.key;
+      request = entry.value;
+      break;
     }
+  }
+  
+  if (completedId != null && request != null) {
+    _log('✅ Sound completed for ${request.observationId}');
     
-    if (completedId != null) {
-      final request = _activeRequests[completedId]!;
-      _log('✅ Sound completed for ${request.observationId}');
-      
-      // Reset retry count
-      request.retryCount = 0;
-      request.lastActivity = DateTime.now();
-      
-      // Schedule next sound with delay
+    // Reset retry count
+    request.retryCount = 0;
+    request.lastActivity = DateTime.now();
+    
+    // Mark player as available
+    _playerBusy[player] = false;
+    
+    // Call external completion handler if set
+    if (onSoundComplete != null) {
+      onSoundComplete!(request.observationId);
+    } else {
+      // Default: try to play next sound
       int delay = 3000 + _random.nextInt(3000); // 3-6 seconds
       Future.delayed(Duration(milliseconds: delay), () {
         if (_activeRequests.containsKey(completedId)) {
-          _playRandomSound(request);
+          _playRandomSound(request!);
         }
       });
-    } else {
-      // Orphaned completion, mark player as available
-      _playerBusy[player] = false;
     }
+  } else {
+    // Orphaned completion, mark player as available
+    _playerBusy[player] = false;
   }
+}
+
+// Add this callback to be set by LocationService
+Function(String observationId)? onSoundComplete;
   
   // Update panning and volume
   Future<void> updatePanningAndVolume(String observationId, double pan, double volume) async {
@@ -464,34 +427,35 @@ class BirdSoundPlayer {
     }
   }
   
-  // Stop sounds for an observation
-  Future<void> stopSounds(String observationId) async {
-    _log('🛑 Stopping sound for $observationId');
+  // Modify stopSounds to gradually reduce volume
+Future<void> stopSounds(String observationId) async {
+  _log('🛑 Stopping sound for $observationId');
+  
+  if (_activeRequests.containsKey(observationId)) {
+    final request = _activeRequests.remove(observationId)!;
+    final player = request.player;
     
-    if (_activeRequests.containsKey(observationId)) {
-      final request = _activeRequests.remove(observationId)!;
-      final player = request.player;
-      
-      if (player != null) {
-        try {
-          // First zero out the volume to prevent popping
-          await player.setVolume(0);
-          // Then stop the player
-          await player.stop();
-          
-          _playerBusy[player] = false;
-          _lastPlayerActivity[player] = DateTime.now();
-        } catch (e) {
-          _log('❌ Error stopping sound: $e');
-          // Mark as available anyway
-          _playerBusy[player] = false;
-        }
+    if (player != null) {
+      try {
+        // Gradually reduce volume
+        await player.setVolume(0.3);
+        await Future.delayed(Duration(milliseconds: 100));
+        await player.setVolume(0.1);
+        await Future.delayed(Duration(milliseconds: 100));
+        await player.setVolume(0);
+        await player.stop();
+        
+        _playerBusy[player] = false;
+        _lastPlayerActivity[player] = DateTime.now();
+      } catch (e) {
+        _log('❌ Error stopping sound: $e');
+        _playerBusy[player] = false;
       }
     }
-    
-    // Remove from settings list
-    _soundSettings.remove(observationId);
   }
+  
+  _soundSettings.remove(observationId);
+}
   
   // Dispose
   void dispose() {

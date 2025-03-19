@@ -146,13 +146,17 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
     });
   }
   
-  // Process any pending position updates
   void _processPendingPositionUpdate() {
-    if (_pendingPositionUpdate != null && mounted) {
+  if (_pendingPositionUpdate != null && mounted) {
+    try {
       _safelyUpdatePosition(_pendingPositionUpdate!);
+    } catch (e) {
+      debugPrint('Error processing position update: $e');
+    } finally {
       _pendingPositionUpdate = null;
     }
   }
+}
   
   // Safely update position outside of build method
   void _safelyUpdatePosition(Position position) {
@@ -209,31 +213,39 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   }
 
   void _initializeLocationService() {
-    try {
-      if (!mounted) return;
-      
-      final locationService = Provider.of<LocationService>(context, listen: false);
-      _locationService = locationService;
-      
-      if (!locationService.isInitialized) {
-        locationService.initialize(context).then((_) {
-          // Force another UI update when service is initialized
-          if (mounted) {
-            setState(() {});
-          }
-        });
-      }
-      
-      // Don't update position in initialization
+  try {
+    if (!mounted) return;
+    
+    final locationService = Provider.of<LocationService>(context, listen: false);
+    _locationService = locationService;
+    
+    // Use a more robust initialization check
+    if (!locationService.isInitialized) {
+      locationService.initialize(context).then((_) {
+        // Force another UI update when service is initialized
+        if (mounted) {
+          setState(() {
+            // Trigger position update if available
+            if (locationService.currentPosition != null) {
+              _pendingPositionUpdate = locationService.currentPosition;
+            }
+          });
+        }
+      }).catchError((error) {
+        debugPrint('❌ Error initializing LocationService: $error');
+        _stateManager.setError('Could not access location services. Please restart the app.');
+      });
+    } else {
+      // If already initialized, check for current position
       if (locationService.currentPosition != null) {
         _pendingPositionUpdate = locationService.currentPosition;
       }
-    } catch (e) {
-      debugPrint('❌ Error initializing LocationService: $e');
-      _stateManager.setError('Could not access location services. Please restart the app.');
-      _stateManager.setLocationLoaded(true); // Mark as loaded so we can continue
     }
+  } catch (e) {
+    debugPrint('❌ Unexpected error in location service initialization: $e');
+    _stateManager.setError('Unexpected location service error');
   }
+}
   
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
