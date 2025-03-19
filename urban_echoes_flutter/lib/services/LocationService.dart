@@ -490,7 +490,7 @@ void _startSoundsWithNaturalDelays(List<Map<String, dynamic>> observations) {
   
   for (var obsData in observations) {
     // Apply some randomness to each increment
-    int increment = 800 + Random().nextInt(1200); // 800-2000ms between sounds
+    int increment = 500 + Random().nextInt(20000); // 500-20000ms between sounds
     
     // Start this sound after delay
     Future.delayed(Duration(milliseconds: currentDelay), () {
