@@ -62,8 +62,8 @@ class BirdSoundPlayer {
       final player = AudioPlayer();
       
       // Configure player
-      player.setReleaseMode(ReleaseMode.stop);
-      player.setPlayerMode(PlayerMode.lowLatency);
+      player.setReleaseMode(ReleaseMode.release);
+      player.setPlayerMode(PlayerMode.mediaPlayer);
       
       // Initialize volume to a safe value
       player.setVolume(0.5);
@@ -199,15 +199,23 @@ class BirdSoundPlayer {
     }
   }
   
-  // Get an available player
   AudioPlayer? _getAvailablePlayer() {
-    for (final player in _playerPool) {
-      if (_playerBusy[player] == false) {
-        return player;
-      }
+  // Keep track of the last used player index
+   int lastPlayerIndex = -1;
+  
+  // Find an available player starting from the next index after the last used
+  for (int i = 0; i < _playerPool.length; i++) {
+    // Calculate the rotated index
+    int index = (lastPlayerIndex + 1 + i) % _playerPool.length;
+    
+    if (_playerBusy[_playerPool[index]] == false) {
+      lastPlayerIndex = index;
+      return _playerPool[index];
     }
-    return null;
   }
+  
+  return null;
+}
   
   // Start sound for an observation
   Future<void> startSound(String folderPath, String observationId, double pan, double volume) async {
@@ -268,6 +276,8 @@ class BirdSoundPlayer {
     
     // Add to active requests
     _activeRequests[observationId] = request;
+
+    print('Make a requaset for $request');
     
     // Play sound
     _playRandomSound(request);
@@ -383,20 +393,30 @@ void _onPlayerComplete(AudioPlayer player) {
     
     // Reset retry count
     request.retryCount = 0;
-    request.lastActivity = DateTime.now();
     
-    // Mark player as available
+    // Ensure player is marked as available BEFORE potential next playback
     _playerBusy[player] = false;
     
     // Call external completion handler if set
     if (onSoundComplete != null) {
       onSoundComplete!(request.observationId);
     } else {
-      // Default: try to play next sound
+      // Default: try to play next sound with more robust logic
       int delay = 3000 + _random.nextInt(3000); // 3-6 seconds
       Future.delayed(Duration(milliseconds: delay), () {
         if (_activeRequests.containsKey(completedId)) {
-          _playRandomSound(request!);
+          // Explicitly check if the player is still available
+          if (!_playerBusy[player]!) {
+            _playRandomSound(request!);
+          } else {
+            // If player is no longer available, find a new one
+            final availablePlayer = _getAvailablePlayer();
+            if (availablePlayer != null) {
+              request!.player = availablePlayer;
+              _playerBusy[availablePlayer] = true;
+              _playRandomSound(request);
+            }
+          }
         }
       });
     }
