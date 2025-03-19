@@ -4,7 +4,7 @@ import 'package:provider/provider.dart';
 import '../state manegers/page_state_maneger.dart';
 
 class NavBarsPage extends StatelessWidget {
-  const NavBarsPage({Key? key}) : super(key: key);
+  const NavBarsPage({super.key});
 
   @override
   Widget build(BuildContext context) {

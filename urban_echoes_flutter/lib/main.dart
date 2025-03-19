@@ -6,6 +6,7 @@ import 'package:urban_echoes/pages/intro_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:urban_echoes/services/LocationService.dart';
 
+import 'state manegers/MapStateManager.dart';
 import 'state manegers/page_state_maneger.dart';
 
 void main() async {
@@ -13,22 +14,22 @@ void main() async {
   await dotenv.load(fileName: ".env");
   
   // Create service instances before the widget tree
-  final locationService = LocationService();
+  final locationService = LocationService();  // Use LocationService
   
   runApp(MyApp(
     debugMode: false,
-    locationService: locationService,
+    locationService: locationService,  // Updated parameter
   ));
 }
 
 class MyApp extends StatelessWidget {
   final bool debugMode;
-  final LocationService locationService;
+  final LocationService locationService;  // Updated type
 
   const MyApp({
     super.key, 
     required this.debugMode,
-    required this.locationService,
+    required this.locationService,  // Updated parameter
   });
 
   @override
@@ -39,10 +40,14 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<PageStateManager>(
           create: (context) => PageStateManager(),
         ),
+        // Add our new MapStateManager
+        ChangeNotifierProvider<MapStateManager>(
+          create: (context) => MapStateManager(),
+        ),
         // Use .value for objects that already exist
         Provider<bool>.value(value: debugMode),
         // Use .value constructor for pre-created service instances
-        ChangeNotifierProvider<LocationService>.value(value: locationService),
+        ChangeNotifierProvider<LocationService>.value(value: locationService),  // Updated type
       ],
       child: MaterialApp(
         title: 'Urban Echoes',
@@ -90,10 +95,10 @@ class InitialScreenState extends State<InitialScreen> with WidgetsBindingObserve
           // Use try-catch to safely access the provider
           try {
             if (mounted) {
-              Provider.of<LocationService>(context, listen: false).initialize(context);
+              Provider.of<LocationService>(context, listen: false).initialize(context);  // Updated type
             }
           } catch (e) {
-            print('Error initializing LocationService: $e');
+            print('Error initializing LocationService: $e');  // Updated message
           }
           
           if (mounted) {
@@ -115,7 +120,7 @@ class InitialScreenState extends State<InitialScreen> with WidgetsBindingObserve
     if (!mounted) return;
     
     try {
-      final locationService = Provider.of<LocationService>(context, listen: false);
+      final locationService = Provider.of<LocationService>(context, listen: false);  // Updated type
       
       if (state == AppLifecycleState.resumed) {
         // App is in the foreground - enable tracking
@@ -129,7 +134,7 @@ class InitialScreenState extends State<InitialScreen> with WidgetsBindingObserve
         }
       }
     } catch (e) {
-      print('Error accessing LocationService in lifecycle: $e');
+      print('Error accessing LocationService in lifecycle: $e');  // Updated message
     }
   }
 

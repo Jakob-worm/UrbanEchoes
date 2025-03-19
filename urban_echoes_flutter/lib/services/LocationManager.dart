@@ -1,16 +1,15 @@
 import 'dart:async';
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
+import 'package:urban_echoes/services/SpatialAudioManager.dart';
 import 'package:urban_echoes/services/AzureStorageService.dart';
-import 'package:urban_echoes/services/bird_sound_player.dart';
 import 'ObservationService.dart';
 
-class LocationService extends ChangeNotifier {
+class LocationManager extends ChangeNotifier {
   // Services
   final GeolocatorPlatform _geolocatorPlatform = GeolocatorPlatform.instance;
-  final BirdSoundPlayer _soundPlayer = BirdSoundPlayer();
+  final SpatialAudioManager _audioManager = SpatialAudioManager();
   final AzureStorageService _storageService = AzureStorageService();
   
   // State
@@ -39,7 +38,7 @@ class LocationService extends ChangeNotifier {
   
   void _log(String message) {
     if (_debugMode) {
-      debugPrint('[LocationService] $message');
+      debugPrint('[LocationManager] $message');
     }
   }
   
@@ -51,11 +50,6 @@ class LocationService extends ChangeNotifier {
     
     // Initialize Azure Storage Service
     await _storageService.initialize();
-    
-    // Set up buffering timeout handler
-    _soundPlayer.onBufferingTimeout = (String observationId) {
-      _log('Audio buffering timeout for observation: $observationId');
-    };
     
     // Get API URL from context
     final bool debugMode = Provider.of<bool>(context, listen: false);
@@ -94,7 +88,7 @@ class LocationService extends ChangeNotifier {
       notifyListeners();
       
     } catch (e) {
-      _log('Error initializing LocationService: $e');
+      _log('Error initializing LocationManager: $e');
       if (context.mounted) {
         scaffoldMessenger.showSnackBar(
           SnackBar(content: Text('Failed to initialize location services. Please check your settings.')),
@@ -144,18 +138,21 @@ class LocationService extends ChangeNotifier {
     _log('Started location tracking');
   }
   
-  // Call this in _handlePositionUpdate
-void _handlePositionUpdate(Position position) {
-  _currentPosition = position;
-  _log('Position update: ${position.latitude}, ${position.longitude}');
-  
-  if (_isLocationTrackingEnabled) {
-    _updateActiveObservations(position);
-    _prefetchNearbyAudio(position); // Add this line
+  // Handle position update
+  void _handlePositionUpdate(Position position) {
+    _currentPosition = position;
+    _log('Position update: ${position.latitude}, ${position.longitude}');
+    
+    if (_isLocationTrackingEnabled) {
+      _updateActiveObservations(position);
+      
+      if (_isAudioEnabled) {
+        _audioManager.updateUserPosition(position);
+      }
+    }
+    
+    notifyListeners();
   }
-  
-  notifyListeners();
-}
   
   // Update which observations are active based on proximity
   void _updateActiveObservations(Position position) {
@@ -177,13 +174,6 @@ void _handlePositionUpdate(Position position) {
         obs["latitude"], obs["longitude"]
       );
       
-      // Calculate audio settings based on distance
-      final double volume = _calculateVolume(distance);
-      final double pan = _calculatePan(
-        position.latitude, position.longitude,
-        obs["latitude"], obs["longitude"]
-      );
-      
       // Check if in range
       if (distance <= _maxRange) {
         inRangeCount++;
@@ -197,11 +187,8 @@ void _handlePositionUpdate(Position position) {
           
           // Add to audio manager if audio enabled
           if (_isAudioEnabled) {
-            _startSound(obs, pan, volume);
+            _addSoundSource(obs);
           }
-        } else if (_isAudioEnabled) {
-          // Update existing sound's volume and panning
-          _soundPlayer.updatePanningAndVolume(id, pan, volume);
         }
       }
     }
@@ -218,7 +205,7 @@ void _handlePositionUpdate(Position position) {
       _log('Removing observation from active list: ${_activeObservations[id]?["bird_name"]} (ID: $id)');
       _activeObservations.remove(id);
       if (_isAudioEnabled) {
-        _soundPlayer.stopSounds(id);
+        _audioManager.removeSoundSource(id);
       }
       activeObservationsChanged = true;
     }
@@ -233,50 +220,6 @@ void _handlePositionUpdate(Position position) {
       
       notifyListeners();
     }
-  }
-  
-  // Calculate volume based on distance
-  double _calculateVolume(double distance) {
-    // Linear falloff with minimum volume
-    const double minVolume = 0.05; // Minimum volume at max distance
-    const double maxVolume = 1.0;  // Maximum volume at center
-    
-    double falloff = 1.0 - (distance / _maxRange);
-    double volume = minVolume + falloff * (maxVolume - minVolume);
-    return volume.clamp(minVolume, maxVolume);
-  }
-  
-  // Calculate panning based on relative position
-  double _calculatePan(double userLat, double userLng, double soundLat, double soundLng) {
-    // Calculate bearing to sound
-    double bearing = _calculateBearing(userLat, userLng, soundLat, soundLng);
-    
-    // Normalize bearing to -180 to 180
-    if (bearing > 180) bearing -= 360;
-    if (bearing < -180) bearing += 360;
-    
-    // Map to -1 to 1 for audio pan
-    double pan = bearing / 90.0;
-    return pan.clamp(-1.0, 1.0);
-  }
-  
-  // Calculate bearing between points
-  double _calculateBearing(double lat1, double lng1, double lat2, double lng2) {
-    // Convert to radians
-    const double pi = 3.1415926535897932;
-    lat1 = lat1 * pi / 180;
-    lng1 = lng1 * pi / 180;
-    lat2 = lat2 * pi / 180;
-    lng2 = lng2 * pi / 180;
-
-    // Calculate bearing
-    double y = sin(lng2 - lng1) * cos(lat2);
-    double x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(lng2 - lng1);
-    double bearingRad = atan2(y, x);
-
-    // Convert to degrees
-    double bearingDeg = bearingRad * 180 / pi;
-    return (bearingDeg + 360) % 360;
   }
   
   // Get audio files for a directory (with caching)
@@ -301,44 +244,34 @@ void _handlePositionUpdate(Position position) {
       return [];
     }
   }
-
-  Future<void> _prefetchNearbyAudio(Position position) async {
-  // Find observations just outside the active range
-  final prefetchRange = _maxRange * 1.5;  // 50% further than activation range
   
-  for (var obs in _observations) {
-    if (!_activeObservations.containsKey('${obs["id"]}')) {
-      final double distance = Geolocator.distanceBetween(
-        position.latitude, position.longitude,
-        obs["latitude"], obs["longitude"]
-      );
-      
-      if (distance <= prefetchRange && distance > _maxRange) {
-        // Pre-fetch the audio files in background
-        final String? directory = obs["sound_directory"];
-        if (directory != null && directory.isNotEmpty) {
-          _getAudioFiles(directory); // Already caches the result
-        }
-      }
-    }
-  }
-}
-  
-  // Start sound for an observation
-  Future<void> _startSound(Map<String, dynamic> observation, double pan, double volume) async {
+  // Add sound source to audio manager
+  Future<void> _addSoundSource(Map<String, dynamic> observation) async {
     final String id = '${observation["id"]}';
     final String? directory = observation["sound_directory"];
     
     if (directory == null || directory.isEmpty) {
-      _log('Cannot start sound: directory is null or empty for ${observation["bird_name"]}');
+      _log('Cannot add sound source: directory is null or empty for ${observation["bird_name"]}');
       return;
     }
     
     try {
-      _soundPlayer.startSound(directory, id, pan, volume);
-      _log('Started sound for ${observation["bird_name"]} with pan=$pan, volume=$volume');
+      // Get actual audio files from the directory
+      List<String> audioFiles = await _getAudioFiles(directory);
+      
+      if (audioFiles.isNotEmpty) {
+        _audioManager.addSoundSource(
+          id,
+          observation["latitude"],
+          observation["longitude"],
+          audioFiles
+        );
+        _log('Added sound source for ${observation["bird_name"]} with ${audioFiles.length} audio files');
+      } else {
+        _log('No audio files found for ${observation["bird_name"]} in $directory');
+      }
     } catch (e) {
-      _log('Error starting sound: $e');
+      _log('Error adding sound source: $e');
     }
   }
   
@@ -353,10 +286,7 @@ void _handlePositionUpdate(Position position) {
     if (enabled) {
       _startLocationTracking();
     } else {
-      // Stop all sounds
-      for (var id in _activeObservations.keys) {
-        _soundPlayer.stopSounds(id);
-      }
+      _audioManager.stopAllSounds();
       _activeObservations.clear();
     }
     
@@ -372,26 +302,16 @@ void _handlePositionUpdate(Position position) {
     _isAudioEnabled = enabled;
     
     if (!enabled) {
-      // Stop all active sounds
-      for (var id in _activeObservations.keys) {
-        _soundPlayer.stopSounds(id);
-      }
+      _audioManager.stopAllSounds();
     } else if (_currentPosition != null) {
       // Re-add all active sound sources
       for (var obs in _activeObservations.values) {
-        final String id = '${obs["id"]}';
-        final double distance = Geolocator.distanceBetween(
-          _currentPosition!.latitude, _currentPosition!.longitude,
-          obs["latitude"], obs["longitude"]
-        );
-        
-        final double volume = _calculateVolume(distance);
-        final double pan = _calculatePan(
-          _currentPosition!.latitude, _currentPosition!.longitude,
-          obs["latitude"], obs["longitude"]
-        );
-        
-        _startSound(obs, pan, volume);
+        _addSoundSource(obs);
+      }
+      
+      // Update with current position
+      if (_currentPosition != null) {
+        _audioManager.updateUserPosition(_currentPosition!);
       }
     }
     
@@ -400,7 +320,7 @@ void _handlePositionUpdate(Position position) {
   
   @override
   void dispose() {
-    _soundPlayer.dispose();
+    _audioManager.dispose();
     _activeObservations.clear();
     super.dispose();
   }
