@@ -14,6 +14,7 @@ import 'package:urban_echoes/services/bird_search_service.dart';
 
 // Import exceptions
 import 'package:urban_echoes/exceptions/api_exceptions.dart';
+import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 
 // Import state definitions
 
@@ -128,7 +129,13 @@ class MakeObservationPageState extends State<MakeObservationPage> {
 
       if (success) {
         _showSuccessSnackbar('Observation recorded successfully!');
-        _resetForm();
+
+        // Navigate to the map page using PageStateManager
+        // This will change the selected tab in the bottom navigation bar
+        final pageStateManager =
+            Provider.of<PageStateManager>(context, listen: false);
+        pageStateManager.setNavRailPage(
+            NavRailPageType.values[1]); // Assuming Map is index 1
       } else {
         _showErrorSnackbar('Failed to record observation');
       }

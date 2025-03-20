@@ -18,6 +18,7 @@ enum ButtonPageType {
 class PageStateManager extends ChangeNotifier {
   NavRailPageType selectedNavRailPage = NavRailPageType.home;
   ButtonPageType? selectedButtonPage;
+  Map<String, dynamic>? newObservationData;
 
   // Instead of storing widget instances directly, use builder functions
   // that will create the widgets with the current context when needed
