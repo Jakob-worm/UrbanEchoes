@@ -6,6 +6,17 @@
 	<array>
 		<string>audio</string>
 	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>audio</string>
+		<string>location</string>
+	</array>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>This app needs access to location when in use and in the background to play location-based bird sounds.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>This app needs access to location when in the background to play location-based bird sounds.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>This app needs access to location to play location-based bird sounds.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Explanation on why the camera access is needed.</string>
 	<key>NSMicrophoneUsageDescription</key>
