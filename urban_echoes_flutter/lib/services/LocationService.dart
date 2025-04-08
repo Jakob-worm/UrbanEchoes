@@ -7,7 +7,6 @@ import 'package:urban_echoes/services/AzureStorageService.dart';
 import 'package:urban_echoes/services/background_audio_service.dart';
 import 'package:urban_echoes/services/bird_sound_player.dart';
 import 'ObservationService.dart';
-import 'dart:io' show Platform;
 
 class LocationService extends ChangeNotifier {
   // Services

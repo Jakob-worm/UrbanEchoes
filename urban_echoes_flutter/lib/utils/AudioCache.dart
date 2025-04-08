@@ -37,7 +37,7 @@ class AudioCache {
       }
     } catch (e) {
       print('Error downloading file: $e');
-      throw e;
+      rethrow;
     }
   }
   

@@ -1,6 +1,4 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:audio_session/audio_session.dart';
-import 'package:flutter/foundation.dart';
 import 'package:urban_echoes/services/background_audio_handler.dart';
 import 'package:flutter/material.dart';
 

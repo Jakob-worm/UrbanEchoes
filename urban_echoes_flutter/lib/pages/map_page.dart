@@ -15,9 +15,9 @@ class DirectionalLocationMarker extends StatelessWidget {
   final double heading; // In degrees, 0 = North, 90 = East, etc.
   
   const DirectionalLocationMarker({
-    Key? key, 
+    super.key, 
     required this.heading,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
