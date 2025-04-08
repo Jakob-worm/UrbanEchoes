@@ -244,71 +244,72 @@ class LocationService extends ChangeNotifier {
     });
   }
 
-  // Start tracking location
-  Future<void> _startLocationTracking() async {
-    // First, make sure we're not already tracking
-    await _cleanupLocationResources();
+  // In your LocationService class, update _startLocationTracking
 
-    if (!_isLocationTrackingEnabled) {
+Future<void> _startLocationTracking() async {
+  // First, make sure we're not already tracking
+  await _cleanupLocationResources();
+
+  if (!_isLocationTrackingEnabled) {
+    return;
+  }
+
+  // Wait a moment to ensure clean state
+  await Future.delayed(Duration(milliseconds: 100));
+
+  // Use settings optimized for background operation
+  final LocationSettings locationSettings = LocationSettings(
+    accuracy: LocationAccuracy.medium, 
+    distanceFilter: _distanceFilter.toInt(),
+    // Remove timeLimit to prevent cancellation in background
+    // timeLimit: Duration(seconds: _updateIntervalSeconds),
+  );
+
+  try {
+    // Listen for position updates with error handling
+    _positionStreamSubscription = _geolocatorPlatform
+        .getPositionStream(locationSettings: locationSettings)
+        .handleError((error) {
+      _log('! Position stream error: $error');
+      _positionUpdateFailures++;
+      _restartLocationTracking();
       return;
-    }
-
-    // Wait a moment to ensure clean state
-    await Future.delayed(Duration(milliseconds: 100));
-
-    // Use more battery-efficient settings but enable background updates
-    final LocationSettings locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.medium, // Reduced from high
-      distanceFilter: _distanceFilter.toInt(),
-      timeLimit: Duration(seconds: _updateIntervalSeconds),
-    );
-
-    try {
-      // Listen for position updates with error handling
-      _positionStreamSubscription = _geolocatorPlatform
-          .getPositionStream(locationSettings: locationSettings)
-          .handleError((error) {
-        _log('! Position stream error: $error');
+    }).listen(
+      (position) {
+        _positionUpdateFailures = 0; // Reset on successful update
+        _handlePositionUpdate(position);
+      },
+      onError: (e) {
+        _log('! Position update error: $e');
         _positionUpdateFailures++;
         _restartLocationTracking();
-        return;
-      }).listen(
-        (position) {
-          _positionUpdateFailures = 0; // Reset on successful update
-          _handlePositionUpdate(position);
-        },
-        onError: (e) {
-          _log('! Position update error: $e');
-          _positionUpdateFailures++;
-          _restartLocationTracking();
-        },
-        cancelOnError: false,
-      );
+      },
+      cancelOnError: false,
+    );
 
-      // Get initial position with timeout
-      _geolocatorPlatform
-          .getCurrentPosition(
-              locationSettings: LocationSettings(
-            accuracy: LocationAccuracy.medium,
-            timeLimit: Duration(seconds: 8),
-          ))
-          .timeout(Duration(seconds: 8))
-          .then((position) {
-        _positionUpdateFailures = 0; // Reset on success
-        _handlePositionUpdate(position);
-      }).catchError((e) {
-        _log('! Initial position error: $e');
-        _positionUpdateFailures++;
-        // We'll rely on the fallback mechanism to provide a position
-      });
-
-      _log(
-          'Started location tracking with distanceFilter=${_distanceFilter}m, interval=${_updateIntervalSeconds}s');
-    } catch (e) {
-      _log('! Error setting up location tracking: $e');
+    // Get initial position with timeout
+    _geolocatorPlatform
+        .getCurrentPosition(
+            locationSettings: LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: Duration(seconds: 8),
+        ))
+        .timeout(Duration(seconds: 8))
+        .then((position) {
+      _positionUpdateFailures = 0; // Reset on success
+      _handlePositionUpdate(position);
+    }).catchError((e) {
+      _log('! Initial position error: $e');
       _positionUpdateFailures++;
-    }
+      // We'll rely on the fallback mechanism to provide a position
+    });
+
+    _log('Started location tracking with distanceFilter=${_distanceFilter}m');
+  } catch (e) {
+    _log('! Error setting up location tracking: $e');
+    _positionUpdateFailures++;
   }
+}
 
   // Clean up location resources before restarting
   Future<void> _cleanupLocationResources() async {
@@ -630,36 +631,39 @@ class LocationService extends ChangeNotifier {
   }
 
   // In your LocationService
-  void toggleLocationTracking(bool enabled) async {
-    if (_isLocationTrackingEnabled == enabled) {
-      return;
-    }
-
-    _isLocationTrackingEnabled = enabled;
-
-    if (enabled) {
-      // Start background service first
-      await _backgroundAudioService.startService();
-
-      // Then start location tracking
-      _startLocationTracking();
-    } else {
-      // Stop all sounds
-      for (var id in _activeObservations.keys) {
-        _soundPlayer.stopSounds(id);
-      }
-      _activeObservations.clear();
-
-      // Stop background service
-      await _backgroundAudioService.stopService();
-
-      // Cancel any pending updates
-      _batchUpdateTimer?.cancel();
-      _cleanupLocationResources();
-    }
-
-    notifyListeners();
+void toggleLocationTracking(bool enabled) async {
+  if (_isLocationTrackingEnabled == enabled) {
+    return;
   }
+
+  _isLocationTrackingEnabled = enabled;
+
+  if (enabled) {
+    // Start background service first and ensure it's fully initialized
+    await _backgroundAudioService.startService();
+    await Future.delayed(Duration(milliseconds: 500)); // Give audio service time to initialize
+
+    // Then start location tracking
+    _startLocationTracking();
+  } else {
+    // Stop all sounds
+    for (var id in _activeObservations.keys) {
+      _soundPlayer.stopSounds(id);
+    }
+    _activeObservations.clear();
+
+    // First stop location tracking
+    await _cleanupLocationResources();
+    
+    // Then stop background service
+    await _backgroundAudioService.stopService();
+
+    // Cancel any pending updates
+    _batchUpdateTimer?.cancel();
+  }
+
+  notifyListeners();
+}
 
   // Toggle audio
   void toggleAudio(bool enabled) {
