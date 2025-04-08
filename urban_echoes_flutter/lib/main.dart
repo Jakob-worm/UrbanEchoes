@@ -122,7 +122,7 @@ class InitialScreenState extends State<InitialScreen> with WidgetsBindingObserve
               Provider.of<LocationService>(context, listen: false).initialize(context);  // Updated type
             }
           } catch (e) {
-            print('Error initializing LocationService: $e');  // Updated message
+            debugPrint('Error initializing LocationService: $e');  // Updated message
           }
           
           if (mounted) {
@@ -132,7 +132,7 @@ class InitialScreenState extends State<InitialScreen> with WidgetsBindingObserve
           }
         });
       } catch (e) {
-        print('Error in post-frame callback: $e');
+        debugPrint('Error in post-frame callback: $e');
         _isInitializing = false;
       }
     }
@@ -158,7 +158,7 @@ class InitialScreenState extends State<InitialScreen> with WidgetsBindingObserve
         }
       }
     } catch (e) {
-      print('Error accessing LocationService in lifecycle: $e');  // Updated message
+      debugPrint('Error accessing LocationService in lifecycle: $e');  // Updated message
     }
   }
 

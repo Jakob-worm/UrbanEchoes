@@ -3,11 +3,12 @@ import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:urban_echoes/services/AzureStorageService.dart';
+import 'package:urban_echoes/consants.dart';
 
 class BirdSoundPlayer {
   // Configuration
-  static const int MAX_ACTIVE_PLAYERS = 3;
-  static const int RETRY_LIMIT = 3;
+  static const int maxActivePlayers = AppConstants.maxActivePlayers;
+  static const int retryLimit = 3;
   
   // Player pool
   final List<AudioPlayer> _playerPool = [];
@@ -55,14 +56,14 @@ class BirdSoundPlayer {
   _playerBusy.clear();
   _lastPlayerActivity.clear();
   
-  for (int i = 0; i < MAX_ACTIVE_PLAYERS; i++) {
+  for (int i = 0; i < maxActivePlayers; i++) {
     _createAndAddPlayer();
   }
   
   // Verify player pool after creation
   _verifyPlayerPool();
   
-  _log('🎵 Created $MAX_ACTIVE_PLAYERS audio players in pool');
+  _log('🎵 Created $maxActivePlayers audio players in pool');
 }
 
 void _createAndAddPlayer() {
@@ -440,7 +441,7 @@ void _verifyPlayerPool() {
       _log('❌ Error playing sound: $e');
       request.retryCount++;
       
-      if (request.retryCount <= RETRY_LIMIT) {
+      if (request.retryCount <= retryLimit) {
         // Retry after delay
         int delay = (1000 * request.retryCount).clamp(1000, 5000);
         Future.delayed(Duration(milliseconds: delay), () {
