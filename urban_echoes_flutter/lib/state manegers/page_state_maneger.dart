@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:urban_echoes/pages/home_page.dart';
-import 'package:urban_echoes/pages/make_observation/make_observation_page.dart';
+import 'package:urban_echoes/pages/make_observation/MakeObservationPage.dart';
 import 'package:urban_echoes/pages/map_page.dart';
 
 enum NavRailPageType {
@@ -19,6 +19,15 @@ class PageStateManager extends ChangeNotifier {
   NavRailPageType selectedNavRailPage = NavRailPageType.home;
   ButtonPageType? selectedButtonPage;
   Map<String, dynamic>? newObservationData;
+
+    // Add this flag to track when map needs refreshing
+  bool _needsMapRefresh = false;
+  bool get needsMapRefresh => _needsMapRefresh;
+
+  void setNeedsMapRefresh(bool value) {
+    _needsMapRefresh = value;
+    notifyListeners();
+  }
 
   // Instead of storing widget instances directly, use builder functions
   // that will create the widgets with the current context when needed

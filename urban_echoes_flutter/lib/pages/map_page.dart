@@ -9,6 +9,7 @@ import 'package:urban_echoes/services/ObservationService.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:urban_echoes/services/LocationService.dart';
 import 'package:urban_echoes/state%20manegers/MapStateManager.dart';
+import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 
 // Improved location marker that shows direction
 class DirectionalLocationMarker extends StatelessWidget {
@@ -107,6 +108,74 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   Position? _pendingPositionUpdate;
   Timer? _positionUpdateTimer;
 
+  Future<void> refreshObservations() async {
+  if (!mounted) return;
+  
+  debugPrint('Refreshing observations after new submission');
+  
+  // Clear existing data to avoid duplicates
+  _observations.clear();
+  _circles.clear();
+  
+  // Reload all observations
+  await _loadObservations();
+}
+
+  // Add this method to update observations from the service
+  void _updateObservationsFromService(List<Map<String, dynamic>> activeObservations) {
+    // Don't process if no new observations
+    if (activeObservations.isEmpty) return;
+    
+    // Check if any of these observations are not already in our main list
+    List<Map<String, dynamic>> newObservations = [];
+    
+    for (var obs in activeObservations) {
+      // Only add if not already in the list
+      if (!_observations.any((existingObs) => existingObs["id"] == obs["id"])) {
+        newObservations.add(obs);
+      }
+    }
+    
+    // If we have new observations, add them to our lists
+    if (newObservations.isNotEmpty) {
+      List<CircleMarker> newCircles = [];
+      
+      for (var obs in newObservations) {
+        if (obs["latitude"] == null || obs["longitude"] == null) continue;
+        
+        // Add to observations list
+        _observations.add({
+          "id": obs["id"],
+          "bird_name": obs["bird_name"],
+          "scientific_name": obs["scientific_name"],
+          "sound_directory": obs["sound_directory"],
+          "latitude": obs["latitude"],
+          "longitude": obs["longitude"],
+          "observation_date": obs["observation_date"],
+          "observation_time": obs["observation_time"],
+          "observer_id": obs["observer_id"],
+          "is_test_data": obs["is_test_data"],
+        });
+        
+        // Create circle marker
+        newCircles.add(CircleMarker(
+          point: LatLng(obs["latitude"], obs["longitude"]),
+          radius: AppConstants.defaultPointRadius,
+          useRadiusInMeter: true,
+          color: getObservationColor(obs).withOpacity(0.3),
+          borderColor: getObservationColor(obs).withOpacity(0.7),
+          borderStrokeWidth: 2,
+        ));
+      }
+      
+      if (mounted) {
+        setState(() {
+          _circles.addAll(newCircles);
+        });
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -147,16 +216,16 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   }
   
   void _processPendingPositionUpdate() {
-  if (_pendingPositionUpdate != null && mounted) {
-    try {
-      _safelyUpdatePosition(_pendingPositionUpdate!);
-    } catch (e) {
-      debugPrint('Error processing position update: $e');
-    } finally {
-      _pendingPositionUpdate = null;
+    if (_pendingPositionUpdate != null && mounted) {
+      try {
+        _safelyUpdatePosition(_pendingPositionUpdate!);
+      } catch (e) {
+        debugPrint('Error processing position update: $e');
+      } finally {
+        _pendingPositionUpdate = null;
+      }
     }
   }
-}
   
   // Safely update position outside of build method
   void _safelyUpdatePosition(Position position) {
@@ -213,39 +282,39 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   }
 
   void _initializeLocationService() {
-  try {
-    if (!mounted) return;
-    
-    final locationService = Provider.of<LocationService>(context, listen: false);
-    _locationService = locationService;
-    
-    // Use a more robust initialization check
-    if (!locationService.isInitialized) {
-      locationService.initialize(context).then((_) {
-        // Force another UI update when service is initialized
-        if (mounted) {
-          setState(() {
-            // Trigger position update if available
-            if (locationService.currentPosition != null) {
-              _pendingPositionUpdate = locationService.currentPosition;
-            }
-          });
+    try {
+      if (!mounted) return;
+      
+      final locationService = Provider.of<LocationService>(context, listen: false);
+      _locationService = locationService;
+      
+      // Use a more robust initialization check
+      if (!locationService.isInitialized) {
+        locationService.initialize(context).then((_) {
+          // Force another UI update when service is initialized
+          if (mounted) {
+            setState(() {
+              // Trigger position update if available
+              if (locationService.currentPosition != null) {
+                _pendingPositionUpdate = locationService.currentPosition;
+              }
+            });
+          }
+        }).catchError((error) {
+          debugPrint('❌ Error initializing LocationService: $error');
+          _stateManager.setError('Could not access location services. Please restart the app.');
+        });
+      } else {
+        // If already initialized, check for current position
+        if (locationService.currentPosition != null) {
+          _pendingPositionUpdate = locationService.currentPosition;
         }
-      }).catchError((error) {
-        debugPrint('❌ Error initializing LocationService: $error');
-        _stateManager.setError('Could not access location services. Please restart the app.');
-      });
-    } else {
-      // If already initialized, check for current position
-      if (locationService.currentPosition != null) {
-        _pendingPositionUpdate = locationService.currentPosition;
       }
+    } catch (e) {
+      debugPrint('❌ Unexpected error in location service initialization: $e');
+      _stateManager.setError('Unexpected location service error');
     }
-  } catch (e) {
-    debugPrint('❌ Unexpected error in location service initialization: $e');
-    _stateManager.setError('Unexpected location service error');
   }
-}
   
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -525,6 +594,19 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
     if (_locationService == null) {
       _initializeLocationService();
     }
+
+    // Check if we need to refresh observations (e.g., after adding a new one)
+  try {
+    final pageStateManager = Provider.of<PageStateManager>(context, listen: false);
+    if (pageStateManager.needsMapRefresh) {
+      // Reset the flag and refresh observations
+      pageStateManager.setNeedsMapRefresh(false);
+      // Use Future.microtask to avoid calling setState during build
+      Future.microtask(() => refreshObservations());
+    }
+  } catch (e) {
+    debugPrint('Error checking map refresh state: $e');
+  }
     
     // Listen to state changes
     return ChangeNotifierProvider.value(
@@ -617,6 +699,9 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   
   // Extract the map building logic to a separate method
   Widget _buildMapContent(List<Map<String, dynamic>> activeObservations) {
+    // Update observations from service
+    _updateObservationsFromService(activeObservations);
+    
     return Scaffold(
       body: Stack(
         children: [
