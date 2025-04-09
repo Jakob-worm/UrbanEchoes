@@ -103,7 +103,6 @@ class _BirdCallFilterDemoState extends State<BirdCallFilterDemo> {
   }
 
   Future<List<double>> _extractAudioSamples(String filePath) async {
-    // TODO: Implement actual audio sample extraction
     // This would typically involve using a audio processing library
     // to convert audio file to numerical samples
     return []; // Placeholder

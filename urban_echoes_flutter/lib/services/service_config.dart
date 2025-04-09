@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 class ServiceConfig {
   // Singleton instance
   static final ServiceConfig _instance = ServiceConfig._internal();

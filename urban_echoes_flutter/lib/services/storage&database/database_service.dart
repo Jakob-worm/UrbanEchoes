@@ -50,7 +50,7 @@ class DatabaseService {
       return true;
     } catch (e, stackTrace) {
       debugPrint('Database connection failed: $e');
-      print(stackTrace);
+      debugPrint(stackTrace as String?);
       _isConnected = false;
       return false;
     }

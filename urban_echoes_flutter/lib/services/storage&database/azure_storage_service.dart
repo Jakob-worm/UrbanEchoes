@@ -14,7 +14,7 @@ class AzureStorageService {
   bool _initialized = false;
   
   // Cache settings
-  static const int CACHE_EXPIRATION_MINUTES = 30;
+  static const int cacheExpirationMinutes = 30;
   
   // Response caching
   final Map<String, _CachedResponse> _responseCache = {};
@@ -269,7 +269,7 @@ class _CachedResponse {
   
   bool isExpired() {
     return DateTime.now().difference(timestamp).inMinutes > 
-      AzureStorageService.CACHE_EXPIRATION_MINUTES;
+      AzureStorageService.cacheExpirationMinutes;
   }
 }
 
@@ -285,6 +285,6 @@ class _CachedFileList {
   
   bool isExpired() {
     return DateTime.now().difference(timestamp).inMinutes > 
-      AzureStorageService.CACHE_EXPIRATION_MINUTES;
+      AzureStorageService.cacheExpirationMinutes;
   }
 }

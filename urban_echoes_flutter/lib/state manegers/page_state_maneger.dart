@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:urban_echoes/pages/home_page.dart';
-import 'package:urban_echoes/pages/make_observation/MakeObservationPage.dart';
+import 'package:urban_echoes/pages/make_observation/make_observation_page.dart';
 import 'package:urban_echoes/pages/map_page.dart';
 
 enum NavRailPageType {
