@@ -82,7 +82,9 @@ flutter:
     - assets/images/song-sparrow-7942522_1920.jpg
     - assets/audio/Test/XC944072 - Bougainvillesanger - Cincloramphus llaneae.wav
     - assets/audio/Test/XC521615 - Blåmejse - Cyanistes caeruleus.mp3
+    - assets/audio/seilent.mp3
     - .env
+    
   uses-material-design: true
 
   # To add assets to your application, add an assets section, like this:
