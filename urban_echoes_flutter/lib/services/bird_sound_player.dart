@@ -2,8 +2,8 @@ import 'dart:async';
 import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
-import 'package:urban_echoes/services/storage&database/AzureStorageService.dart';
 import 'package:urban_echoes/services/service_config.dart';
+import 'package:urban_echoes/services/storage&database/azure_storage_service.dart';
 
 class BirdSoundPlayer {
   // Get config instance once

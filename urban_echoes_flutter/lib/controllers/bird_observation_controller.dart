@@ -7,7 +7,7 @@ import 'package:location/location.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
-import 'package:urban_echoes/services/storage&database/DatabaseService.dart';
+import 'package:urban_echoes/services/storage&database/database_service.dart';
 import 'package:xml/xml.dart';
 
 class BirdObservationController {

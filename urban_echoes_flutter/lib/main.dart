@@ -4,9 +4,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:urban_echoes/pages/nav_bars_page.dart';
 import 'package:urban_echoes/pages/intro_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:urban_echoes/services/LocationService.dart';
+import 'package:urban_echoes/services/location_service.dart';
 import 'package:audio_session/audio_session.dart';
-import 'state manegers/MapStateManager.dart';
+import 'package:urban_echoes/state%20manegers/map_state_manager.dart';
 import 'state manegers/page_state_maneger.dart';
 
 void main() async {
