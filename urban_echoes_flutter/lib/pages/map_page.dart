@@ -31,7 +31,7 @@ class DirectionalLocationMarker extends StatelessWidget {
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            color: Colors.blue.withOpacity(0.3),
+            color: Colors.blue.withAlpha(76), // Changed from withOpacity(0.3) to withAlpha(76)
             shape: BoxShape.circle,
           ),
         ),
@@ -166,8 +166,8 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
           point: LatLng(obs["latitude"], obs["longitude"]),
           radius: _config.maxRange, // Using maxRange from ServiceConfig
           useRadiusInMeter: true,
-          color: getObservationColor(obs).withOpacity(0.3),
-          borderColor: getObservationColor(obs).withOpacity(0.7),
+          color: getObservationColor(obs).withAlpha(76), // Changed from withOpacity(0.3) to withAlpha(76)
+          borderColor: getObservationColor(obs).withAlpha(178), // Changed from withOpacity(0.7) to withAlpha(178)
           borderStrokeWidth: 2,
         ));
       }
@@ -490,8 +490,8 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
           point: LatLng(obs["latitude"], obs["longitude"]),
           radius: _config.maxRange,
           useRadiusInMeter: true,
-          color: getObservationColor(obs).withOpacity(0.3),
-          borderColor: getObservationColor(obs).withOpacity(0.7),
+          color: getObservationColor(obs).withAlpha(76), // Changed from withOpacity(0.3) to withAlpha(76)
+          borderColor: getObservationColor(obs).withAlpha(178), // Changed from withOpacity(0.7) to withAlpha(178)
           borderStrokeWidth: 2,
         ));
       }
@@ -667,7 +667,7 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
               Container(
                 padding: EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withAlpha(26), // Changed from withOpacity(0.1) to withAlpha(26)
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -794,11 +794,11 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
               child: Container(
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withAlpha(230), // Changed from withOpacity(0.9) to withAlpha(230)
                   borderRadius: BorderRadius.circular(8.0),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.1),
+                      color: Colors.black.withAlpha(26), // Changed from withOpacity(0.1) to withAlpha(26)
                       blurRadius: 4.0,
                       spreadRadius: 2.0,
                     ),
@@ -878,7 +878,7 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
               child: Container(
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.8),
+                  color: Colors.red.withAlpha(204), // Changed from withOpacity(0.8) to withAlpha(204)
                   borderRadius: BorderRadius.circular(8.0),
                 ),
                 child: Text(
