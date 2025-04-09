@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
-import 'package:urban_echoes/services/AzureStorageService.dart';
+import 'package:urban_echoes/services/storage&database/AzureStorageService.dart';
 import 'package:urban_echoes/services/service_config.dart';
 
 class BirdSoundPlayer {

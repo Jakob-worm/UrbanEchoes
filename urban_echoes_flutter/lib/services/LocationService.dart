@@ -3,9 +3,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:provider/provider.dart';
-import 'package:urban_echoes/services/AzureStorageService.dart';
 import 'package:urban_echoes/services/background_audio_service.dart';
 import 'package:urban_echoes/services/bird_sound_player.dart';
+import 'package:urban_echoes/services/storage&database/AzureStorageService.dart';
 import 'ObservationService.dart';
 
 class LocationService extends ChangeNotifier {

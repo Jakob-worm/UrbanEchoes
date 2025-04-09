@@ -2,12 +2,12 @@ import 'dart:io';
 import 'dart:math';
 import 'package:azblob/azblob.dart';
 import 'package:urban_echoes/models/bird_observation.dart';
-import 'package:urban_echoes/services/DatabaseService.dart';
 import 'package:urban_echoes/services/bird_sound_player.dart';
 import 'package:location/location.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
+import 'package:urban_echoes/services/storage&database/DatabaseService.dart';
 import 'package:xml/xml.dart';
 
 class BirdObservationController {
