@@ -7,7 +7,7 @@ import 'package:provider/provider.dart';
 
 import 'package:geolocator/geolocator.dart';
 import 'package:urban_echoes/services/LocationService.dart';
-import 'package:urban_echoes/services/observation_service.dart';
+import 'package:urban_echoes/services/ObservationService.dart';
 import 'package:urban_echoes/services/service_config.dart'; // Import ServiceConfig
 import 'package:urban_echoes/state%20manegers/MapStateManager.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';

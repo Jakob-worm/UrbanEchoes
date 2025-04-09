@@ -3,11 +3,14 @@ import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:urban_echoes/services/AzureStorageService.dart';
-import 'package:urban_echoes/consants.dart';
+import 'package:urban_echoes/services/service_config.dart';
 
 class BirdSoundPlayer {
+  // Get config instance once
+  final ServiceConfig _config = ServiceConfig();
+
   // Configuration
-  static const int maxActivePlayers = AppConstants.maxActivePlayers;
+  late int maxActivePlayers;
   static const int retryLimit = 3;
   
   // Player pool
@@ -46,6 +49,7 @@ class BirdSoundPlayer {
   
   // Constructor 
   BirdSoundPlayer() {
+    maxActivePlayers = _config.maxActivePlayers;
     _initializeAllPlayers();
     _startPeriodicChecks();
   }
