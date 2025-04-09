@@ -3,9 +3,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';  // For Position class
-import 'package:urban_echoes/services/background_audio_service.dart';
-import 'package:urban_echoes/services/bird_sound_player.dart';
 import 'package:urban_echoes/services/manegers/location_manager.dart';
+import 'package:urban_echoes/services/sound/background_audio_service.dart';
+import 'package:urban_echoes/services/sound/bird_sound_player.dart';
 import 'package:urban_echoes/services/storage&database/azure_storage_service.dart';
 import 'observation_service.dart';
 

@@ -1,6 +1,6 @@
 import 'package:audio_service/audio_service.dart';
-import 'package:urban_echoes/services/background_audio_handler.dart';
 import 'package:flutter/material.dart';
+import 'package:urban_echoes/services/sound/background_audio_handler.dart';
 
 class BackgroundAudioService {
   static final BackgroundAudioService _instance = BackgroundAudioService._internal();
