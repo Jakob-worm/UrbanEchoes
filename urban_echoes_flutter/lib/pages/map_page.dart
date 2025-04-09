@@ -70,10 +70,10 @@ class MapPage extends StatefulWidget {
   const MapPage({super.key});
 
   @override
-  _MapPageState createState() => _MapPageState();
+  MapPageState createState() => MapPageState();
 }
 
-class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
+class MapPageState extends State<MapPage> with WidgetsBindingObserver {
   // Get config instance once
   final ServiceConfig _config = ServiceConfig();
 

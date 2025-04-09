@@ -75,10 +75,10 @@ class BirdCallFilterDemo extends StatefulWidget {
   const BirdCallFilterDemo({super.key});
 
   @override
-  _BirdCallFilterDemoState createState() => _BirdCallFilterDemoState();
+  BirdCallFilterDemoState createState() => BirdCallFilterDemoState();
 }
 
-class _BirdCallFilterDemoState extends State<BirdCallFilterDemo> {
+class BirdCallFilterDemoState extends State<BirdCallFilterDemo> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final BirdCallFilter _birdCallFilter = BirdCallFilter();
 
