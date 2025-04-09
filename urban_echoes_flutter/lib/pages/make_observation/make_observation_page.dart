@@ -110,6 +110,9 @@ class MakeObservationPageState extends State<MakeObservationPage> {
     return;
   }
 
+  // Store the PageStateManager reference before any async operations
+  final pageStateManager = Provider.of<PageStateManager>(context, listen: false);
+
   setState(() {
     _state = ObservationState.loading;
   });
@@ -123,6 +126,9 @@ class MakeObservationPageState extends State<MakeObservationPage> {
     final success = await _controller.submitObservation(
         searchValue, selectedBird.scientificName, _selectedNumber!);
 
+    // Check if the widget is still mounted after the async operation
+    if (!mounted) return;
+
     setState(() {
       _state = success ? ObservationState.success : ObservationState.error;
     });
@@ -130,8 +136,7 @@ class MakeObservationPageState extends State<MakeObservationPage> {
     if (success) {
       _showSuccessSnackbar('Observation recorded successfully!');
 
-      // Set the flag to refresh map data when navigating
-      final pageStateManager = Provider.of<PageStateManager>(context, listen: false);
+      // Use the previously stored pageStateManager reference
       pageStateManager.setNeedsMapRefresh(true);  // Set the refresh flag
       pageStateManager.setNavRailPage(
           NavRailPageType.values[1]); // Assuming Map is index 1
@@ -139,6 +144,9 @@ class MakeObservationPageState extends State<MakeObservationPage> {
       _showErrorSnackbar('Failed to record observation');
     }
   } catch (e) {
+    // Check if the widget is still mounted after the async operation
+    if (!mounted) return;
+    
     setState(() {
       _state = ObservationState.error;
       _errorMessage = 'Error: ${e.toString()}';
@@ -146,16 +154,6 @@ class MakeObservationPageState extends State<MakeObservationPage> {
     _showErrorSnackbar('Error: ${e.toString()}');
   }
 }
-
-  void _resetForm() {
-    setState(() {
-      _searchController.clear();
-      _selectedNumber = null;
-      _isValidInput = false;
-      _validSearchText = '';
-      _state = ObservationState.initial;
-    });
-  }
 
   void _showErrorSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(

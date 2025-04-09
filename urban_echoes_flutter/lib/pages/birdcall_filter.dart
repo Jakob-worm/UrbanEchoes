@@ -92,8 +92,7 @@ class _BirdCallFilterDemoState extends State<BirdCallFilterDemo> {
       List<double> audioSamples = await _extractAudioSamples(filePath);
 
       // Apply bird call filter
-      List<double> filteredSamples =
-          _birdCallFilter.detectBirdCalls(audioSamples);
+      _birdCallFilter.detectBirdCalls(audioSamples);
 
       // Optional: Play filtered audio or save to new file
       // Note: Actual implementation would require audio reconstruction

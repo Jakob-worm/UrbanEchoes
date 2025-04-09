@@ -37,9 +37,7 @@ class PageStateManager extends ChangeNotifier {
         return HomePage();
       case NavRailPageType.map:
         return MapPage();
-      default:
-        return HomePage();
-    }
+      }
   }
 
   Widget getButtonPage(BuildContext context) {

@@ -391,11 +391,10 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
           _pendingPositionUpdate = lastPosition;
         }
         
-        // Then get accurate position with timeout
         Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.medium, // Reduced from high
+          desiredAccuracy: LocationAccuracy.high,
           timeLimit: Duration(seconds: 8),
-        );
+        ).timeout(Duration(seconds: 8));
         
         if (!mounted) return;
         

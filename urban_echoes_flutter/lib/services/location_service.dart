@@ -71,15 +71,7 @@ class LocationService extends ChangeNotifier {
       return;
     }
 
-    // Initialize Azure Storage Service
-    await _storageService.initialize();
-
-    // Set up error handler for audio playback
-    _soundPlayer.onBufferingTimeout = (String observationId) {
-      _log('Audio buffering timeout for observation: $observationId');
-    };
-
-    // Get API URL from context
+    // Get API URL and debug mode from context before any async operations
     bool debugMode = false;
     try {
       debugMode = Provider.of<bool>(context, listen: false);
@@ -91,29 +83,35 @@ class LocationService extends ChangeNotifier {
         ? 'http://10.0.2.2:8000/observations'
         : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
 
-    // Cache the scaffold messenger - Fixed type issue
+    // Cache the scaffold messenger before any async operations
     ScaffoldMessengerState? scaffoldMessenger;
     try {
-      if (context.mounted) {
-        scaffoldMessenger = ScaffoldMessenger.of(context);
-      }
+      scaffoldMessenger = ScaffoldMessenger.of(context);
     } catch (e) {
       _log('Error getting ScaffoldMessenger: $e');
     }
 
     try {
-      // 1. Initialize the location manager
+      // 1. Initialize Azure Storage Service
+      await _storageService.initialize();
+
+      // 2. Set up error handler for audio playback
+      _soundPlayer.onBufferingTimeout = (String observationId) {
+        _log('Audio buffering timeout for observation: $observationId');
+      };
+
+      // 3. Initialize the location manager
       bool locationInitialized = await _locationManager.initialize();
       if (!locationInitialized) {
         _log('Warning: Location manager initialization had issues');
       }
 
-      // 2. Fetch observations
+      // 4. Fetch observations
       _log('Fetching observations from $apiUrl');
       _observations =
           await ObservationService(apiUrl: apiUrl).fetchObservations();
 
-      // 3. Filter valid observations (with sound directories)
+      // 5. Filter valid observations (with sound directories)
       _observations = _observations.where((obs) {
         if (obs["sound_directory"] == null) {
           _log('Skipping observation with null sound directory: ${obs["id"]}');
@@ -128,7 +126,7 @@ class LocationService extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       _log('Error initializing LocationService: $e');
-      if (scaffoldMessenger != null && context.mounted) {
+      if (scaffoldMessenger != null) {
         scaffoldMessenger.showSnackBar(
           SnackBar(
               content: Text(
@@ -260,7 +258,6 @@ class LocationService extends ChangeNotifier {
         // Check if observation is still active before starting
         if (_activeObservations.containsKey(obsData['id'])) {
           var obs = obsData['observation'];
-          var id = obsData['id'];
           var pan = obsData['pan'];
           var volume = obsData['volume'];
 
