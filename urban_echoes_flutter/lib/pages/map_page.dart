@@ -4,10 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
-import 'package:urban_echoes/consants.dart';
-import 'package:urban_echoes/services/ObservationService.dart';
+
 import 'package:geolocator/geolocator.dart';
 import 'package:urban_echoes/services/LocationService.dart';
+import 'package:urban_echoes/services/observation_service.dart';
+import 'package:urban_echoes/services/service_config.dart'; // Import ServiceConfig
 import 'package:urban_echoes/state%20manegers/MapStateManager.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 
@@ -73,10 +74,13 @@ class MapPage extends StatefulWidget {
 }
 
 class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
+  // Get config instance once
+  final ServiceConfig _config = ServiceConfig();
+
   // Map state
   final List<Map<String, dynamic>> _observations = [];
   final List<CircleMarker> _circles = [];
-  double _zoomLevel = AppConstants.defaultZoom;
+  late double _zoomLevel; // Will be initialized from _config
   LatLng _userLocation = LatLng(56.171812, 10.187769);
   double _userHeading = 0.0; // Default heading (North)
   MapController? _mapController;
@@ -157,10 +161,10 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
           "is_test_data": obs["is_test_data"],
         });
         
-        // Create circle marker
+        // Create circle marker - now using _config instead of AppConstants
         newCircles.add(CircleMarker(
           point: LatLng(obs["latitude"], obs["longitude"]),
-          radius: AppConstants.defaultPointRadius,
+          radius: _config.maxRange, // Using maxRange from ServiceConfig
           useRadiusInMeter: true,
           color: getObservationColor(obs).withOpacity(0.3),
           borderColor: getObservationColor(obs).withOpacity(0.7),
@@ -180,6 +184,9 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    
+    // Initialize zoom level from config
+    _zoomLevel = _config.defaultZoom;
     
     // Create map controller once
     _mapController = MapController();
@@ -423,9 +430,8 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
       debugPrint('Error accessing debug mode: $e');
     }
     
-    final String apiUrl = debugMode
-        ? 'http://10.0.2.2:8000/observations'
-        : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
+    // Use getApiUrl method from ServiceConfig
+    final String apiUrl = _config.getApiUrl(debugMode);
 
     try {
       final data = await ObservationService(apiUrl: apiUrl).fetchObservations();
@@ -479,10 +485,10 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
           "is_test_data": obs["is_test_data"],
         });
         
-        // Create circle marker
+        // Create circle marker - now using _config instead of AppConstants
         newCircles.add(CircleMarker(
           point: LatLng(obs["latitude"], obs["longitude"]),
-          radius: AppConstants.defaultPointRadius,
+          radius: _config.maxRange,
           useRadiusInMeter: true,
           color: getObservationColor(obs).withOpacity(0.3),
           borderColor: getObservationColor(obs).withOpacity(0.7),
@@ -596,17 +602,17 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
     }
 
     // Check if we need to refresh observations (e.g., after adding a new one)
-  try {
-    final pageStateManager = Provider.of<PageStateManager>(context, listen: false);
-    if (pageStateManager.needsMapRefresh) {
-      // Reset the flag and refresh observations
-      pageStateManager.setNeedsMapRefresh(false);
-      // Use Future.microtask to avoid calling setState during build
-      Future.microtask(() => refreshObservations());
+    try {
+      final pageStateManager = Provider.of<PageStateManager>(context, listen: false);
+      if (pageStateManager.needsMapRefresh) {
+        // Reset the flag and refresh observations
+        pageStateManager.setNeedsMapRefresh(false);
+        // Use Future.microtask to avoid calling setState during build
+        Future.microtask(() => refreshObservations());
+      }
+    } catch (e) {
+      debugPrint('Error checking map refresh state: $e');
     }
-  } catch (e) {
-    debugPrint('Error checking map refresh state: $e');
-  }
     
     // Listen to state changes
     return ChangeNotifierProvider.value(
@@ -709,9 +715,9 @@ class _MapPageState extends State<MapPage> with WidgetsBindingObserver {
             mapController: _mapController,
             options: MapOptions(
               initialCenter: _userLocation,
-              minZoom: AppConstants.minZoom,
+              minZoom: _config.minZoom, // Now using _config instead of AppConstants
               initialZoom: _zoomLevel,
-              maxZoom: AppConstants.maxZoom,
+              maxZoom: _config.maxZoom, // Now using _config instead of AppConstants
               onTap: (_, tappedPoint) => _onMapTap(tappedPoint),
               onMapReady: () {
                 if (_mapController != null) {
