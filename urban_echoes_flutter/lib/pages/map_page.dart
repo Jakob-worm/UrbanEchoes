@@ -356,66 +356,73 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  Future<void> _getUserLocation() async {
-    debugPrint('Getting user location');
-    _stateManager.waitForLocation();
-    
-    try {
-      // Check if we already have location permission
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        
-        if (!mounted) return;
-        
-        if (permission == LocationPermission.denied) {
-          _stateManager.setError('Location permission denied');
-          _stateManager.setLocationLoaded(true);
-          return;
-        }
-      }
+  // Replace the deprecated code in the _getUserLocation method
 
-      if (permission == LocationPermission.deniedForever) {
-        if (!mounted) return;
-        
-        _stateManager.setError('Location permission permanently denied. Please enable in settings.');
+Future<void> _getUserLocation() async {
+  debugPrint('Getting user location');
+  _stateManager.waitForLocation();
+  
+  try {
+    // Check if we already have location permission
+    LocationPermission permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      
+      if (!mounted) return;
+      
+      if (permission == LocationPermission.denied) {
+        _stateManager.setError('Location permission denied');
         _stateManager.setLocationLoaded(true);
         return;
       }
+    }
 
-      // Add timeout to getCurrentPosition
-      try {
-        // Use last known position first for immediate response
-        Position? lastPosition = await Geolocator.getLastKnownPosition();
-        if (lastPosition != null && mounted) {
-          _pendingPositionUpdate = lastPosition;
-        }
-        
-        Position position = await Geolocator.getCurrentPosition(
-          desiredAccuracy: LocationAccuracy.high,
-          timeLimit: Duration(seconds: 8),
-        ).timeout(Duration(seconds: 8));
-        
-        if (!mounted) return;
-        
-        _pendingPositionUpdate = position;
-      } catch (timeoutError) {
-        debugPrint('❌ Timeout getting location: $timeoutError');
-        
-        if (!mounted) return;
-        
-        // We already tried last known position above, so just show error
-        _stateManager.setError('Could not get your precise location. Using last known position.');
-        _stateManager.setLocationLoaded(true);
-      }
-    } catch (e) {
-      debugPrint('❌ General error getting location: $e');
+    if (permission == LocationPermission.deniedForever) {
       if (!mounted) return;
       
-      _stateManager.setError('Error accessing location: $e');
+      _stateManager.setError('Location permission permanently denied. Please enable in settings.');
+      _stateManager.setLocationLoaded(true);
+      return;
+    }
+
+    // Add timeout to getCurrentPosition
+    try {
+      // Use last known position first for immediate response
+      Position? lastPosition = await Geolocator.getLastKnownPosition();
+      if (lastPosition != null && mounted) {
+        _pendingPositionUpdate = lastPosition;
+      }
+      
+      // Using LocationSettings instead of the deprecated parameters
+      const locationSettings = LocationSettings(
+        accuracy: LocationAccuracy.high,
+        timeLimit: Duration(seconds: 8),
+      );
+      
+      Position position = await Geolocator.getCurrentPosition(
+        locationSettings: locationSettings,
+      ).timeout(Duration(seconds: 8));
+      
+      if (!mounted) return;
+      
+      _pendingPositionUpdate = position;
+    } catch (timeoutError) {
+      debugPrint('❌ Timeout getting location: $timeoutError');
+      
+      if (!mounted) return;
+      
+      // We already tried last known position above, so just show error
+      _stateManager.setError('Could not get your precise location. Using last known position.');
       _stateManager.setLocationLoaded(true);
     }
+  } catch (e) {
+    debugPrint('❌ General error getting location: $e');
+    if (!mounted) return;
+    
+    _stateManager.setError('Error accessing location: $e');
+    _stateManager.setLocationLoaded(true);
   }
+}
 
   Future<void> _loadObservations() async {
     if (!mounted) return;
