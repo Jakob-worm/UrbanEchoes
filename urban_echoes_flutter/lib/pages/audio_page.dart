@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
-import 'package:urban_echoes/services/ObservationService.dart';
+import 'package:urban_echoes/services/observation_service.dart';
 
 class AudioPage extends StatefulWidget {
   const AudioPage({super.key});
