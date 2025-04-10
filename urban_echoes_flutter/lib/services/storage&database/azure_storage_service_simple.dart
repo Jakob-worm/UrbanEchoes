@@ -6,5 +6,5 @@ main() async {
 
   var storage = AzureStorage.parse(connectionString);
 
-  var container = storage.getBlob('bird-sounds');
+  storage.getBlob('bird-sounds');
 }

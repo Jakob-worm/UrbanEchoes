@@ -41,7 +41,7 @@ class DatabaseService {
       }
 
       debugPrint('Creating database connection...');
-      _connection = PostgreSQLConnection(dbHost, 5432, 'urban_echoes_db',
+      _connection = PostgreSQLConnection(dbHost, 5432, 'urban_echoes_db ',
           username: dbUser, password: dbPassword, useSSL: true);
 
       await _connection!.open();
@@ -50,7 +50,7 @@ class DatabaseService {
       return true;
     } catch (e, stackTrace) {
       debugPrint('Database connection failed: $e');
-      print(stackTrace);
+      debugPrint(stackTrace as String?);
       _isConnected = false;
       return false;
     }

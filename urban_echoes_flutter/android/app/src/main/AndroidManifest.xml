@@ -1,9 +1,23 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Permissions -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
+    
     <application
         android:label="urban_echoes"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:debuggable="false">
+        android:debuggable="false"
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config">
 
         <service
             android:name="com.ryanheise.audioservice.AudioService"
@@ -13,6 +27,15 @@
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
+        
+        <!-- Add the MediaButtonReceiver - this is required! -->
+        <receiver 
+            android:name="com.ryanheise.audioservice.MediaButtonReceiver" 
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
         
         <!-- Add these meta-data tags to reduce verbosity -->
         <meta-data
@@ -31,8 +54,8 @@
             
             <meta-data
               android:name="io.flutter.embedding.android.NormalTheme"
-              android:resource="@style/NormalTheme"
-              />
+              android:resource="@style/NormalTheme" />
+              
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
@@ -44,11 +67,6 @@
             android:value="2" />
     </application>
 
-    <uses-permission android:name="android.permission.INTERNET"/>
-    
-    android:usesCleartextTraffic="true"
-    android:networkSecurityConfig="@xml/network_security_config"
-    
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>

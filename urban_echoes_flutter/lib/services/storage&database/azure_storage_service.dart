@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:azblob/azblob.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -15,7 +14,7 @@ class AzureStorageService {
   bool _initialized = false;
   
   // Cache settings
-  static const int CACHE_EXPIRATION_MINUTES = 30;
+  static const int cacheExpirationMinutes = 30;
   
   // Response caching
   final Map<String, _CachedResponse> _responseCache = {};
@@ -270,7 +269,7 @@ class _CachedResponse {
   
   bool isExpired() {
     return DateTime.now().difference(timestamp).inMinutes > 
-      AzureStorageService.CACHE_EXPIRATION_MINUTES;
+      AzureStorageService.cacheExpirationMinutes;
   }
 }
 
@@ -286,6 +285,6 @@ class _CachedFileList {
   
   bool isExpired() {
     return DateTime.now().difference(timestamp).inMinutes > 
-      AzureStorageService.CACHE_EXPIRATION_MINUTES;
+      AzureStorageService.cacheExpirationMinutes;
   }
 }

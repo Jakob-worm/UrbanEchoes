@@ -4,19 +4,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:urban_echoes/pages/nav_bars_page.dart';
 import 'package:urban_echoes/pages/intro_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:urban_echoes/services/LocationService.dart';
+import 'package:urban_echoes/services/location_service.dart';
 import 'package:audio_session/audio_session.dart';
-import 'state manegers/MapStateManager.dart';
+import 'package:urban_echoes/state%20manegers/map_state_manager.dart';
 import 'state manegers/page_state_maneger.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
 
- // Store the original function
-final originalDebugPrint = debugPrint;
+  // Enable wakelock to keep screen on
+  WakelockPlus.enable();
 
-// Set up proper audio session
+ // Store the original function
+  final originalDebugPrint = debugPrint;
+
+  // Set up proper audio session
   final session = await AudioSession.instance;
   await session.configure(AudioSessionConfiguration(
     avAudioSessionCategory: AVAudioSessionCategory.playback,
@@ -28,14 +32,14 @@ final originalDebugPrint = debugPrint;
     androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
   ));
 
-// Replace with filtered version
-debugPrint = (String? message, {int? wrapWidth}) {
-  if (message != null && 
-      !message.contains('getCurrentPosition') && 
-      !message.contains('MediaPlayer')) {
-    originalDebugPrint(message, wrapWidth: wrapWidth);
-  }
-};
+  // Replace with filtered version
+  debugPrint = (String? message, {int? wrapWidth}) {
+    if (message != null && 
+        !message.contains('getCurrentPosition') && 
+        !message.contains('MediaPlayer')) {
+      originalDebugPrint(message, wrapWidth: wrapWidth);
+    }
+  };
 
   // Create service instances before the widget tree
   final locationService = LocationService();  // Use LocationService
@@ -122,7 +126,7 @@ class InitialScreenState extends State<InitialScreen> with WidgetsBindingObserve
               Provider.of<LocationService>(context, listen: false).initialize(context);  // Updated type
             }
           } catch (e) {
-            print('Error initializing LocationService: $e');  // Updated message
+            debugPrint('Error initializing LocationService: $e');  // Updated message
           }
           
           if (mounted) {
@@ -132,7 +136,7 @@ class InitialScreenState extends State<InitialScreen> with WidgetsBindingObserve
           }
         });
       } catch (e) {
-        print('Error in post-frame callback: $e');
+        debugPrint('Error in post-frame callback: $e');
         _isInitializing = false;
       }
     }
@@ -147,23 +151,27 @@ class InitialScreenState extends State<InitialScreen> with WidgetsBindingObserve
       final locationService = Provider.of<LocationService>(context, listen: false);  // Updated type
       
       if (state == AppLifecycleState.resumed) {
-        // App is in the foreground - enable tracking
+        // App is in the foreground - enable tracking and wakelock
+        WakelockPlus.enable();  // Re-enable wakelock when app is resumed
         if (!locationService.isLocationTrackingEnabled) {
           locationService.toggleLocationTracking(true);
         }
       } else if (state == AppLifecycleState.paused) {
-        // App is in the background - disable tracking to save battery
+        // App is in the background - disable tracking and wakelock to save battery
+        WakelockPlus.disable();  // Disable wakelock when app is paused
         if (locationService.isLocationTrackingEnabled) {
           locationService.toggleLocationTracking(false);
         }
       }
     } catch (e) {
-      print('Error accessing LocationService in lifecycle: $e');  // Updated message
+      debugPrint('Error accessing LocationService in lifecycle: $e');  // Updated message
     }
   }
 
   @override
   void dispose() {
+    // Make sure to disable wakelock when the app is closed
+    WakelockPlus.disable();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

@@ -18,6 +18,16 @@ enum ButtonPageType {
 class PageStateManager extends ChangeNotifier {
   NavRailPageType selectedNavRailPage = NavRailPageType.home;
   ButtonPageType? selectedButtonPage;
+  Map<String, dynamic>? newObservationData;
+
+    // Add this flag to track when map needs refreshing
+  bool _needsMapRefresh = false;
+  bool get needsMapRefresh => _needsMapRefresh;
+
+  void setNeedsMapRefresh(bool value) {
+    _needsMapRefresh = value;
+    notifyListeners();
+  }
 
   // Instead of storing widget instances directly, use builder functions
   // that will create the widgets with the current context when needed
@@ -27,9 +37,7 @@ class PageStateManager extends ChangeNotifier {
         return HomePage();
       case NavRailPageType.map:
         return MapPage();
-      default:
-        return HomePage();
-    }
+      }
   }
 
   Widget getButtonPage(BuildContext context) {

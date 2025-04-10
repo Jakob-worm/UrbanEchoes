@@ -75,10 +75,10 @@ class BirdCallFilterDemo extends StatefulWidget {
   const BirdCallFilterDemo({super.key});
 
   @override
-  _BirdCallFilterDemoState createState() => _BirdCallFilterDemoState();
+  BirdCallFilterDemoState createState() => BirdCallFilterDemoState();
 }
 
-class _BirdCallFilterDemoState extends State<BirdCallFilterDemo> {
+class BirdCallFilterDemoState extends State<BirdCallFilterDemo> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   final BirdCallFilter _birdCallFilter = BirdCallFilter();
 
@@ -92,8 +92,7 @@ class _BirdCallFilterDemoState extends State<BirdCallFilterDemo> {
       List<double> audioSamples = await _extractAudioSamples(filePath);
 
       // Apply bird call filter
-      List<double> filteredSamples =
-          _birdCallFilter.detectBirdCalls(audioSamples);
+      _birdCallFilter.detectBirdCalls(audioSamples);
 
       // Optional: Play filtered audio or save to new file
       // Note: Actual implementation would require audio reconstruction
@@ -103,7 +102,6 @@ class _BirdCallFilterDemoState extends State<BirdCallFilterDemo> {
   }
 
   Future<List<double>> _extractAudioSamples(String filePath) async {
-    // TODO: Implement actual audio sample extraction
     // This would typically involve using a audio processing library
     // to convert audio file to numerical samples
     return []; // Placeholder

@@ -2,12 +2,12 @@ import 'dart:io';
 import 'dart:math';
 import 'package:azblob/azblob.dart';
 import 'package:urban_echoes/models/bird_observation.dart';
-import 'package:urban_echoes/services/DatabaseService.dart';
-import 'package:urban_echoes/services/bird_sound_player.dart';
 import 'package:location/location.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
+import 'package:urban_echoes/services/sound/bird_sound_player.dart';
+import 'package:urban_echoes/services/storage&database/database_service.dart';
 import 'package:xml/xml.dart';
 
 class BirdObservationController {
@@ -129,28 +129,31 @@ class BirdObservationController {
   }
 
   Future<LocationData> _getCurrentLocation() async {
-    // Check if running on emulator (in a real app, you'd use a more reliable method)
-    if (!kReleaseMode) {
-      return _getEmulatorLocation();
+  // Try to get actual location first, regardless of debug mode
+  try {
+    if (!await _location.serviceEnabled() &&
+        !await _location.requestService()) {
+      throw Exception('Location service disabled');
     }
 
-    try {
-      if (!await _location.serviceEnabled() &&
-          !await _location.requestService()) {
-        throw Exception('Location service disabled');
-      }
-
-      if (await _location.hasPermission() == PermissionStatus.denied &&
-          await _location.requestPermission() != PermissionStatus.granted) {
-        throw Exception('Location permission denied');
-      }
-
-      return await _location.getLocation();
-    } catch (e) {
-      debugPrint('Error getting location: $e');
-      return _getEmulatorLocation();
+    if (await _location.hasPermission() == PermissionStatus.denied &&
+        await _location.requestPermission() != PermissionStatus.granted) {
+      throw Exception('Location permission denied');
     }
+
+    // Try to get the actual location first
+    final actualLocation = await _location.getLocation();
+    if (actualLocation.latitude != null && actualLocation.longitude != null) {
+      debugPrint('Using actual location: ${actualLocation.latitude}, ${actualLocation.longitude}');
+      return actualLocation;
+    }
+    throw Exception('Invalid location data received');
+  } catch (e) {
+    debugPrint('Error getting location: $e, falling back to emulator location');
+    // Only use emulator location as a fallback
+    return _getEmulatorLocation();
   }
+}
 
   LocationData _getEmulatorLocation() {
     // Generate random coordinates around Aarhus

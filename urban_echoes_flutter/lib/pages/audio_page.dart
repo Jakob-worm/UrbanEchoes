@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
-import '../services/ObservationService.dart';
+import 'package:urban_echoes/services/observation_service.dart';
 
 class AudioPage extends StatefulWidget {
   const AudioPage({super.key});
 
   @override
-  _AudioPageState createState() => _AudioPageState();
+  AudioPageState createState() => AudioPageState();
 }
 
-class _AudioPageState extends State<AudioPage> {
+class AudioPageState extends State<AudioPage> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   List<String> soundUrls = [];
   int currentIndex = 0;
@@ -19,6 +19,12 @@ class _AudioPageState extends State<AudioPage> {
   @override
   void initState() {
     super.initState();
+    // We'll load the observations in didChangeDependencies instead
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     loadObservations();
   }
 
@@ -27,7 +33,6 @@ class _AudioPageState extends State<AudioPage> {
     final String apiUrl = debugMode
         ? 'http://10.0.2.2:8000/observations'
         : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
-    super.initState();
 
     ObservationService(apiUrl: apiUrl).fetchObservations().then((data) {
       setState(() {

@@ -14,6 +14,7 @@ import 'package:urban_echoes/services/bird_search_service.dart';
 
 // Import exceptions
 import 'package:urban_echoes/exceptions/api_exceptions.dart';
+import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 
 // Import state definitions
 
@@ -103,53 +104,56 @@ class MakeObservationPageState extends State<MakeObservationPage> {
   }
 
   Future<void> _handleSubmit() async {
-    final searchValue = _searchController.text;
-    if (searchValue.isEmpty || _selectedNumber == null) {
-      _showErrorSnackbar('Please fill in both the bird name and quantity');
-      return;
-    }
-
-    setState(() {
-      _state = ObservationState.loading;
-    });
-
-    try {
-      final selectedBird = _birds.firstWhere(
-        (bird) => bird.commonName == searchValue,
-        orElse: () => Bird(commonName: searchValue, scientificName: ''),
-      );
-
-      final success = await _controller.submitObservation(
-          searchValue, selectedBird.scientificName, _selectedNumber!);
-
-      setState(() {
-        _state = success ? ObservationState.success : ObservationState.error;
-      });
-
-      if (success) {
-        _showSuccessSnackbar('Observation recorded successfully!');
-        _resetForm();
-      } else {
-        _showErrorSnackbar('Failed to record observation');
-      }
-    } catch (e) {
-      setState(() {
-        _state = ObservationState.error;
-        _errorMessage = 'Error: ${e.toString()}';
-      });
-      _showErrorSnackbar('Error: ${e.toString()}');
-    }
+  final searchValue = _searchController.text;
+  if (searchValue.isEmpty || _selectedNumber == null) {
+    _showErrorSnackbar('Please fill in both the bird name and quantity');
+    return;
   }
 
-  void _resetForm() {
+  // Store the PageStateManager reference before any async operations
+  final pageStateManager = Provider.of<PageStateManager>(context, listen: false);
+
+  setState(() {
+    _state = ObservationState.loading;
+  });
+
+  try {
+    final selectedBird = _birds.firstWhere(
+      (bird) => bird.commonName == searchValue,
+      orElse: () => Bird(commonName: searchValue, scientificName: ''),
+    );
+
+    final success = await _controller.submitObservation(
+        searchValue, selectedBird.scientificName, _selectedNumber!);
+
+    // Check if the widget is still mounted after the async operation
+    if (!mounted) return;
+
     setState(() {
-      _searchController.clear();
-      _selectedNumber = null;
-      _isValidInput = false;
-      _validSearchText = '';
-      _state = ObservationState.initial;
+      _state = success ? ObservationState.success : ObservationState.error;
     });
+
+    if (success) {
+      _showSuccessSnackbar('Observation recorded successfully!');
+
+      // Use the previously stored pageStateManager reference
+      pageStateManager.setNeedsMapRefresh(true);  // Set the refresh flag
+      pageStateManager.setNavRailPage(
+          NavRailPageType.values[1]); // Assuming Map is index 1
+    } else {
+      _showErrorSnackbar('Failed to record observation');
+    }
+  } catch (e) {
+    // Check if the widget is still mounted after the async operation
+    if (!mounted) return;
+    
+    setState(() {
+      _state = ObservationState.error;
+      _errorMessage = 'Error: ${e.toString()}';
+    });
+    _showErrorSnackbar('Error: ${e.toString()}');
   }
+}
 
   void _showErrorSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(

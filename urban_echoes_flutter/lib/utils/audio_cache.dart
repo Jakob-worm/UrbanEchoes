@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 class AudioCache {
@@ -36,8 +37,8 @@ class AudioCache {
         throw Exception('Failed to download audio file');
       }
     } catch (e) {
-      print('Error downloading file: $e');
-      throw e;
+      debugPrint('Error downloading file: $e');
+      rethrow;
     }
   }
   

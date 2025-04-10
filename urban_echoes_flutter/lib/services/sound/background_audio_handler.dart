@@ -1,9 +1,11 @@
-import 'package:audio_service/audio_service.dart';
-import 'package:flutter/foundation.dart';
 import 'dart:async';
+
+import 'package:audio_service/audio_service.dart';
 
 class UrbanEchoesAudioHandler extends BaseAudioHandler {
   Timer? _keepAliveTimer;
+  Timer? _silentAudioTimer;
+  StreamSubscription? _locationSubscription;
   
   UrbanEchoesAudioHandler() {
     // Initialize with a dummy media item
@@ -21,6 +23,7 @@ class UrbanEchoesAudioHandler extends BaseAudioHandler {
     ));
     
     _startKeepAliveTimer();
+    _startSilentAudioPlayer();
   }
   
   void _startKeepAliveTimer() {
@@ -33,9 +36,24 @@ class UrbanEchoesAudioHandler extends BaseAudioHandler {
     });
   }
   
+  // Play a silent audio track to keep the audio session active
+  void _startSilentAudioPlayer() {
+    _silentAudioTimer?.cancel();
+    _silentAudioTimer = Timer.periodic(const Duration(minutes: 1), (_) {
+      // Update state to ensure the system thinks we're playing audio
+      playbackState.add(PlaybackState(
+        processingState: AudioProcessingState.ready,
+        playing: true,
+        updatePosition: Duration(milliseconds: DateTime.now().millisecondsSinceEpoch),
+      ));
+    });
+  }
+  
   @override
   Future<void> stop() async {
     _keepAliveTimer?.cancel();
+    _silentAudioTimer?.cancel();
+    _locationSubscription?.cancel();
     await super.stop();
   }
   
