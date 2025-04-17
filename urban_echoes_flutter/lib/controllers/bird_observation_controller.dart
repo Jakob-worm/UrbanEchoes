@@ -89,7 +89,7 @@ class BirdObservationController {
       longitude: locationData.longitude ?? 0.0,
       observationDate: DateTime.now(),
       observationTime: DateFormat('HH:mm:ss').format(DateTime.now()),
-      observerId: 1, // One observerID for now
+      observerId: 2, // One observerID for now
       quantity: quantity,
       isTestData: false,
       testBatchId: 1, // Example test batch ID
@@ -129,31 +129,33 @@ class BirdObservationController {
   }
 
   Future<LocationData> _getCurrentLocation() async {
-  // Try to get actual location first, regardless of debug mode
-  try {
-    if (!await _location.serviceEnabled() &&
-        !await _location.requestService()) {
-      throw Exception('Location service disabled');
-    }
+    // Try to get actual location first, regardless of debug mode
+    try {
+      if (!await _location.serviceEnabled() &&
+          !await _location.requestService()) {
+        throw Exception('Location service disabled');
+      }
 
-    if (await _location.hasPermission() == PermissionStatus.denied &&
-        await _location.requestPermission() != PermissionStatus.granted) {
-      throw Exception('Location permission denied');
-    }
+      if (await _location.hasPermission() == PermissionStatus.denied &&
+          await _location.requestPermission() != PermissionStatus.granted) {
+        throw Exception('Location permission denied');
+      }
 
-    // Try to get the actual location first
-    final actualLocation = await _location.getLocation();
-    if (actualLocation.latitude != null && actualLocation.longitude != null) {
-      debugPrint('Using actual location: ${actualLocation.latitude}, ${actualLocation.longitude}');
-      return actualLocation;
+      // Try to get the actual location first
+      final actualLocation = await _location.getLocation();
+      if (actualLocation.latitude != null && actualLocation.longitude != null) {
+        debugPrint(
+            'Using actual location: ${actualLocation.latitude}, ${actualLocation.longitude}');
+        return actualLocation;
+      }
+      throw Exception('Invalid location data received');
+    } catch (e) {
+      debugPrint(
+          'Error getting location: $e, falling back to emulator location');
+      // Only use emulator location as a fallback
+      return _getEmulatorLocation();
     }
-    throw Exception('Invalid location data received');
-  } catch (e) {
-    debugPrint('Error getting location: $e, falling back to emulator location');
-    // Only use emulator location as a fallback
-    return _getEmulatorLocation();
   }
-}
 
   LocationData _getEmulatorLocation() {
     // Generate random coordinates around Aarhus

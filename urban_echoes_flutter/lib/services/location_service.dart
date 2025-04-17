@@ -2,19 +2,23 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:geolocator/geolocator.dart';  // For Position class
+import 'package:geolocator/geolocator.dart'; // For Position class
 import 'package:urban_echoes/services/manegers/location_manager.dart';
 import 'package:urban_echoes/services/sound/background_audio_service.dart';
 import 'package:urban_echoes/services/sound/bird_sound_player.dart';
 import 'package:urban_echoes/services/storage&database/azure_storage_service.dart';
+import 'package:urban_echoes/services/season_service.dart';
+import 'package:urban_echoes/models/season.dart';
 import 'observation_service.dart';
 
 class LocationService extends ChangeNotifier {
   // Services
   final BirdSoundPlayer _soundPlayer = BirdSoundPlayer();
   final AzureStorageService _storageService = AzureStorageService();
-  final BackgroundAudioService _backgroundAudioService = BackgroundAudioService();
-  
+  final BackgroundAudioService _backgroundAudioService =
+      BackgroundAudioService();
+  final SeasonService _seasonService = SeasonService();
+
   // New dependency - LocationManager
   late final LocationManager _locationManager;
 
@@ -25,7 +29,7 @@ class LocationService extends ChangeNotifier {
 
   // Throttling state
   Timer? _batchUpdateTimer;
-  
+
   // Settings
   bool _isAudioEnabled = true;
 
@@ -36,25 +40,52 @@ class LocationService extends ChangeNotifier {
   // Debug
   final bool _debugMode = true;
 
+  // Listen for season changes
+  StreamSubscription? _seasonSubscription;
+
   // Constructor - allow dependency injection for testing
   LocationService({LocationManager? locationManager}) {
     // Initialize location manager with position update callback
-    _locationManager = locationManager ?? LocationManager(
-      onPositionUpdate: (position) {
-        // Schedule a batch update
-        _batchUpdateTimer?.cancel();
-        _batchUpdateTimer = Timer(Duration(milliseconds: _batchUpdateMs), () {
-          _updateActiveObservations(position);
-          notifyListeners();
+    _locationManager = locationManager ??
+        LocationManager(onPositionUpdate: (position) {
+          // Schedule a batch update
+          _batchUpdateTimer?.cancel();
+          _batchUpdateTimer = Timer(Duration(milliseconds: _batchUpdateMs), () {
+            _updateActiveObservations(position);
+            notifyListeners();
+          });
         });
+
+    // Set up listener for season changes
+    _seasonService.addListener(_onSeasonChanged);
+  }
+
+  // Called when season changes
+  void _onSeasonChanged() {
+    _log('Season changed to: ${_seasonService.currentSeason}');
+
+    // Stop all sounds since we'll be filtering observations differently
+    if (_isAudioEnabled) {
+      for (var id in _activeObservations.keys) {
+        _soundPlayer.stopSounds(id);
       }
-    );
+    }
+
+    // Clear active observations
+    _activeObservations.clear();
+
+    // Force update if we have a position
+    if (_locationManager.currentPosition != null) {
+      _updateActiveObservations(_locationManager.currentPosition!);
+      notifyListeners();
+    }
   }
 
   // Getters
   bool get isInitialized => _isInitialized;
   Position? get currentPosition => _locationManager.currentPosition;
-  bool get isLocationTrackingEnabled => _locationManager.isLocationTrackingEnabled;
+  bool get isLocationTrackingEnabled =>
+      _locationManager.isLocationTrackingEnabled;
   bool get isAudioEnabled => _isAudioEnabled;
   List<Map<String, dynamic>> get activeObservations =>
       _activeObservations.values.toList();
@@ -136,6 +167,37 @@ class LocationService extends ChangeNotifier {
     }
   }
 
+  // Method to check if observation is in the current season
+  bool _isObservationInCurrentSeason(Map<String, dynamic> observation) {
+    // If using "all seasons", accept all observations
+    if (_seasonService.currentSeason == Season.all) {
+      return true;
+    }
+
+    // Check observation date
+    if (observation["observation_date"] == null) {
+      return false;
+    }
+
+    // Parse the date
+    DateTime obsDate;
+    if (observation["observation_date"] is String) {
+      try {
+        obsDate = DateTime.parse(observation["observation_date"]);
+      } catch (e) {
+        _log('Error parsing observation date: $e');
+        return false;
+      }
+    } else if (observation["observation_date"] is DateTime) {
+      obsDate = observation["observation_date"];
+    } else {
+      return false;
+    }
+
+    // Check if date matches current season
+    return _seasonService.isDateInSelectedSeason(obsDate);
+  }
+
   void _updateActiveObservations(Position position) {
     Set<String> observationsInRange = {};
     bool activeObservationsChanged = false;
@@ -150,11 +212,16 @@ class LocationService extends ChangeNotifier {
         continue;
       }
 
+      // Skip observations not in current season
+      if (!_isObservationInCurrentSeason(obs)) {
+        continue;
+      }
+
       final String id = '${obs["id"]}';
       final double distance = _locationManager.calculateDistance(
           position.latitude,
-          position.longitude, 
-          obs["latitude"], 
+          position.longitude,
+          obs["latitude"],
           obs["longitude"]);
 
       // Calculate audio settings based on distance
@@ -308,8 +375,8 @@ class LocationService extends ChangeNotifier {
         userLat, userLng, soundLat, soundLng);
 
     // Calculate bearing to sound
-    double bearing = _locationManager.calculateBearing(
-        userLat, userLng, soundLat, soundLng);
+    double bearing =
+        _locationManager.calculateBearing(userLat, userLng, soundLat, soundLng);
 
     // Normalize bearing to -180 to 180
     if (bearing > 180) bearing -= 360;
@@ -363,7 +430,8 @@ class LocationService extends ChangeNotifier {
     if (enabled) {
       // Start background service first and ensure it's fully initialized
       await _backgroundAudioService.startService();
-      await Future.delayed(Duration(milliseconds: 500)); // Give audio service time to initialize
+      await Future.delayed(
+          Duration(milliseconds: 500)); // Give audio service time to initialize
 
       // Then start location tracking
       await _locationManager.setLocationTrackingEnabled(true);
@@ -376,7 +444,7 @@ class LocationService extends ChangeNotifier {
 
       // First stop location tracking
       await _locationManager.setLocationTrackingEnabled(false);
-      
+
       // Then stop background service
       await _backgroundAudioService.stopService();
 
@@ -414,8 +482,8 @@ class LocationService extends ChangeNotifier {
         final double volume = _calculateVolume(distance);
         final double pan = _calculatePan(
             _locationManager.currentPosition!.latitude,
-            _locationManager.currentPosition!.longitude, 
-            obs["latitude"], 
+            _locationManager.currentPosition!.longitude,
+            obs["latitude"],
             obs["longitude"]);
 
         // Stagger sound starts to avoid audio overload
@@ -434,6 +502,7 @@ class LocationService extends ChangeNotifier {
   @override
   void dispose() {
     _batchUpdateTimer?.cancel();
+    _seasonService.removeListener(_onSeasonChanged);
     _locationManager.dispose();
     _soundPlayer.dispose();
     _activeObservations.clear();

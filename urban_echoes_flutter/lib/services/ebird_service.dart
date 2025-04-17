@@ -160,9 +160,9 @@ class EBirdService {
   Future<List<BirdObservation>> fetchRecentObservationsForCurrentSeason({
     required double latitude,
     required double longitude,
-    double radiusKm = 25,
-    int daysBack = 5,
-    int maxResults = 100,
+    double radiusKm = 1500,
+    int daysBack = 360,
+    int maxResults = 3000,
     int observerId = 0,
   }) async {
     // Get all observations first
