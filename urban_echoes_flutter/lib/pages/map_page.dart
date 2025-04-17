@@ -15,9 +15,9 @@ import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 // Improved location marker that shows direction
 class DirectionalLocationMarker extends StatelessWidget {
   final double heading; // In degrees, 0 = North, 90 = East, etc.
-  
+
   const DirectionalLocationMarker({
-    super.key, 
+    super.key,
     required this.heading,
   });
 
@@ -31,7 +31,8 @@ class DirectionalLocationMarker extends StatelessWidget {
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            color: Colors.blue.withAlpha(76), // Changed from withOpacity(0.3) to withAlpha(76)
+            color: Colors.blue.withAlpha(
+                76), // Changed from withOpacity(0.3) to withAlpha(76)
             shape: BoxShape.circle,
           ),
         ),
@@ -45,22 +46,6 @@ class DirectionalLocationMarker extends StatelessWidget {
           ),
         ),
         // Direction indicator
-        Transform.rotate(
-          angle: heading * (math.pi / 180),
-          child: Container(
-            width: 40,
-            height: 40,
-            alignment: Alignment.topCenter,
-            child: Container(
-              width: 10,
-              height: 15,
-              decoration: BoxDecoration(
-                color: Colors.blue,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(5)),
-              ),
-            ),
-          ),
-        ),
       ],
     );
   }
@@ -84,27 +69,27 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
   LatLng _userLocation = LatLng(56.171812, 10.187769);
   double _userHeading = 0.0; // Default heading (North)
   MapController? _mapController;
-  
+
   // Throttling state
   DateTime _lastMapUpdate = DateTime.now();
   Timer? _mapUpdateTimer;
-  
+
   // Services
   LocationService? _locationService;
-  
+
   // State manager
   late MapStateManager _stateManager;
-  
+
   // Loading timeout
   Timer? _loadingTimeoutTimer;
   Timer? _periodicStateCheck;
 
   // Observation display
   List<Map<String, dynamic>> _lastActiveObservations = [];
-  
+
   // Follow user flag
   bool _followUser = true;
-  
+
   // Keep track of previous position for heading calculation
   Position? _lastUserLocation;
 
@@ -113,40 +98,41 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
   Timer? _positionUpdateTimer;
 
   Future<void> refreshObservations() async {
-  if (!mounted) return;
-  
-  debugPrint('Refreshing observations after new submission');
-  
-  // Clear existing data to avoid duplicates
-  _observations.clear();
-  _circles.clear();
-  
-  // Reload all observations
-  await _loadObservations();
-}
+    if (!mounted) return;
+
+    debugPrint('Refreshing observations after new submission');
+
+    // Clear existing data to avoid duplicates
+    _observations.clear();
+    _circles.clear();
+
+    // Reload all observations
+    await _loadObservations();
+  }
 
   // Add this method to update observations from the service
-  void _updateObservationsFromService(List<Map<String, dynamic>> activeObservations) {
+  void _updateObservationsFromService(
+      List<Map<String, dynamic>> activeObservations) {
     // Don't process if no new observations
     if (activeObservations.isEmpty) return;
-    
+
     // Check if any of these observations are not already in our main list
     List<Map<String, dynamic>> newObservations = [];
-    
+
     for (var obs in activeObservations) {
       // Only add if not already in the list
       if (!_observations.any((existingObs) => existingObs["id"] == obs["id"])) {
         newObservations.add(obs);
       }
     }
-    
+
     // If we have new observations, add them to our lists
     if (newObservations.isNotEmpty) {
       List<CircleMarker> newCircles = [];
-      
+
       for (var obs in newObservations) {
         if (obs["latitude"] == null || obs["longitude"] == null) continue;
-        
+
         // Add to observations list
         _observations.add({
           "id": obs["id"],
@@ -160,18 +146,20 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
           "observer_id": obs["observer_id"],
           "is_test_data": obs["is_test_data"],
         });
-        
+
         // Create circle marker - now using _config instead of AppConstants
         newCircles.add(CircleMarker(
           point: LatLng(obs["latitude"], obs["longitude"]),
           radius: _config.maxRange, // Using maxRange from ServiceConfig
           useRadiusInMeter: true,
-          color: getObservationColor(obs).withAlpha(76), // Changed from withOpacity(0.3) to withAlpha(76)
-          borderColor: getObservationColor(obs).withAlpha(178), // Changed from withOpacity(0.7) to withAlpha(178)
+          color: getObservationColor(obs)
+              .withAlpha(76), // Changed from withOpacity(0.3) to withAlpha(76)
+          borderColor: getObservationColor(obs).withAlpha(
+              178), // Changed from withOpacity(0.7) to withAlpha(178)
           borderStrokeWidth: 2,
         ));
       }
-      
+
       if (mounted) {
         setState(() {
           _circles.addAll(newCircles);
@@ -184,36 +172,38 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    
+
     // Initialize zoom level from config
     _zoomLevel = _config.defaultZoom;
-    
+
     // Create map controller once
     _mapController = MapController();
-    
+
     // Initialize state manager
     _stateManager = MapStateManager();
     _stateManager.initialize();
-    
+
     // Set a timeout for loading
     _loadingTimeoutTimer = Timer(Duration(seconds: 15), () {
       if (mounted) {
         _stateManager.forceReady();
       }
     });
-    
+
     // Add periodic check to ensure UI components stay visible
     _periodicStateCheck = Timer.periodic(Duration(seconds: 5), (_) {
-      if (mounted && _stateManager.state != MapState.ready && _locationService?.currentPosition != null) {
+      if (mounted &&
+          _stateManager.state != MapState.ready &&
+          _locationService?.currentPosition != null) {
         _stateManager.forceReady();
       }
     });
-    
+
     // Start position update timer
     _positionUpdateTimer = Timer.periodic(Duration(milliseconds: 500), (_) {
       _processPendingPositionUpdate();
     });
-    
+
     // Defer initialization until after the widget is properly built
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -221,7 +211,7 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
       }
     });
   }
-  
+
   void _processPendingPositionUpdate() {
     if (_pendingPositionUpdate != null && mounted) {
       try {
@@ -233,7 +223,7 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
       }
     }
   }
-  
+
   // Safely update position outside of build method
   void _safelyUpdatePosition(Position position) {
     // Skip frequent updates
@@ -242,23 +232,26 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
       return;
     }
     _lastMapUpdate = now;
-    
+
     // Calculate heading if we have previous position
     if (_lastUserLocation != null) {
-      if (position.speed > 0.5) { // Only update heading if moving
+      if (position.speed > 0.5) {
+        // Only update heading if moving
         _userHeading = position.heading;
       }
     }
     _lastUserLocation = position;
-    
+
     // Update state
     if (mounted) {
       setState(() {
         _userLocation = LatLng(position.latitude, position.longitude);
         _stateManager.setLocationLoaded(true);
-        
+
         // Only move map if following user and it's ready
-        if (_followUser && _stateManager.isMapFullyLoaded && _mapController != null) {
+        if (_followUser &&
+            _stateManager.isMapFullyLoaded &&
+            _mapController != null) {
           try {
             _mapController!.move(_userLocation, _zoomLevel);
           } catch (e) {
@@ -268,14 +261,14 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
       });
     }
   }
-  
+
   void _initializeAfterBuild() {
     // Transition to loading data state
     _stateManager.startLoadingData();
-    
+
     // Initialize LocationService with proper error handling
     _initializeLocationService();
-    
+
     // Load observations and get user location in parallel
     Future.wait([
       _loadObservations(),
@@ -291,10 +284,11 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
   void _initializeLocationService() {
     try {
       if (!mounted) return;
-      
-      final locationService = Provider.of<LocationService>(context, listen: false);
+
+      final locationService =
+          Provider.of<LocationService>(context, listen: false);
       _locationService = locationService;
-      
+
       // Use a more robust initialization check
       if (!locationService.isInitialized) {
         locationService.initialize(context).then((_) {
@@ -309,7 +303,8 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
           }
         }).catchError((error) {
           debugPrint('❌ Error initializing LocationService: $error');
-          _stateManager.setError('Could not access location services. Please restart the app.');
+          _stateManager.setError(
+              'Could not access location services. Please restart the app.');
         });
       } else {
         // If already initialized, check for current position
@@ -322,11 +317,11 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
       _stateManager.setError('Unexpected location service error');
     }
   }
-  
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!mounted || _locationService == null) return;
-    
+
     try {
       if (state == AppLifecycleState.resumed) {
         if (!_locationService!.isLocationTrackingEnabled) {
@@ -358,102 +353,104 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
 
   // Replace the deprecated code in the _getUserLocation method
 
-Future<void> _getUserLocation() async {
-  debugPrint('Getting user location');
-  _stateManager.waitForLocation();
-  
-  try {
-    // Check if we already have location permission
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      
-      if (!mounted) return;
-      
+  Future<void> _getUserLocation() async {
+    debugPrint('Getting user location');
+    _stateManager.waitForLocation();
+
+    try {
+      // Check if we already have location permission
+      LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        _stateManager.setError('Location permission denied');
+        permission = await Geolocator.requestPermission();
+
+        if (!mounted) return;
+
+        if (permission == LocationPermission.denied) {
+          _stateManager.setError('Location permission denied');
+          _stateManager.setLocationLoaded(true);
+          return;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        if (!mounted) return;
+
+        _stateManager.setError(
+            'Location permission permanently denied. Please enable in settings.');
         _stateManager.setLocationLoaded(true);
         return;
       }
-    }
 
-    if (permission == LocationPermission.deniedForever) {
-      if (!mounted) return;
-      
-      _stateManager.setError('Location permission permanently denied. Please enable in settings.');
-      _stateManager.setLocationLoaded(true);
-      return;
-    }
+      // Add timeout to getCurrentPosition
+      try {
+        // Use last known position first for immediate response
+        Position? lastPosition = await Geolocator.getLastKnownPosition();
+        if (lastPosition != null && mounted) {
+          _pendingPositionUpdate = lastPosition;
+        }
 
-    // Add timeout to getCurrentPosition
-    try {
-      // Use last known position first for immediate response
-      Position? lastPosition = await Geolocator.getLastKnownPosition();
-      if (lastPosition != null && mounted) {
-        _pendingPositionUpdate = lastPosition;
+        // Using LocationSettings instead of the deprecated parameters
+        const locationSettings = LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 8),
+        );
+
+        Position position = await Geolocator.getCurrentPosition(
+          locationSettings: locationSettings,
+        ).timeout(Duration(seconds: 8));
+
+        if (!mounted) return;
+
+        _pendingPositionUpdate = position;
+      } catch (timeoutError) {
+        debugPrint('❌ Timeout getting location: $timeoutError');
+
+        if (!mounted) return;
+
+        // We already tried last known position above, so just show error
+        _stateManager.setError(
+            'Could not get your precise location. Using last known position.');
+        _stateManager.setLocationLoaded(true);
       }
-      
-      // Using LocationSettings instead of the deprecated parameters
-      const locationSettings = LocationSettings(
-        accuracy: LocationAccuracy.high,
-        timeLimit: Duration(seconds: 8),
-      );
-      
-      Position position = await Geolocator.getCurrentPosition(
-        locationSettings: locationSettings,
-      ).timeout(Duration(seconds: 8));
-      
+    } catch (e) {
+      debugPrint('❌ General error getting location: $e');
       if (!mounted) return;
-      
-      _pendingPositionUpdate = position;
-    } catch (timeoutError) {
-      debugPrint('❌ Timeout getting location: $timeoutError');
-      
-      if (!mounted) return;
-      
-      // We already tried last known position above, so just show error
-      _stateManager.setError('Could not get your precise location. Using last known position.');
+
+      _stateManager.setError('Error accessing location: $e');
       _stateManager.setLocationLoaded(true);
     }
-  } catch (e) {
-    debugPrint('❌ General error getting location: $e');
-    if (!mounted) return;
-    
-    _stateManager.setError('Error accessing location: $e');
-    _stateManager.setLocationLoaded(true);
   }
-}
 
   Future<void> _loadObservations() async {
     if (!mounted) return;
-    
+
     debugPrint('Loading observations');
-    
+
     bool debugMode = false;
     try {
       debugMode = Provider.of<bool>(context, listen: false);
     } catch (e) {
       debugPrint('Error accessing debug mode: $e');
     }
-    
+
     // Use getApiUrl method from ServiceConfig
     final String apiUrl = _config.getApiUrl(debugMode);
 
     try {
       final data = await ObservationService(apiUrl: apiUrl).fetchObservations();
-      
+
       if (!mounted) return;
-      
+
       debugPrint('Received ${data.length} observations');
-      
+
       // Process data in chunks to avoid UI blocking
       _processObservationsInChunks(data);
-      
+
       _stateManager.setDataLoaded(true);
     } catch (error) {
       debugPrint('❌ Error loading observations: $error');
       if (!mounted) return;
-      
+
       _stateManager.setError('Failed to load observations: $error');
       _stateManager.setDataLoaded(true);
     }
@@ -463,20 +460,20 @@ Future<void> _getUserLocation() async {
   void _processObservationsInChunks(List<Map<String, dynamic>> data) {
     const int chunkSize = 50;
     int processedCount = 0;
-    
+
     Future<void> processChunk() async {
       if (processedCount >= data.length || !mounted) return;
-      
-      int endIdx = (processedCount + chunkSize) < data.length 
-          ? processedCount + chunkSize 
+
+      int endIdx = (processedCount + chunkSize) < data.length
+          ? processedCount + chunkSize
           : data.length;
-      
+
       List<Map<String, dynamic>> chunk = data.sublist(processedCount, endIdx);
       List<CircleMarker> newCircles = [];
-      
+
       for (var obs in chunk) {
         if (obs["latitude"] == null || obs["longitude"] == null) continue;
-        
+
         // Add to observations list
         _observations.add({
           "id": obs["id"],
@@ -490,33 +487,35 @@ Future<void> _getUserLocation() async {
           "observer_id": obs["observer_id"],
           "is_test_data": obs["is_test_data"],
         });
-        
+
         // Create circle marker - now using _config instead of AppConstants
         newCircles.add(CircleMarker(
           point: LatLng(obs["latitude"], obs["longitude"]),
           radius: _config.maxRange,
           useRadiusInMeter: true,
-          color: getObservationColor(obs).withAlpha(76), // Changed from withOpacity(0.3) to withAlpha(76)
-          borderColor: getObservationColor(obs).withAlpha(178), // Changed from withOpacity(0.7) to withAlpha(178)
+          color: getObservationColor(obs)
+              .withAlpha(76), // Changed from withOpacity(0.3) to withAlpha(76)
+          borderColor: getObservationColor(obs).withAlpha(
+              178), // Changed from withOpacity(0.7) to withAlpha(178)
           borderStrokeWidth: 2,
         ));
       }
-      
+
       if (mounted) {
         setState(() {
           _circles.addAll(newCircles);
         });
       }
-      
+
       processedCount = endIdx;
-      
+
       if (processedCount < data.length) {
         // Schedule next chunk with small delay
         await Future.delayed(Duration(milliseconds: 10));
         processChunk();
       }
     }
-    
+
     // Start processing
     processChunk();
   }
@@ -529,6 +528,9 @@ Future<void> _getUserLocation() async {
       return Colors.green;
     } else if (isTestData) {
       return Colors.red;
+    } else if (observerId == 1) {
+      //Ebirds
+      return Colors.yellow;
     } else {
       return Colors.blue;
     }
@@ -536,7 +538,7 @@ Future<void> _getUserLocation() async {
 
   void _onMapTap(LatLng tappedPoint) {
     if (_stateManager.isLoading || _observations.isEmpty) return;
-    
+
     double minDistance = double.infinity;
     Map<String, dynamic>? nearestObservation;
 
@@ -568,7 +570,8 @@ Future<void> _getUserLocation() async {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text("Scientific Name: ${observation["scientific_name"] ?? "Unknown"}"),
+              Text(
+                  "Scientific Name: ${observation["scientific_name"] ?? "Unknown"}"),
               Text("Date: ${observation["observation_date"] ?? "Unknown"}"),
               Text("Time: ${observation["observation_time"] ?? "Unknown"}"),
               const SizedBox(height: 10),
@@ -584,12 +587,12 @@ Future<void> _getUserLocation() async {
       },
     );
   }
-  
+
   // Called when the map is ready to be used
   void _onMapCreated(MapController controller) {
     debugPrint('Map is now ready!');
     _stateManager.setMapReady(true);
-    
+
     // If we already have user location, center the map on it
     if (_stateManager.state == MapState.ready && _mapController != null) {
       try {
@@ -609,7 +612,8 @@ Future<void> _getUserLocation() async {
 
     // Check if we need to refresh observations (e.g., after adding a new one)
     try {
-      final pageStateManager = Provider.of<PageStateManager>(context, listen: false);
+      final pageStateManager =
+          Provider.of<PageStateManager>(context, listen: false);
       if (pageStateManager.needsMapRefresh) {
         // Reset the flag and refresh observations
         pageStateManager.setNeedsMapRefresh(false);
@@ -619,7 +623,7 @@ Future<void> _getUserLocation() async {
     } catch (e) {
       debugPrint('Error checking map refresh state: $e');
     }
-    
+
     // Listen to state changes
     return ChangeNotifierProvider.value(
       value: _stateManager,
@@ -637,19 +641,20 @@ Future<void> _getUserLocation() async {
               if (locationService.currentPosition != null) {
                 _pendingPositionUpdate = locationService.currentPosition;
               }
-              
+
               // Get active observations from the LocationService
               final activeObservations = locationService.activeObservations;
-              
+
               // Cache the active observations to prevent UI flicker
               if (activeObservations.isNotEmpty) {
                 _lastActiveObservations = List.from(activeObservations);
               }
-              
+
               // Use cached observations if current is empty (prevents flicker)
-              final observationsToShow = activeObservations.isNotEmpty ? 
-                  activeObservations : _lastActiveObservations;
-              
+              final observationsToShow = activeObservations.isNotEmpty
+                  ? activeObservations
+                  : _lastActiveObservations;
+
               return _buildMapContent(observationsToShow);
             },
           );
@@ -657,7 +662,7 @@ Future<void> _getUserLocation() async {
       ),
     );
   }
-  
+
   // Build loading screen
   Widget _buildLoadingScreen(MapStateManager stateManager) {
     return Scaffold(
@@ -673,7 +678,8 @@ Future<void> _getUserLocation() async {
               Container(
                 padding: EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.red.withAlpha(26), // Changed from withOpacity(0.1) to withAlpha(26)
+                  color: Colors.red.withAlpha(
+                      26), // Changed from withOpacity(0.1) to withAlpha(26)
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
@@ -695,7 +701,7 @@ Future<void> _getUserLocation() async {
       ),
     );
   }
-  
+
   String _getLoadingMessage(MapState state) {
     switch (state) {
       case MapState.initializing:
@@ -708,12 +714,12 @@ Future<void> _getUserLocation() async {
         return "Loading map data...";
     }
   }
-  
+
   // Extract the map building logic to a separate method
   Widget _buildMapContent(List<Map<String, dynamic>> activeObservations) {
     // Update observations from service
     _updateObservationsFromService(activeObservations);
-    
+
     return Scaffold(
       body: Stack(
         children: [
@@ -721,9 +727,11 @@ Future<void> _getUserLocation() async {
             mapController: _mapController,
             options: MapOptions(
               initialCenter: _userLocation,
-              minZoom: _config.minZoom, // Now using _config instead of AppConstants
+              minZoom:
+                  _config.minZoom, // Now using _config instead of AppConstants
               initialZoom: _zoomLevel,
-              maxZoom: _config.maxZoom, // Now using _config instead of AppConstants
+              maxZoom:
+                  _config.maxZoom, // Now using _config instead of AppConstants
               onTap: (_, tappedPoint) => _onMapTap(tappedPoint),
               onMapReady: () {
                 if (_mapController != null) {
@@ -737,7 +745,8 @@ Future<void> _getUserLocation() async {
                 if (hasGesture && mounted) {
                   setState(() {
                     _zoomLevel = position.zoom;
-                    _followUser = false; // Stop following user when manually panning
+                    _followUser =
+                        false; // Stop following user when manually panning
                   });
                 }
               },
@@ -778,7 +787,7 @@ Future<void> _getUserLocation() async {
                   setState(() {
                     _followUser = true;
                   });
-                  
+
                   if (_locationService!.currentPosition != null) {
                     _pendingPositionUpdate = _locationService!.currentPosition;
                   } else {
@@ -800,11 +809,13 @@ Future<void> _getUserLocation() async {
               child: Container(
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
-                  color: Colors.white.withAlpha(230), // Changed from withOpacity(0.9) to withAlpha(230)
+                  color: Colors.white.withAlpha(
+                      230), // Changed from withOpacity(0.9) to withAlpha(230)
                   borderRadius: BorderRadius.circular(8.0),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withAlpha(26), // Changed from withOpacity(0.1) to withAlpha(26)
+                      color: Colors.black.withAlpha(
+                          26), // Changed from withOpacity(0.1) to withAlpha(26)
                       blurRadius: 4.0,
                       spreadRadius: 2.0,
                     ),
@@ -829,7 +840,8 @@ Future<void> _getUserLocation() async {
                         GestureDetector(
                           onTap: () {
                             if (_locationService != null) {
-                              _locationService!.toggleAudio(!_locationService!.isAudioEnabled);
+                              _locationService!.toggleAudio(
+                                  !_locationService!.isAudioEnabled);
                             }
                           },
                           child: Container(
@@ -839,8 +851,8 @@ Future<void> _getUserLocation() async {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Icon(
-                              _locationService?.isAudioEnabled ?? false 
-                                  ? Icons.volume_up 
+                              _locationService?.isAudioEnabled ?? false
+                                  ? Icons.volume_up
                                   : Icons.volume_off,
                               size: 16,
                               color: Colors.blue,
@@ -884,7 +896,8 @@ Future<void> _getUserLocation() async {
               child: Container(
                 padding: const EdgeInsets.all(8.0),
                 decoration: BoxDecoration(
-                  color: Colors.red.withAlpha(204), // Changed from withOpacity(0.8) to withAlpha(204)
+                  color: Colors.red.withAlpha(
+                      204), // Changed from withOpacity(0.8) to withAlpha(204)
                   borderRadius: BorderRadius.circular(8.0),
                 ),
                 child: Text(

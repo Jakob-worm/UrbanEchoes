@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:urban_echoes/pages/nav_bars_page.dart';
 import 'package:urban_echoes/pages/intro_screen.dart';
 import 'package:provider/provider.dart';
+import 'package:urban_echoes/services/AppStartupService.dart';
 import 'package:urban_echoes/services/location_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:urban_echoes/state%20manegers/map_state_manager.dart';
@@ -17,7 +18,7 @@ void main() async {
   // Enable wakelock to keep screen on
   WakelockPlus.enable();
 
- // Store the original function
+  // Store the original function
   final originalDebugPrint = debugPrint;
 
   // Set up proper audio session
@@ -34,30 +35,31 @@ void main() async {
 
   // Replace with filtered version
   debugPrint = (String? message, {int? wrapWidth}) {
-    if (message != null && 
-        !message.contains('getCurrentPosition') && 
+    if (message != null &&
+        !message.contains('getCurrentPosition') &&
         !message.contains('MediaPlayer')) {
       originalDebugPrint(message, wrapWidth: wrapWidth);
     }
   };
 
   // Create service instances before the widget tree
-  final locationService = LocationService();  // Use LocationService
-  
+  final locationService = LocationService(); // Use LocationService
+  // We're no longer creating appStartupService here since it's created in the provider
+
   runApp(MyApp(
     debugMode: false,
-    locationService: locationService,  // Updated parameter
+    locationService: locationService,
   ));
 }
 
 class MyApp extends StatelessWidget {
   final bool debugMode;
-  final LocationService locationService;  // Updated type
+  final LocationService locationService;
 
   const MyApp({
-    super.key, 
+    super.key,
     required this.debugMode,
-    required this.locationService,  // Updated parameter
+    required this.locationService,
   });
 
   @override
@@ -75,7 +77,9 @@ class MyApp extends StatelessWidget {
         // Use .value for objects that already exist
         Provider<bool>.value(value: debugMode),
         // Use .value constructor for pre-created service instances
-        ChangeNotifierProvider<LocationService>.value(value: locationService),  // Updated type
+        ChangeNotifierProvider<LocationService>.value(value: locationService),
+        // Add startup service provider
+        Provider<AppStartupService>(create: (_) => AppStartupService()),
       ],
       child: MaterialApp(
         title: 'Urban Echoes',
@@ -100,7 +104,8 @@ class InitialScreen extends StatefulWidget {
   InitialScreenState createState() => InitialScreenState();
 }
 
-class InitialScreenState extends State<InitialScreen> with WidgetsBindingObserver {
+class InitialScreenState extends State<InitialScreen>
+    with WidgetsBindingObserver {
   bool _isFirstTime = true;
   bool _isInitializing = true;
 
@@ -114,7 +119,7 @@ class InitialScreenState extends State<InitialScreen> with WidgetsBindingObserve
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    
+
     if (_isInitializing) {
       // Try-catch to handle potential provider errors
       try {
@@ -123,12 +128,19 @@ class InitialScreenState extends State<InitialScreen> with WidgetsBindingObserve
           // Use try-catch to safely access the provider
           try {
             if (mounted) {
-              Provider.of<LocationService>(context, listen: false).initialize(context);  // Updated type
+              // Initialize location service
+              Provider.of<LocationService>(context, listen: false)
+                  .initialize(context);
+
+              // Run eBird sync in background - ADD THIS SECTION
+              final appStartupService =
+                  Provider.of<AppStartupService>(context, listen: false);
+              appStartupService.runStartupTasks();
             }
           } catch (e) {
-            debugPrint('Error initializing LocationService: $e');  // Updated message
+            debugPrint('Error initializing services: $e');
           }
-          
+
           if (mounted) {
             setState(() {
               _isInitializing = false;
@@ -141,30 +153,34 @@ class InitialScreenState extends State<InitialScreen> with WidgetsBindingObserve
       }
     }
   }
-  
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Safely access the LocationService provider
     if (!mounted) return;
-    
+
     try {
-      final locationService = Provider.of<LocationService>(context, listen: false);  // Updated type
-      
+      final locationService =
+          Provider.of<LocationService>(context, listen: false);
+
       if (state == AppLifecycleState.resumed) {
         // App is in the foreground - enable tracking and wakelock
-        WakelockPlus.enable();  // Re-enable wakelock when app is resumed
+        WakelockPlus.enable(); // Re-enable wakelock when app is resumed
         if (!locationService.isLocationTrackingEnabled) {
           locationService.toggleLocationTracking(true);
         }
+
+        // You can also refresh eBird data when the app is resumed if desired
+        // Provider.of<AppStartupService>(context, listen: false).syncEBirdObservations();
       } else if (state == AppLifecycleState.paused) {
         // App is in the background - disable tracking and wakelock to save battery
-        WakelockPlus.disable();  // Disable wakelock when app is paused
+        WakelockPlus.disable(); // Disable wakelock when app is paused
         if (locationService.isLocationTrackingEnabled) {
           locationService.toggleLocationTracking(false);
         }
       }
     } catch (e) {
-      debugPrint('Error accessing LocationService in lifecycle: $e');  // Updated message
+      debugPrint('Error accessing services in lifecycle: $e');
     }
   }
 
