@@ -3,6 +3,8 @@ import 'package:postgres/postgres.dart';
 import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:urban_echoes/models/bird_observation.dart';
+import 'package:urban_echoes/models/season.dart';
+import 'package:urban_echoes/services/season_service.dart';
 
 class DatabaseService {
   PostgreSQLConnection? _connection; // Changed from late to nullable
@@ -10,6 +12,8 @@ class DatabaseService {
 
   // Singleton pattern
   static final DatabaseService _instance = DatabaseService._internal();
+
+  final SeasonService _seasonService = SeasonService();
 
   factory DatabaseService() {
     return _instance;
@@ -149,8 +153,9 @@ class DatabaseService {
     }
   }
 
-  // Method to get all bird observations
-  Future<List<BirdObservation>> getAllBirdObservations() async {
+  // Method to get all bird observations with optional season filtering
+  Future<List<BirdObservation>> getAllBirdObservations(
+      {Season? seasonFilter}) async {
     bool connected = await _ensureConnection();
     if (!connected || _connection == null) {
       return []; // Return empty list if connection fails
@@ -175,7 +180,7 @@ class DatabaseService {
         ORDER BY created_at DESC
         ''');
 
-      return results
+      final observations = results
           .map((row) => BirdObservation(
                 birdName: row[1] as String,
                 scientificName: row[2] as String,
@@ -190,9 +195,34 @@ class DatabaseService {
                 testBatchId: row[11] as int,
               ))
           .toList();
+
+      // Apply season filtering if a season is specified
+      if (seasonFilter != null && seasonFilter != Season.all) {
+        return observations.where((obs) {
+          // Get the season for this observation's date
+          final obsSeason =
+              _seasonService.getCurrentSeasonForDate(obs.observationDate);
+          return obsSeason == seasonFilter;
+        }).toList();
+      } else {
+        // Return all observations if no season filter or filter is "all"
+        return observations;
+      }
     } catch (e) {
       debugPrint('Error fetching bird observations: $e');
       return []; // Return empty list on error
     }
+  }
+
+  // New method to get observations filtered by the current season
+  Future<List<BirdObservation>> getBirdObservationsForCurrentSeason() async {
+    final currentSeason = _seasonService.currentSeason;
+    return getAllBirdObservations(seasonFilter: currentSeason);
+  }
+
+  // New method to get observations for a specific season
+  Future<List<BirdObservation>> getBirdObservationsForSeason(
+      Season season) async {
+    return getAllBirdObservations(seasonFilter: season);
   }
 }

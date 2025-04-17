@@ -8,9 +8,12 @@ import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:urban_echoes/services/location_service.dart';
 import 'package:urban_echoes/services/observation_service.dart';
+import 'package:urban_echoes/services/season_service.dart';
+import 'package:urban_echoes/models/season.dart';
 import 'package:urban_echoes/services/service_config.dart'; // Import ServiceConfig
 import 'package:urban_echoes/state%20manegers/map_state_manager.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
+import 'package:urban_echoes/wigdets/season_selector_widget.dart';
 
 // Improved location marker that shows direction
 class DirectionalLocationMarker extends StatelessWidget {
@@ -62,6 +65,9 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
   // Get config instance once
   final ServiceConfig _config = ServiceConfig();
 
+  // Season service
+  late SeasonService _seasonService;
+
   // Map state
   final List<Map<String, dynamic>> _observations = [];
   final List<CircleMarker> _circles = [];
@@ -110,16 +116,50 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
     await _loadObservations();
   }
 
-  // Add this method to update observations from the service
+  // Add this method to filter observations by the current season:
+  List<Map<String, dynamic>> _filterObservationsBySeason(
+      List<Map<String, dynamic>> observations) {
+    if (_seasonService.currentSeason == Season.all) {
+      return observations; // Return all if no filtering needed
+    }
+
+    return observations.where((obs) {
+      // Extract date from the observation
+      if (obs["observation_date"] == null) return false;
+
+      DateTime obsDate;
+      if (obs["observation_date"] is String) {
+        // Parse date string format (assuming yyyy-MM-dd format)
+        try {
+          obsDate = DateTime.parse(obs["observation_date"]);
+        } catch (e) {
+          return false;
+        }
+      } else if (obs["observation_date"] is DateTime) {
+        obsDate = obs["observation_date"];
+      } else {
+        return false;
+      }
+
+      // Check if the observation date is in the current season
+      return _seasonService.isDateInSelectedSeason(obsDate);
+    }).toList();
+  }
+
+  // Method to update observations from the service
   void _updateObservationsFromService(
       List<Map<String, dynamic>> activeObservations) {
     // Don't process if no new observations
     if (activeObservations.isEmpty) return;
 
+    // Filter observations by season first
+    final filteredObservations =
+        _filterObservationsBySeason(activeObservations);
+
     // Check if any of these observations are not already in our main list
     List<Map<String, dynamic>> newObservations = [];
 
-    for (var obs in activeObservations) {
+    for (var obs in filteredObservations) {
       // Only add if not already in the list
       if (!_observations.any((existingObs) => existingObs["id"] == obs["id"])) {
         newObservations.add(obs);
@@ -172,6 +212,9 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    // Initialize services
+    _seasonService = SeasonService();
 
     // Initialize zoom level from config
     _zoomLevel = _config.defaultZoom;
@@ -351,8 +394,6 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  // Replace the deprecated code in the _getUserLocation method
-
   Future<void> _getUserLocation() async {
     debugPrint('Getting user location');
     _stateManager.waitForLocation();
@@ -458,17 +499,21 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
 
   // Process observations in chunks to avoid UI freezing
   void _processObservationsInChunks(List<Map<String, dynamic>> data) {
+    // Filter observations by season first
+    final filteredData = _filterObservationsBySeason(data);
+
     const int chunkSize = 50;
     int processedCount = 0;
 
     Future<void> processChunk() async {
-      if (processedCount >= data.length || !mounted) return;
+      if (processedCount >= filteredData.length || !mounted) return;
 
-      int endIdx = (processedCount + chunkSize) < data.length
+      int endIdx = (processedCount + chunkSize) < filteredData.length
           ? processedCount + chunkSize
-          : data.length;
+          : filteredData.length;
 
-      List<Map<String, dynamic>> chunk = data.sublist(processedCount, endIdx);
+      List<Map<String, dynamic>> chunk =
+          filteredData.sublist(processedCount, endIdx);
       List<CircleMarker> newCircles = [];
 
       for (var obs in chunk) {
@@ -509,7 +554,7 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
 
       processedCount = endIdx;
 
-      if (processedCount < data.length) {
+      if (processedCount < filteredData.length) {
         // Schedule next chunk with small delay
         await Future.delayed(Duration(milliseconds: 10));
         processChunk();
@@ -775,6 +820,7 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
               ),
             ],
           ),
+
           // Location recenter button
           Positioned(
             right: 16,
@@ -800,6 +846,38 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
               child: const Icon(Icons.my_location, color: Colors.blue),
             ),
           ),
+
+          // Season selector widget - ADD THIS
+          Positioned(
+            left: 16,
+            bottom: 50,
+            child: Consumer<SeasonService>(
+              builder: (context, seasonService, _) {
+                return Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(40),
+                        blurRadius: 4,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: SeasonSelectorWidget(
+                    useDanishNames: true,
+                    showAllOption: true,
+                    onSeasonChanged: (season) {
+                      // Refresh the observations when the season changes
+                      refreshObservations();
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+
           // Active bird sound information with all observations
           if (activeObservations.isNotEmpty)
             Positioned(

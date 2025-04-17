@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:urban_echoes/services/EBirdService.dart';
+import 'package:urban_echoes/services/ebird_service.dart';
 
 /// Service to handle tasks that need to run when the app starts
 class AppStartupService {

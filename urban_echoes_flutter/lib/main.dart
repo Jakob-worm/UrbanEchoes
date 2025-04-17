@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:urban_echoes/services/AppStartupService.dart';
 import 'package:urban_echoes/services/location_service.dart';
 import 'package:audio_session/audio_session.dart';
+import 'package:urban_echoes/services/season_service.dart';
 import 'package:urban_echoes/state%20manegers/map_state_manager.dart';
 import 'state manegers/page_state_maneger.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
@@ -74,12 +75,17 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider<MapStateManager>(
           create: (context) => MapStateManager(),
         ),
+        ChangeNotifierProvider<SeasonService>(
+          create: (_) => SeasonService(),
+        ),
         // Use .value for objects that already exist
         Provider<bool>.value(value: debugMode),
         // Use .value constructor for pre-created service instances
         ChangeNotifierProvider<LocationService>.value(value: locationService),
         // Add startup service provider
         Provider<AppStartupService>(create: (_) => AppStartupService()),
+        // Add season service provider
+        ChangeNotifierProvider<SeasonService>(create: (_) => SeasonService()),
       ],
       child: MaterialApp(
         title: 'Urban Echoes',

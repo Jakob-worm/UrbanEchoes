@@ -4,12 +4,15 @@ import 'package:http/http.dart' as http;
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:urban_echoes/models/bird_observation.dart';
+import 'package:urban_echoes/models/season.dart';
+import 'package:urban_echoes/services/season_service.dart';
 import 'package:urban_echoes/services/storage&database/database_service.dart';
 
 class EBirdService {
   final String _baseUrl = 'https://api.ebird.org/v2';
   String? _apiKey;
   final DatabaseService _databaseService = DatabaseService();
+  final SeasonService _seasonService = SeasonService();
 
   // Denmark's approximate bounding box
   static const double _denmarkMinLat = 54.5;
@@ -132,6 +135,48 @@ class EBirdService {
       debugPrint('Error syncing eBird observations: $e');
       return 0;
     }
+  }
+
+  /// Filters a list of observations by the current season setting
+  List<BirdObservation> filterObservationsBySeason(
+      List<BirdObservation> observations,
+      {Season? overrideSeason}) {
+    final seasonToUse = overrideSeason ?? _seasonService.currentSeason;
+
+    // If no filtering needed, return all observations
+    if (seasonToUse == Season.all) {
+      return observations;
+    }
+
+    // Filter observations by season
+    return observations.where((observation) {
+      final observationSeason =
+          _seasonService.getCurrentSeasonForDate(observation.observationDate);
+      return observationSeason == seasonToUse;
+    }).toList();
+  }
+
+  // Add this method to get only the observations for the current season
+  Future<List<BirdObservation>> fetchRecentObservationsForCurrentSeason({
+    required double latitude,
+    required double longitude,
+    double radiusKm = 25,
+    int daysBack = 5,
+    int maxResults = 100,
+    int observerId = 0,
+  }) async {
+    // Get all observations first
+    final allObservations = await fetchRecentObservations(
+      latitude: latitude,
+      longitude: longitude,
+      radiusKm: radiusKm,
+      daysBack: daysBack,
+      maxResults: maxResults,
+      observerId: observerId,
+    );
+
+    // Then filter them by the current season
+    return filterObservationsBySeason(allObservations);
   }
 
   // Fetch observations from a specific region using the eBird API
