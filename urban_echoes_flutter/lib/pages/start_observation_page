@@ -1,0 +1,93 @@
+import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+class StartObservationPage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('Bird Observer'),
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(20.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Record a Bird Observation',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 40),
+              ElevatedButton(
+                onPressed: () async {
+                  // Check and request permissions
+                  bool permissionsGranted = await _checkAndRequestPermissions();
+                  
+                  if (permissionsGranted) {
+                    // Navigate to observation screen if permissions are granted
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => BirdObservationScreen(),
+                      ),
+                    );
+                  } else {
+                    // Show error message if permissions are denied
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Microphone permission is required for speech recognition'),
+                        duration: Duration(seconds: 3),
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  padding: EdgeInsets.symmetric(vertical: 20, horizontal: 40),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  backgroundColor: Colors.green,
+                ),
+                child: Column(
+                  children: [
+                    Icon(
+                      Icons.mic,
+                      size: 80,
+                      color: Colors.white,
+                    ),
+                    SizedBox(height: 10),
+                    Text(
+                      'Start Observation',
+                      style: TextStyle(
+                        fontSize: 22,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Check and request necessary permissions
+  Future<bool> _checkAndRequestPermissions() async {
+    // Request microphone permission
+    var microphoneStatus = await Permission.microphone.request();
+    
+    // On iOS, we also need speech recognition permission
+    var speechStatus = await Permission.speech.request();
+    
+    // Return true if both permissions are granted
+    return microphoneStatus.isGranted && 
+           (speechStatus.isGranted || speechStatus.isPermanentlyDenied);
+  }
+}
