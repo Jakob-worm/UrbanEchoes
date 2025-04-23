@@ -9,20 +9,45 @@ import 'package:urban_echoes/services/location_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:urban_echoes/services/season_service.dart';
 import 'package:urban_echoes/state%20manegers/map_state_manager.dart';
-import 'state manegers/page_state_maneger.dart';
+import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
+import 'package:urban_echoes/services/tts_service.dart';
 
-void main() async {
+Future<void> main() async {
+  try {
+    await _initializeApp();
+    final locationService = await _initializeServices();
+
+    runApp(MyApp(
+      debugMode: false,
+      locationService: locationService,
+    ));
+  } catch (e) {
+    debugPrint('Fatal error during app initialization: $e');
+    // You might want to show an error screen here instead of crashing
+  }
+}
+
+/// Initialize app-level configurations
+Future<void> _initializeApp() async {
+  // Ensure Flutter bindings are initialized
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables
   await dotenv.load(fileName: ".env");
 
   // Enable wakelock to keep screen on
-  WakelockPlus.enable();
+  await WakelockPlus.enable();
 
-  // Store the original function
-  final originalDebugPrint = debugPrint;
+  // Configure debug print to filter noisy logs
+  _configureDebugPrint();
 
   // Set up proper audio session
+  await _configureAudioSession();
+}
+
+/// Configure audio session for proper media playback
+Future<void> _configureAudioSession() async {
   final session = await AudioSession.instance;
   await session.configure(AudioSessionConfiguration(
     avAudioSessionCategory: AVAudioSessionCategory.playback,
@@ -33,8 +58,11 @@ void main() async {
     ),
     androidAudioFocusGainType: AndroidAudioFocusGainType.gain,
   ));
+}
 
-  // Replace with filtered version
+/// Configure debug print to filter out noisy logs
+void _configureDebugPrint() {
+  final originalDebugPrint = debugPrint;
   debugPrint = (String? message, {int? wrapWidth}) {
     if (message != null &&
         !message.contains('getCurrentPosition') &&
@@ -42,15 +70,12 @@ void main() async {
       originalDebugPrint(message, wrapWidth: wrapWidth);
     }
   };
+}
 
-  // Create service instances before the widget tree
-  final locationService = LocationService(); // Use LocationService
-  // We're no longer creating appStartupService here since it's created in the provider
-
-  runApp(MyApp(
-    debugMode: false,
-    locationService: locationService,
-  ));
+/// Initialize services that need to be created before the widget tree
+Future<LocationService> _initializeServices() async {
+  // Create and return the location service
+  return LocationService();
 }
 
 class MyApp extends StatelessWidget {
@@ -67,37 +92,40 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        // Create providers at the highest appropriate level
+        // State managers
         ChangeNotifierProvider<PageStateManager>(
           create: (context) => PageStateManager(),
         ),
-        // Add our new MapStateManager
         ChangeNotifierProvider<MapStateManager>(
           create: (context) => MapStateManager(),
         ),
+
+        // Services
         ChangeNotifierProvider<SeasonService>(
           create: (_) => SeasonService(),
         ),
-        // Use .value for objects that already exist
+        ChangeNotifierProvider<TtsService>(
+          create: (_) => TtsService(),
+        ),
+        Provider<AppStartupService>(
+          create: (_) => AppStartupService(),
+        ),
+
+        // Pre-created instances
         Provider<bool>.value(value: debugMode),
-        // Use .value constructor for pre-created service instances
         ChangeNotifierProvider<LocationService>.value(value: locationService),
-        // Add startup service provider
-        Provider<AppStartupService>(create: (_) => AppStartupService()),
-        // Add season service provider
-        ChangeNotifierProvider<SeasonService>(create: (_) => SeasonService()),
       ],
       child: MaterialApp(
         title: 'Urban Echoes',
         theme: ThemeData(
           primarySwatch: Colors.blue,
-          bottomNavigationBarTheme: BottomNavigationBarThemeData(
+          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
             backgroundColor: Colors.black,
             selectedItemColor: Colors.white,
             unselectedItemColor: Colors.grey,
           ),
         ),
-        home: InitialScreen(),
+        home: const InitialScreen(),
       ),
     );
   }
@@ -114,6 +142,8 @@ class InitialScreenState extends State<InitialScreen>
     with WidgetsBindingObserver {
   bool _isFirstTime = true;
   bool _isInitializing = true;
+  bool _initializationError = false;
+  String _errorMessage = '';
 
   @override
   void initState() {
@@ -127,66 +157,76 @@ class InitialScreenState extends State<InitialScreen>
     super.didChangeDependencies();
 
     if (_isInitializing) {
-      // Try-catch to handle potential provider errors
-      try {
-        // Initialize the location service only once
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          // Use try-catch to safely access the provider
-          try {
-            if (mounted) {
-              // Initialize location service
-              Provider.of<LocationService>(context, listen: false)
-                  .initialize(context);
-
-              // Run eBird sync in background - ADD THIS SECTION
-              final appStartupService =
-                  Provider.of<AppStartupService>(context, listen: false);
-              appStartupService.runStartupTasks();
-            }
-          } catch (e) {
-            debugPrint('Error initializing services: $e');
-          }
-
-          if (mounted) {
-            setState(() {
-              _isInitializing = false;
-            });
-          }
-        });
-      } catch (e) {
-        debugPrint('Error in post-frame callback: $e');
-        _isInitializing = false;
-      }
+      _initializeServices();
     }
+  }
+
+  void _initializeServices() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        if (!mounted) return;
+
+        // Initialize location service
+        final locationService =
+            Provider.of<LocationService>(context, listen: false);
+        locationService.initialize(context);
+
+        // Run startup tasks in background
+        final appStartupService =
+            Provider.of<AppStartupService>(context, listen: false);
+        appStartupService.runStartupTasks();
+
+        if (mounted) {
+          setState(() {
+            _isInitializing = false;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error initializing services: $e');
+        if (mounted) {
+          setState(() {
+            _isInitializing = false;
+            _initializationError = true;
+            _errorMessage = e.toString();
+          });
+        }
+      }
+    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Safely access the LocationService provider
     if (!mounted) return;
 
     try {
       final locationService =
           Provider.of<LocationService>(context, listen: false);
 
-      if (state == AppLifecycleState.resumed) {
-        // App is in the foreground - enable tracking and wakelock
-        WakelockPlus.enable(); // Re-enable wakelock when app is resumed
-        if (!locationService.isLocationTrackingEnabled) {
-          locationService.toggleLocationTracking(true);
-        }
+      switch (state) {
+        case AppLifecycleState.resumed:
+          // App is in the foreground - enable tracking and wakelock
+          WakelockPlus.enable();
+          if (!locationService.isLocationTrackingEnabled) {
+            locationService.toggleLocationTracking(true);
+          }
+          break;
 
-        // You can also refresh eBird data when the app is resumed if desired
-        // Provider.of<AppStartupService>(context, listen: false).syncEBirdObservations();
-      } else if (state == AppLifecycleState.paused) {
-        // App is in the background - disable tracking and wakelock to save battery
-        WakelockPlus.disable(); // Disable wakelock when app is paused
-        if (locationService.isLocationTrackingEnabled) {
-          locationService.toggleLocationTracking(false);
-        }
+        case AppLifecycleState.paused:
+        case AppLifecycleState.inactive:
+        case AppLifecycleState.detached:
+          // App is in the background - disable tracking and wakelock to save battery
+          WakelockPlus.disable();
+          if (locationService.isLocationTrackingEnabled) {
+            locationService.toggleLocationTracking(false);
+          }
+          break;
+
+        default:
+          // Handle any future lifecycle states
+          break;
       }
     } catch (e) {
-      debugPrint('Error accessing services in lifecycle: $e');
+      debugPrint('Error managing app lifecycle: $e');
     }
   }
 
@@ -199,22 +239,80 @@ class InitialScreenState extends State<InitialScreen>
   }
 
   Future<void> _checkFirstTime() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    bool isFirstTime = prefs.getBool('isFirstTime') ?? true;
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      bool isFirstTime = prefs.getBool('isFirstTime') ?? true;
 
-    if (isFirstTime) {
-      await prefs.setBool('isFirstTime', false);
-    }
+      if (isFirstTime) {
+        await prefs.setBool('isFirstTime', false);
+      }
 
-    if (mounted) {
-      setState(() {
-        _isFirstTime = isFirstTime;
-      });
+      if (mounted) {
+        setState(() {
+          _isFirstTime = isFirstTime;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error checking first time status: $e');
+      // Default to showing intro screen if there's an error
+      // This ensures users don't get stuck if preferences are corrupted
+      if (mounted) {
+        setState(() {
+          _isFirstTime = true;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Show error state if initialization failed
+    if (_initializationError) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.error_outline, color: Colors.red, size: 64),
+              const SizedBox(height: 16),
+              const Text(
+                'Failed to initialize app',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                _errorMessage,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.red),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton(
+                onPressed: () {
+                  setState(() {
+                    _isInitializing = true;
+                    _initializationError = false;
+                    _errorMessage = '';
+                  });
+                  _initializeServices();
+                },
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show loading indicator while initializing
+    if (_isInitializing) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    // Show intro screen for first-time users
     if (_isFirstTime) {
       return IntroScreen(
         onDone: () {
@@ -223,8 +321,9 @@ class InitialScreenState extends State<InitialScreen>
           });
         },
       );
-    } else {
-      return NavBarsPage();
     }
+
+    // Show main app UI
+    return const NavBarsPage();
   }
 }

@@ -60,7 +60,7 @@ dependencies:
   audio_service: ^0.18.17
   wakelock_plus: ^1.2.11
   speech_to_text: ^7.0.0
-  flutter_tts: ^3.7.0
+  flutter_tts: ^4.2.2
 
 dev_dependencies:
   flutter_test:
