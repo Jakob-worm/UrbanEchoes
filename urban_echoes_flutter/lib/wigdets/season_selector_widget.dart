@@ -12,11 +12,11 @@ class SeasonSelectorWidget extends StatelessWidget {
   final bool useDanishNames;
 
   const SeasonSelectorWidget({
-    Key? key,
+    super.key,
     this.onSeasonChanged,
     this.showAllOption = true,
     this.useDanishNames = true,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
