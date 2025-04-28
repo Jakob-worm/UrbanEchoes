@@ -357,8 +357,8 @@ class InitialScreenState extends State<InitialScreen>
         },
         backgroundColor: Colors.purple,
         mini: true,
-        child: const Text('T', style: TextStyle(fontWeight: FontWeight.bold)),
         tooltip: 'Bird Recognition Test Mode',
+        child: const Text('T', style: TextStyle(fontWeight: FontWeight.bold)),
       ) : null,
     );
   }

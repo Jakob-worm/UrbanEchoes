@@ -1,0 +1,326 @@
+Aftenfalk
+Agerhøne
+Alexanderparakit
+Alk
+Allike
+Almindelig Kjove
+Almindelig Ryle
+Almindelig Skråpe
+Amerikansk Krikand
+Amerikansk Skarveand
+Amerikansk Sortand
+Atlingand
+Biæder
+Bjergand
+Bjergirisk
+Bjerglærke
+Bjergpiber
+Bjergvipstjert
+Blisgås
+Blishøne
+Blå Kærhøg
+Blåhals
+Blåmejse
+Bogfinke
+Bomlærke
+Bramgås
+Brilleand
+Broget Fluesnapper
+Brun Løvsanger
+Brushane
+Buskrørsanger
+Bynkefugl
+Bysvale
+Canadagås
+Citronvipstjert
+Damklire
+Digesvale
+Dobbeltbekkasin
+Dompap
+Drosselrørsanger
+Duehøg
+Dværgfalk
+Dværggås
+Dværgmåge
+Dværgryle
+Dværgterne
+Dværgværling
+Ederfugl
+Ellekrage
+Engpiber
+Engsnarre
+Enkeltbekkasin
+Fasan
+Fiskehejre
+Fiskeørn
+Fjeldvåge
+Fjordterne
+Flodsanger
+Fløjlsand
+Fuglekonge
+Fuglekongesanger
+Fyrremejse
+Gransanger
+Gravand
+Græshoppesanger
+Grønirisk
+Grønsisken
+Grønspætte
+Grå Fluesnapper
+Gråand
+Grågås
+Gråkrage
+Gråmåge
+Gråspurv
+Gråstrubet Lappedykker
+Gul Vipstjert
+Gulbug
+Gulirisk
+Gulspurv
+Gærdesanger
+Gærdesmutte
+Gøg
+Halemejse
+Havesanger
+Havlit
+Havterne
+Havørn
+Hedehøg
+Hedelærke
+Hjejle
+Hortulan
+Huldue
+Husrødstjert
+Husskade
+Hvepsevåge
+Hvid Stork
+Hvid Vipstjert
+Hvidbrynet Løvsanger
+Hvidbrystet Præstekrave
+Hvidhalset Fluesnapper
+Hvidklire
+Hvidnæbbet Lom
+Hvidsisken
+Hvidvinget Korsnæb
+Hvidvinget Måge
+Hvidvinget Terne
+Hvidøjet And
+Hvinand
+Hærfugl
+Hættemåge
+Høgesanger
+Høgeugle
+Indisk Gås
+Isfugl
+Islandsk Ryle
+Islom
+Jagtfalk
+Jernspurv
+Karmindompap
+Kaspisk Måge
+Kernebider
+Kirkeugle
+Klippedue
+Klyde
+Knarand
+Knopsvane
+Knortegås
+Kohejre
+Kongeederfugl
+Kongeørn
+Kortnæbbet Gås
+Korttået Træløber
+Krikand
+Krognæb
+Krumnæbbet Ryle
+Kvækerfinke
+Kærløber
+Kærsanger
+Landsvale
+Lapværling
+Lille Flagspætte
+Lille Fluesnapper
+Lille Gråsisken
+Lille Kjove
+Lille Kobbersneppe
+Lille Korsnæb
+Lille Lappedykker
+Lille Præstekrave
+Lille Skallesluger
+Lille Skrigeørn
+Lille Stormsvale
+Lomvie
+Lunde
+Lundsanger
+Lærkefalk
+Løvsanger
+Mallemuk
+Mandarinand
+Markpiber
+Mellemflagspætte
+Mellemkjove
+Middelhavssølvmåge
+Misteldrossel
+Mosehornugle
+Mudderklire
+Munk
+Mursejler
+Musvit
+Musvåge
+Nathejre
+Natravn
+Nattergal
+Natugle
+Nilgås
+Nordisk Lappedykker
+Nordlig Gråsisken
+Nøddekrige
+Odinshane
+Perleugle
+Pibeand
+Pibesvane
+Pirol
+Plettet Rørvagtel
+Pomeransfugl
+Pungmejse
+Ravn
+Ride
+Ringdrossel
+Ringdue
+Rosenbrystet Tornskade
+Rosenstær
+Rovterne
+Rustand
+Rød Glente
+Rødben
+Rødhals
+Rødhalset Gås
+Rødhovedet And
+Rødhovedet Tornskade
+Rødhøne
+Rødrygget Svale
+Rødrygget Tornskade
+Rødstjert
+Rødstrubet Lom
+Rødstrubet Piber
+Rødtoppet Fuglekonge
+Rørdrum
+Rørhøg
+Rørhøne
+Rørsanger
+Rørspurv
+Råge
+Sabinemåge
+Sandløber
+Sandterne
+Sangdrossel
+Sanglærke
+Sangsvane
+Savisanger
+Sildemåge
+Silkehale
+Silkehejre
+Sivsanger
+Sjagger
+Skarv
+Skeand
+Skestork
+Skovhornugle
+Skovpiber
+Skovsanger
+Skovskade
+Skovsneppe
+Skovspurv
+Skægmejse
+Skærpiber
+Slangeørn
+Slørugle
+Småspove
+Snegås
+Snespurv
+Sneugle
+Sodfarvet Skråpe
+Solsort
+Sort Glente
+Sort Ibis
+Sort Stork
+Sortand
+Sortgrå Ryle
+Sorthalset Lappedykker
+Sorthovedet Måge
+Sortklire
+Sortkrage
+Sortmejse
+Sortspætte
+Sortstrubet Bynkefugl
+Sortstrubet Lom
+Sortsvane
+Sortterne
+Spidsand
+Splitterne
+Spurvehøg
+Spurveugle
+Spætmejse
+Stellersand
+Stenpikker
+Stenvender
+Steppehøg
+Stillits
+Stor Flagspætte
+Stor Hornugle
+Stor Kobbersneppe
+Stor Korsnæb
+Stor Præstekrave
+Stor Skallesluger
+Stor Skrigeørn
+Stor Stormsvale
+Stor Tornskade
+Storkjove
+Stormmåge
+Storpiber
+Storspove
+Strandhjejle
+Strandskade
+Stribet Ryle
+Stylteløber
+Stær
+Sule
+Sumpmejse
+Svaleklire
+Svartbag
+Sydlig Nattergal
+Søkonge
+Sølvhejre
+Sølvmåge
+Taffeland
+Tajgasædgås
+Tejst
+Temmincksryle
+Terekklire
+Thorshane
+Tinksmed
+Toplærke
+Topmejse
+Toppet Lappedykker
+Toppet Skallesluger
+Topskarv
+Tornirisk
+Tornsanger
+Trane
+Tredækker
+Triel
+Troldand
+Træløber
+Tundrasædgås
+Turteldue
+Tyrkerdue
+Tårnfalk
+Urfugl
+Vagtel
+Vandrefalk
+Vandrikse
+Vandsanger
+Vandstær
+Vendehals
+Vibe
+Vindrossel

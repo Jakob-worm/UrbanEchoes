@@ -3,10 +3,17 @@ import 'package:flutter/foundation.dart';
 import 'package:speech_to_text/speech_recognition_error.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:speech_to_text/speech_recognition_result.dart';
+import 'bird_data_helper.dart';
+import 'bird_data_loader.dart';
 
 class BirdRecognitionService extends ChangeNotifier {
   // Core speech recognition
   final SpeechToText _speech = SpeechToText();
+  
+  // Bird data components
+  late BirdDataLoader _dataLoader;
+  late BirdDataHelper _dataHelper;
+  bool _dataInitialized = false;
   
   // State variables
   bool _isInitialized = false;
@@ -35,21 +42,45 @@ class BirdRecognitionService extends ChangeNotifier {
   double get successRate => _recognitionAttempts > 0 
       ? _successfulMatches / _recognitionAttempts 
       : 0.0;
-  
-  // Danish bird names (simplified list for initial testing)
-  // In production, load this from a file or database
-  final List<String> birdNames = [
-    'Musvit', 'Solsort', 'Gråspurv', 'Husskade', 'Ringdue', 
-    'Bogfinke', 'Blåmejse', 'Allike', 'Grønirisk', 'Rødhals',
-    // Add more birds in phases - start with most common birds first
-  ];
+  List<String> get birdNames => _dataInitialized ? _dataHelper.activeBirds : [];
   
   // Constructor
   BirdRecognitionService({bool debugMode = false}) {
     _debugMode = debugMode;
-    // Initialize asynchronously to not block main thread
+    _dataLoader = BirdDataLoader();
+    _initBirdData();
     _initSpeech();
   }
+  
+  Future<void> _initBirdData() async {
+  try {
+    _logDebug('Initializing bird data (dataInitialized=$_dataInitialized)');
+    
+    // Load bird names
+    List<String> allBirdNames = await _dataLoader.loadBirdNames();
+    
+    _logDebug('Creating data helper with ${allBirdNames.length} bird names');
+    // Create data helper with loaded names
+    _dataHelper = BirdDataHelper(allBirdNames);
+    
+    // Log test mode before setting
+    _logDebug('Current test mode: ${_dataHelper.isTestMode}');
+    
+    // Set test mode based on debug setting
+    await _dataHelper.setTestMode(false); // Force to false for testing
+    _logDebug('Test mode set to false, active birds: ${_dataHelper.activeBirds.length}');
+    
+    _dataInitialized = true;
+    _logDebug('Bird data initialized with ${allBirdNames.length} names');
+    _logDebug('Active birds after initialization: ${_dataHelper.activeBirds.length}');
+    
+    notifyListeners();
+  } catch (e) {
+    _logDebug('Error initializing bird data: $e');
+    _errorMessage = 'Failed to initialize bird data: $e';
+    notifyListeners();
+  }
+}
   
   // Initialize speech recognition
   Future<bool> _initSpeech() async {
@@ -103,10 +134,20 @@ class BirdRecognitionService extends ChangeNotifier {
       _logDebug('Starting speech recognition');
       _errorMessage = null;
       
+      // Make sure both speech and bird data are initialized
       if (!_isInitialized) {
         await _initSpeech();
         if (!_isInitialized) {
           _errorMessage = 'Speech recognition not available';
+          notifyListeners();
+          return false;
+        }
+      }
+      
+      if (!_dataInitialized) {
+        await _initBirdData();
+        if (!_dataInitialized) {
+          _errorMessage = 'Bird data not initialized';
           notifyListeners();
           return false;
         }
@@ -173,28 +214,46 @@ class BirdRecognitionService extends ChangeNotifier {
     
     _logDebug('Recognized: $_recognizedText (${(_confidence * 100).toStringAsFixed(1)}%)');
     
-    // Very simple matching logic for Phase 1
-    // This will be enhanced in later phases
-    _matchBirdName(_recognizedText);
+    // Make sure data is initialized before matching
+    if (_dataInitialized) {
+      _matchBirdName(_recognizedText);
+    } else {
+      _logDebug('Bird data not initialized, can\'t match bird names');
+      _errorMessage = 'Bird data not available for matching';
+    }
     
     notifyListeners();
   }
   
-  // Basic bird name matching logic (Phase 1)
+  // Match bird name using the data helper
   void _matchBirdName(String text) {
+    if (text.isEmpty) return;
+    
+    // In Phase 1, use basic matching
+    // This will be enhanced in Phase 2 with the data helper's advanced methods
     String lowerText = text.toLowerCase();
     _possibleMatches = [];
     
-    // Simple contains matching for initial testing
-    for (String bird in birdNames) {
+    // Simple matching for initial testing
+    for (String bird in _dataHelper.activeBirds) {
       if (lowerText.contains(bird.toLowerCase())) {
         _possibleMatches.add(bird);
       }
     }
     
+    // If no exact matches, try phonetic matching
+    if (_possibleMatches.isEmpty) {
+      _possibleMatches = _dataHelper.findPhoneticallySimilarBirds(text);
+    }
+    
+    // Update matched bird and record success if found
     if (_possibleMatches.isNotEmpty) {
       _matchedBird = _possibleMatches.first;
       _successfulMatches++;
+      
+      // Record in data helper for analytics
+      _dataHelper.recordRecognition(_matchedBird, _confidence);
+      
       _logDebug('Matched bird: $_matchedBird');
     } else {
       _matchedBird = '';
@@ -218,6 +277,22 @@ class BirdRecognitionService extends ChangeNotifier {
     _recognitionAttempts = 0;
     _successfulMatches = 0;
     notifyListeners();
+  }
+  
+  Future<void> setTestMode(bool value) async {
+  if (_dataInitialized) {
+    await _dataHelper.setTestMode(value);
+    print("Test mode set to: $value, active birds: ${_dataHelper.activeBirds.length}");
+    notifyListeners();
+  }
+}
+  
+  // Add custom birds to active set (for testing)
+  Future<void> addCustomBirdsToActive(List<String> birds) async {
+    if (_dataInitialized) {
+      await _dataHelper.addCustomBirdsToActive(birds);
+      notifyListeners();
+    }
   }
   
   // Debug logging

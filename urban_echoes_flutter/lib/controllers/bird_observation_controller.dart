@@ -5,7 +5,6 @@ import 'package:urban_echoes/models/bird_observation.dart';
 import 'package:location/location.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:provider/provider.dart';
 import 'package:urban_echoes/services/sound/bird_sound_player.dart';
