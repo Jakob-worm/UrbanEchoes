@@ -92,7 +92,7 @@ Future<void> _loadStoredData() async {
   
   // Always keep all birds active regardless of test mode
   _activeBirds = _allBirdNames.toList();
-  print("BirdDataHelper - Test mode set to: $value, but keeping all birds active: ${_activeBirds.length}");
+  debugPrint("BirdDataHelper - Test mode set to: $value, but keeping all birds active: ${_activeBirds.length}");
   
   await _saveData();
 }

@@ -33,8 +33,7 @@ class SpeechCoordinator extends ChangeNotifier {
   String get recognizedText => _speechService.recognizedText;
   double get confidence => _speechService.confidence;
   String? get errorMessage => _speechService.errorMessage ?? 
-                             _birdService.errorMessage ??
-                             null;
+                             _birdService.errorMessage;
   
   void _onSpeechUpdate() {
     if (_speechService.recognizedText.isNotEmpty) {
