@@ -38,6 +38,7 @@ class BirdRecognitionService extends ChangeNotifier {
   double get confidence => _confidence;
   String? get errorMessage => _errorMessage;
   int get recognitionAttempts => _recognitionAttempts;
+  bool get isDataInitialized => _dataInitialized;
   int get successfulMatches => _successfulMatches;
   double get successRate => _recognitionAttempts > 0 
       ? _successfulMatches / _recognitionAttempts 

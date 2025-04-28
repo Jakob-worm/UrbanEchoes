@@ -12,6 +12,7 @@ import 'package:urban_echoes/services/season_service.dart';
 import 'package:urban_echoes/services/speach_regognition/bird_regognition_service.dart';
 import 'package:urban_echoes/state%20manegers/map_state_manager.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
+import 'package:urban_echoes/utils/navigation_provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:urban_echoes/services/tts_service.dart';
 import 'package:urban_echoes/services/service_config.dart';
@@ -83,14 +84,14 @@ Future<LocationService> _initializeServices() async {
 }
 
 class MyApp extends StatelessWidget {
-  final bool debugMode;
-  final LocationService locationService;
-
   const MyApp({
     super.key,
     required this.debugMode,
     required this.locationService,
   });
+
+  final bool debugMode;
+  final LocationService locationService;
 
   @override
   Widget build(BuildContext context) {
@@ -102,6 +103,9 @@ class MyApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<MapStateManager>(
           create: (context) => MapStateManager(),
+        ),
+        ChangeNotifierProvider<NavigationProvider>(
+        create: (context) => NavigationProvider(),
         ),
 
         // Services
@@ -152,61 +156,12 @@ class InitialScreen extends StatefulWidget {
 
 class InitialScreenState extends State<InitialScreen>
     with WidgetsBindingObserver {
+  String _errorMessage = '';
+  bool _initializationError = false;
   bool _isFirstTime = true;
   bool _isInitializing = true;
-  bool _initializationError = false;
-  String _errorMessage = '';
   // Add flag for bird recognition test mode
   bool _showBirdRecognitionTest = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _checkFirstTime();
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-
-    if (_isInitializing) {
-      _initializeServices();
-    }
-  }
-
-  void _initializeServices() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      try {
-        if (!mounted) return;
-
-        // Initialize location service
-        final locationService =
-            Provider.of<LocationService>(context, listen: false);
-        locationService.initialize(context);
-
-        // Run startup tasks in background
-        final appStartupService =
-            Provider.of<AppStartupService>(context, listen: false);
-        appStartupService.runStartupTasks();
-
-        if (mounted) {
-          setState(() {
-            _isInitializing = false;
-          });
-        }
-      } catch (e) {
-        debugPrint('Error initializing services: $e');
-        if (mounted) {
-          setState(() {
-            _isInitializing = false;
-            _initializationError = true;
-            _errorMessage = e.toString();
-          });
-        }
-      }
-    });
-  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -245,11 +200,60 @@ class InitialScreenState extends State<InitialScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    if (_isInitializing) {
+      _initializeServices();
+    }
+  }
+
+  @override
   void dispose() {
     // Make sure to disable wakelock when the app is closed
     WakelockPlus.disable();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _checkFirstTime();
+  }
+
+  void _initializeServices() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        if (!mounted) return;
+
+        // Initialize location service
+        final locationService =
+            Provider.of<LocationService>(context, listen: false);
+        locationService.initialize(context);
+
+        // Run startup tasks in background
+        final appStartupService =
+            Provider.of<AppStartupService>(context, listen: false);
+        appStartupService.runStartupTasks();
+
+        if (mounted) {
+          setState(() {
+            _isInitializing = false;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error initializing services: $e');
+        if (mounted) {
+          setState(() {
+            _isInitializing = false;
+            _initializationError = true;
+            _errorMessage = e.toString();
+          });
+        }
+      }
+    });
   }
 
   Future<void> _checkFirstTime() async {
