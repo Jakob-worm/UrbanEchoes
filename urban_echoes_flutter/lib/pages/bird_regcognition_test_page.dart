@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:urban_echoes/services/bird_regognition_service.dart';
+import 'package:urban_echoes/services/speach_regognition/bird_regognition_service.dart';
 
 class BirdRecognitionTestPage extends StatefulWidget {
   const BirdRecognitionTestPage({Key? key}) : super(key: key);

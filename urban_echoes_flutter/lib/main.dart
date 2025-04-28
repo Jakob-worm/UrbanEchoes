@@ -6,14 +6,15 @@ import 'package:urban_echoes/pages/nav_bars_page.dart';
 import 'package:urban_echoes/pages/intro_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:urban_echoes/services/AppStartupService.dart';
-import 'package:urban_echoes/services/bird_regognition_service.dart';
 import 'package:urban_echoes/services/location_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:urban_echoes/services/season_service.dart';
+import 'package:urban_echoes/services/speach_regognition/bird_regognition_service.dart';
 import 'package:urban_echoes/state%20manegers/map_state_manager.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:urban_echoes/services/tts_service.dart';
+import 'package:urban_echoes/services/service_config.dart';
 
 
 Future<void> main() async {
@@ -22,7 +23,7 @@ Future<void> main() async {
     final locationService = await _initializeServices();
 
     runApp(MyApp(
-      debugMode: true, // Set to true to enable development features
+      debugMode: ServiceConfig().debugMode, // Set to true to enable development features
       locationService: locationService,
     ));
   } catch (e) {
