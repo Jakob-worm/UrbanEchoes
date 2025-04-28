@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:urban_echoes/pages/bird_regcognition_test_page.dart';
 import 'package:urban_echoes/pages/nav_bars_page.dart';
 import 'package:urban_echoes/pages/intro_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:urban_echoes/services/AppStartupService.dart';
+import 'package:urban_echoes/services/bird_regognition_service.dart';
 import 'package:urban_echoes/services/location_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:urban_echoes/services/season_service.dart';
@@ -13,13 +15,14 @@ import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:urban_echoes/services/tts_service.dart';
 
+
 Future<void> main() async {
   try {
     await _initializeApp();
     final locationService = await _initializeServices();
 
     runApp(MyApp(
-      debugMode: false,
+      debugMode: true, // Set to true to enable development features
       locationService: locationService,
     ));
   } catch (e) {
@@ -110,6 +113,14 @@ class MyApp extends StatelessWidget {
         Provider<AppStartupService>(
           create: (_) => AppStartupService(),
         ),
+        
+        // Add Bird Recognition Service (lazy initialization)
+        ChangeNotifierProvider<BirdRecognitionService>(
+          // Pass debugMode to the service for detailed logging in test mode
+          create: (_) => BirdRecognitionService(debugMode: debugMode),
+          // Lazy: true ensures it's only created when first accessed
+          lazy: true,
+        ),
 
         // Pre-created instances
         Provider<bool>.value(value: debugMode),
@@ -144,6 +155,8 @@ class InitialScreenState extends State<InitialScreen>
   bool _isInitializing = true;
   bool _initializationError = false;
   String _errorMessage = '';
+  // Add flag for bird recognition test mode
+  bool _showBirdRecognitionTest = false;
 
   @override
   void initState() {
@@ -266,6 +279,14 @@ class InitialScreenState extends State<InitialScreen>
 
   @override
   Widget build(BuildContext context) {
+    // Get debug mode from Provider
+    final bool debugMode = Provider.of<bool>(context);
+    
+    // Show test page if in test mode
+    if (_showBirdRecognitionTest) {
+      return BirdRecognitionTestPage();
+    }
+    
     // Show error state if initialization failed
     if (_initializationError) {
       return Scaffold(
@@ -323,7 +344,21 @@ class InitialScreenState extends State<InitialScreen>
       );
     }
 
-    // Show main app UI
-    return const NavBarsPage();
+    // Show main app UI with debug options if in debug mode
+    return Scaffold(
+      body: const NavBarsPage(),
+      // Add a debug FAB only in debug mode
+      floatingActionButton: debugMode ? FloatingActionButton(
+        onPressed: () {
+          setState(() {
+            _showBirdRecognitionTest = true;
+          });
+        },
+        backgroundColor: Colors.purple,
+        mini: true,
+        child: const Text('T', style: TextStyle(fontWeight: FontWeight.bold)),
+        tooltip: 'Bird Recognition Test Mode',
+      ) : null,
+    );
   }
 }

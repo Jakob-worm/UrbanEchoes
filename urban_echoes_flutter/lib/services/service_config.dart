@@ -33,7 +33,7 @@ class ServiceConfig {
   int locationStallThresholdMinutes = 3; // Time before restart
   
   // Debug settings to Default to Flutter's debug mode write debugMode = kDebugMode; //
-  bool debugMode = false;
+  bool debugMode = true;
 
   // Fixed API URLs - remove the /observations suffix
   String getApiUrl(bool debugMode) {
