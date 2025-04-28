@@ -69,20 +69,40 @@ async def get_danish_taxonomy():
     except requests.exceptions.RequestException as e:
         raise HTTPException(status_code=500, detail=f"Error fetching taxonomy: {str(e)}")
     
-
 @app.get("/observations")
-def get_observations():
-    """Fetch all bird observations from the database."""
+def get_observations(after_timestamp: str = Query(None, description="Fetch only observations created after this timestamp")):
+    """Fetch bird observations from the database, with optional filtering by timestamp."""
     try:
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         
-        cursor.execute("""
-            SELECT id, bird_name, scientific_name, sound_directory, latitude, longitude, observation_date, observation_time, observer_id, created_at, quantity, is_test_data, test_batch_id
-            FROM bird_observations
-        """)
+        if after_timestamp:
+            # If timestamp is provided, only get observations created after that time
+            cursor.execute("""
+                SELECT id, bird_name, scientific_name, sound_directory, latitude, longitude, 
+                       observation_date, observation_time, observer_id, created_at, 
+                       quantity, is_test_data, test_batch_id
+                FROM bird_observations
+                WHERE created_at > %s
+                ORDER BY created_at ASC
+            """, (after_timestamp,))
+            
+            logger.info(f"Fetching observations created after {after_timestamp}")
+        else:
+            # Otherwise, get all observations
+            cursor.execute("""
+                SELECT id, bird_name, scientific_name, sound_directory, latitude, longitude, 
+                       observation_date, observation_time, observer_id, created_at, 
+                       quantity, is_test_data, test_batch_id
+                FROM bird_observations
+                ORDER BY created_at ASC
+            """)
+            
+            logger.info("Fetching all observations")
         
         observations = cursor.fetchall()
+        logger.info(f"Returning {len(observations)} observations")
+        
         cursor.close()
         conn.close()
         

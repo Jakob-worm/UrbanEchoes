@@ -6,8 +6,11 @@ import 'package:location/location.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:provider/provider.dart';
 import 'package:urban_echoes/services/sound/bird_sound_player.dart';
 import 'package:urban_echoes/services/storage&database/database_service.dart';
+import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 import 'package:xml/xml.dart';
 
 class BirdObservationController {
@@ -34,10 +37,12 @@ class BirdObservationController {
 
   // State
   bool _initialized = false;
+  bool _disposed = false;
 
   // Initialization
   Future<bool> initialize() async {
     if (_initialized) return true;
+    if (_disposed) return false;
 
     debugPrint('Validating environment variables...');
     if (!_validateEnvironmentVariables()) return false;
@@ -53,6 +58,7 @@ class BirdObservationController {
   // Resource cleanup
   void dispose() {
     try {
+      _disposed = true;
       _databaseService.closeConnection();
       _soundPlayer.dispose();
       debugPrint('BirdObservationController disposed');
@@ -73,7 +79,8 @@ class BirdObservationController {
   // Main functionality
   Future<bool> submitObservation(
       String birdName, String scientificName, int quantity,
-      {File? soundFile}) async {
+      {File? soundFile, BuildContext? context}) async {
+    if (_disposed) return false;
     if (!await initialize()) return false;
 
     debugPrint('Submitting observation for $birdName ($scientificName)');
@@ -89,7 +96,7 @@ class BirdObservationController {
       longitude: locationData.longitude ?? 0.0,
       observationDate: DateTime.now(),
       observationTime: DateFormat('HH:mm:ss').format(DateTime.now()),
-      observerId: 1, // One observerID for now
+      observerId: 2, // One observerID for now
       quantity: quantity,
       isTestData: false,
       testBatchId: 1, // Example test batch ID
@@ -98,6 +105,18 @@ class BirdObservationController {
     final id = await _databaseService.addBirdObservation(observation);
     if (id > 0) {
       debugPrint('$birdName ($quantity) recorded successfully with ID: $id');
+      
+      // Set the page state refresh flag if context is provided
+      if (context != null) {
+        try {
+          final pageStateManager = Provider.of<PageStateManager>(context, listen: false);
+          debugPrint('Setting needsMapRefresh flag to true');
+          pageStateManager.setNeedsMapRefresh(true);
+        } catch (e) {
+          debugPrint('Error setting map refresh flag: $e');
+        }
+      }
+      
       if (soundUrl != null) await playBirdSound(soundUrl);
       return true;
     }
@@ -129,31 +148,33 @@ class BirdObservationController {
   }
 
   Future<LocationData> _getCurrentLocation() async {
-  // Try to get actual location first, regardless of debug mode
-  try {
-    if (!await _location.serviceEnabled() &&
-        !await _location.requestService()) {
-      throw Exception('Location service disabled');
-    }
+    // Try to get actual location first, regardless of debug mode
+    try {
+      if (!await _location.serviceEnabled() &&
+          !await _location.requestService()) {
+        throw Exception('Location service disabled');
+      }
 
-    if (await _location.hasPermission() == PermissionStatus.denied &&
-        await _location.requestPermission() != PermissionStatus.granted) {
-      throw Exception('Location permission denied');
-    }
+      if (await _location.hasPermission() == PermissionStatus.denied &&
+          await _location.requestPermission() != PermissionStatus.granted) {
+        throw Exception('Location permission denied');
+      }
 
-    // Try to get the actual location first
-    final actualLocation = await _location.getLocation();
-    if (actualLocation.latitude != null && actualLocation.longitude != null) {
-      debugPrint('Using actual location: ${actualLocation.latitude}, ${actualLocation.longitude}');
-      return actualLocation;
+      // Try to get the actual location first
+      final actualLocation = await _location.getLocation();
+      if (actualLocation.latitude != null && actualLocation.longitude != null) {
+        debugPrint(
+            'Using actual location: ${actualLocation.latitude}, ${actualLocation.longitude}');
+        return actualLocation;
+      }
+      throw Exception('Invalid location data received');
+    } catch (e) {
+      debugPrint(
+          'Error getting location: $e, falling back to emulator location');
+      // Only use emulator location as a fallback
+      return _getEmulatorLocation();
     }
-    throw Exception('Invalid location data received');
-  } catch (e) {
-    debugPrint('Error getting location: $e, falling back to emulator location');
-    // Only use emulator location as a fallback
-    return _getEmulatorLocation();
   }
-}
 
   LocationData _getEmulatorLocation() {
     // Generate random coordinates around Aarhus

@@ -2,76 +2,149 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:geolocator/geolocator.dart';  // For Position class
+import 'package:geolocator/geolocator.dart';
 import 'package:urban_echoes/services/manegers/location_manager.dart';
 import 'package:urban_echoes/services/sound/background_audio_service.dart';
 import 'package:urban_echoes/services/sound/bird_sound_player.dart';
 import 'package:urban_echoes/services/storage&database/azure_storage_service.dart';
+import 'package:urban_echoes/services/season_service.dart';
+import 'package:urban_echoes/models/season.dart';
 import 'observation_service.dart';
 
+/// A service that manages location-based bird sound observations.
+///
+/// This service handles:
+/// - Location tracking
+/// - Fetching and filtering observations based on season and location
+/// - Playing bird sounds based on proximity to observation points
+/// - Managing audio settings and playback
 class LocationService extends ChangeNotifier {
+  // Constants
+  static const double _MAX_RANGE =
+      50.0; // Maximum range in meters for observation detection
+  static const int _BATCH_UPDATE_MS =
+      500; // Milliseconds for batching UI updates
+  static const bool _DEBUG_MODE = true; // Enable debug logging
+
+  // Audio settings
+  static const double _MIN_VOLUME = 0.05;
+  static const double _MAX_VOLUME = 0.9;
+  static const double _CLOSE_PROXIMITY_THRESHOLD = 5.0; // Meters
+  static const double _CLOSE_PROXIMITY_BOOST = 0.1;
+
   // Services
-  final BirdSoundPlayer _soundPlayer = BirdSoundPlayer();
-  final AzureStorageService _storageService = AzureStorageService();
-  final BackgroundAudioService _backgroundAudioService = BackgroundAudioService();
-  
-  // New dependency - LocationManager
+  final BirdSoundPlayer _soundPlayer;
+  final AzureStorageService _storageService;
+  final BackgroundAudioService _backgroundAudioService;
+  final SeasonService _seasonService;
   late final LocationManager _locationManager;
 
   // State
   bool _isInitialized = false;
   List<Map<String, dynamic>> _observations = [];
   final Map<String, Map<String, dynamic>> _activeObservations = {};
-
-  // Throttling state
   Timer? _batchUpdateTimer;
-  
-  // Settings
   bool _isAudioEnabled = true;
 
-  // Configuration
-  final double _maxRange = 50; // Reduced from 200m
-  final int _batchUpdateMs = 500; // Batch UI updates
+  // Listen for season changes
+  StreamSubscription? _seasonSubscription;
 
-  // Debug
-  final bool _debugMode = true;
-
-  // Constructor - allow dependency injection for testing
-  LocationService({LocationManager? locationManager}) {
+  /// Constructor with optional dependency injection for testing
+  LocationService({
+    BirdSoundPlayer? soundPlayer,
+    AzureStorageService? storageService,
+    BackgroundAudioService? backgroundAudioService,
+    SeasonService? seasonService,
+    LocationManager? locationManager,
+  })  : _soundPlayer = soundPlayer ?? BirdSoundPlayer(),
+        _storageService = storageService ?? AzureStorageService(),
+        _backgroundAudioService =
+            backgroundAudioService ?? BackgroundAudioService(),
+        _seasonService = seasonService ?? SeasonService() {
     // Initialize location manager with position update callback
-    _locationManager = locationManager ?? LocationManager(
-      onPositionUpdate: (position) {
-        // Schedule a batch update
-        _batchUpdateTimer?.cancel();
-        _batchUpdateTimer = Timer(Duration(milliseconds: _batchUpdateMs), () {
-          _updateActiveObservations(position);
-          notifyListeners();
-        });
-      }
-    );
+    _locationManager = locationManager ??
+        LocationManager(onPositionUpdate: _handlePositionUpdate);
+
+    // Set up listener for season changes
+    _seasonService.addListener(_onSeasonChanged);
   }
 
-  // Getters
+  /// Handles position updates from location manager
+  void _handlePositionUpdate(Position position) {
+    // Schedule a batch update
+    _batchUpdateTimer?.cancel();
+    _batchUpdateTimer = Timer(Duration(milliseconds: _BATCH_UPDATE_MS), () {
+      _updateActiveObservations(position);
+      notifyListeners();
+    });
+  }
+
+  // Public getters
   bool get isInitialized => _isInitialized;
   Position? get currentPosition => _locationManager.currentPosition;
-  bool get isLocationTrackingEnabled => _locationManager.isLocationTrackingEnabled;
+  bool get isLocationTrackingEnabled =>
+      _locationManager.isLocationTrackingEnabled;
   bool get isAudioEnabled => _isAudioEnabled;
   List<Map<String, dynamic>> get activeObservations =>
       _activeObservations.values.toList();
 
+  /// Debug logging
   void _log(String message) {
-    if (_debugMode) {
+    if (_DEBUG_MODE) {
       debugPrint('[LocationService] $message');
     }
   }
 
-  // Initialize the service
+  /// Called when season changes
+  void _onSeasonChanged() {
+    _log('Season changed to: ${_seasonService.currentSeason}');
+
+    // Stop all sounds since we'll be filtering observations differently
+    if (_isAudioEnabled) {
+      _stopAllSounds();
+    }
+
+    // Clear active observations
+    _activeObservations.clear();
+
+    // Force update if we have a position
+    if (_locationManager.currentPosition != null) {
+      _updateActiveObservations(_locationManager.currentPosition!);
+      notifyListeners();
+    }
+  }
+
+  /// Stops all currently playing sounds
+  void _stopAllSounds() {
+    for (var id in _activeObservations.keys) {
+      _soundPlayer.stopSounds(id);
+    }
+  }
+
+  /// Initialize the service
   Future<void> initialize(BuildContext context) async {
     if (_isInitialized) {
       return;
     }
 
-    // Get API URL and debug mode from context before any async operations
+    // Get API URL and debug mode from context
+    final apiUrl = _getApiUrl(context);
+    final scaffoldMessenger = _getScaffoldMessenger(context);
+
+    try {
+      await _initializeServices();
+      await _fetchAndFilterObservations(apiUrl);
+
+      _isInitialized = true;
+      notifyListeners();
+    } catch (e) {
+      _log('Error initializing LocationService: $e');
+      _showInitializationError(scaffoldMessenger);
+    }
+  }
+
+  /// Get API URL based on debug mode
+  String _getApiUrl(BuildContext context) {
     bool debugMode = false;
     try {
       debugMode = Provider.of<bool>(context, listen: false);
@@ -79,126 +152,210 @@ class LocationService extends ChangeNotifier {
       _log('Error getting debug mode: $e');
     }
 
-    final String apiUrl = debugMode
+    return debugMode
         ? 'http://10.0.2.2:8000/observations'
         : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
+  }
 
-    // Cache the scaffold messenger before any async operations
+  /// Get scaffold messenger for showing error messages
+  ScaffoldMessengerState? _getScaffoldMessenger(BuildContext context) {
     ScaffoldMessengerState? scaffoldMessenger;
     try {
       scaffoldMessenger = ScaffoldMessenger.of(context);
     } catch (e) {
       _log('Error getting ScaffoldMessenger: $e');
     }
+    return scaffoldMessenger;
+  }
 
-    try {
-      // 1. Initialize Azure Storage Service
-      await _storageService.initialize();
+  /// Initialize all required services
+  Future<void> _initializeServices() async {
+    // 1. Initialize Azure Storage Service
+    await _storageService.initialize();
 
-      // 2. Set up error handler for audio playback
-      _soundPlayer.onBufferingTimeout = (String observationId) {
-        _log('Audio buffering timeout for observation: $observationId');
-      };
+    // 2. Set up error handler for audio playback
+    _soundPlayer.onBufferingTimeout = (String observationId) {
+      _log('Audio buffering timeout for observation: $observationId');
+    };
 
-      // 3. Initialize the location manager
-      bool locationInitialized = await _locationManager.initialize();
-      if (!locationInitialized) {
-        _log('Warning: Location manager initialization had issues');
-      }
-
-      // 4. Fetch observations
-      _log('Fetching observations from $apiUrl');
-      _observations =
-          await ObservationService(apiUrl: apiUrl).fetchObservations();
-
-      // 5. Filter valid observations (with sound directories)
-      _observations = _observations.where((obs) {
-        if (obs["sound_directory"] == null) {
-          _log('Skipping observation with null sound directory: ${obs["id"]}');
-          return false;
-        }
-        return true;
-      }).toList();
-
-      _log('Loaded ${_observations.length} valid observations');
-
-      _isInitialized = true;
-      notifyListeners();
-    } catch (e) {
-      _log('Error initializing LocationService: $e');
-      if (scaffoldMessenger != null) {
-        scaffoldMessenger.showSnackBar(
-          SnackBar(
-              content: Text(
-                  'Failed to initialize location services. Please check your settings.')),
-        );
-      }
+    // 3. Initialize the location manager
+    bool locationInitialized = await _locationManager.initialize();
+    if (!locationInitialized) {
+      _log('Warning: Location manager initialization had issues');
     }
   }
 
+  /// Fetch and filter observations from API
+  Future<void> _fetchAndFilterObservations(String apiUrl) async {
+    _log('Fetching observations from $apiUrl');
+    _observations =
+        await ObservationService(apiUrl: apiUrl).fetchObservations();
+
+    // Filter valid observations (with sound directories)
+    _observations = _observations.where((obs) {
+      if (obs["sound_directory"] == null) {
+        _log('Skipping observation with null sound directory: ${obs["id"]}');
+        return false;
+      }
+      return true;
+    }).toList();
+
+    _log('Loaded ${_observations.length} valid observations');
+  }
+
+  /// Show initialization error message
+  void _showInitializationError(ScaffoldMessengerState? scaffoldMessenger) {
+    if (scaffoldMessenger != null) {
+      scaffoldMessenger.showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Failed to initialize location services. Please check your settings.'),
+        ),
+      );
+    }
+  }
+
+  /// Check if observation is in the current season
+  bool _isObservationInCurrentSeason(Map<String, dynamic> observation) {
+    // If using "all seasons", accept all observations
+    if (_seasonService.currentSeason == Season.all) {
+      return true;
+    }
+
+    // Check observation date
+    if (observation["observation_date"] == null) {
+      return false;
+    }
+
+    // Parse the date
+    DateTime obsDate;
+    try {
+      if (observation["observation_date"] is String) {
+        obsDate = DateTime.parse(observation["observation_date"]);
+      } else if (observation["observation_date"] is DateTime) {
+        obsDate = observation["observation_date"];
+      } else {
+        return false;
+      }
+    } catch (e) {
+      _log('Error parsing observation date: $e');
+      return false;
+    }
+
+    // Check if date matches current season
+    return _seasonService.isDateInSelectedSeason(obsDate);
+  }
+
+  /// Update active observations based on user position
   void _updateActiveObservations(Position position) {
-    Set<String> observationsInRange = {};
+    final Set<String> observationsInRange = {};
     bool activeObservationsChanged = false;
-    List<Map<String, dynamic>> newObservations = [];
+    final List<Map<String, dynamic>> newObservations = [];
 
     // Calculate which observations are in range
     for (var obs in _observations) {
-      // Skip observations without required fields
-      if (obs["latitude"] == null ||
-          obs["longitude"] == null ||
-          obs["sound_directory"] == null) {
+      // Skip invalid observations
+      if (!_isValidObservation(obs) || !_isObservationInCurrentSeason(obs)) {
         continue;
       }
 
       final String id = '${obs["id"]}';
-      final double distance = _locationManager.calculateDistance(
-          position.latitude,
-          position.longitude, 
-          obs["latitude"], 
-          obs["longitude"]);
+      final double distance = _calculateDistanceToObservation(position, obs);
 
       // Calculate audio settings based on distance
       final double volume = _calculateVolume(distance);
-      final double pan = _calculatePan(position.latitude, position.longitude,
-          obs["latitude"], obs["longitude"]);
+      final double pan = _calculatePan(position, obs);
 
       // Check if in range
-      if (distance <= _maxRange) {
+      if (distance <= _MAX_RANGE) {
         observationsInRange.add(id);
-
-        // Add to active observations if not already active
-        if (!_activeObservations.containsKey(id)) {
-          _log(
-              'Adding observation to active list: ${obs["bird_name"]} (ID: $id)');
-          _activeObservations[id] = Map<String, dynamic>.from(obs);
-          _activeObservations[id]!["pan"] = pan;
-          _activeObservations[id]!["volume"] = volume;
-          activeObservationsChanged = true;
-
-          // Collect new observations to start sounds with delay
-          if (_isAudioEnabled) {
-            newObservations.add(
-                {'observation': obs, 'id': id, 'pan': pan, 'volume': volume});
-          }
-        } else if (_isAudioEnabled) {
-          // Only update sound if significant change
-          final currentPan = _activeObservations[id]!["pan"] ?? 0.0;
-          final currentVolume = _activeObservations[id]!["volume"] ?? 0.5;
-
-          if ((pan - currentPan).abs() > 0.1 ||
-              (volume - currentVolume).abs() > 0.1) {
-            _soundPlayer.updatePanningAndVolume(id, pan, volume);
-
-            // Update stored values
-            _activeObservations[id]!["pan"] = pan;
-            _activeObservations[id]!["volume"] = volume;
-          }
-        }
+        activeObservationsChanged = _processInRangeObservation(
+            id, obs, pan, volume, newObservations, activeObservationsChanged);
       }
     }
 
     // Remove observations that are no longer in range
-    List<String> toRemove = [];
+    activeObservationsChanged = _removeOutOfRangeObservations(
+        observationsInRange, activeObservationsChanged);
+
+    // Start new sounds with randomized delays
+    if (newObservations.isNotEmpty) {
+      _startSoundsWithNaturalDelays(newObservations);
+    }
+
+    if (activeObservationsChanged) {
+      _logActiveObservations();
+      notifyListeners();
+    }
+  }
+
+  /// Check if observation has required fields
+  bool _isValidObservation(Map<String, dynamic> obs) {
+    return obs["latitude"] != null &&
+        obs["longitude"] != null &&
+        obs["sound_directory"] != null;
+  }
+
+  /// Calculate distance from user to observation
+  double _calculateDistanceToObservation(
+      Position position, Map<String, dynamic> obs) {
+    return _locationManager.calculateDistance(position.latitude,
+        position.longitude, obs["latitude"], obs["longitude"]);
+  }
+
+  /// Process an observation that is in range
+  bool _processInRangeObservation(
+      String id,
+      Map<String, dynamic> obs,
+      double pan,
+      double volume,
+      List<Map<String, dynamic>> newObservations,
+      bool activeObservationsChanged) {
+    // Add to active observations if not already active
+    if (!_activeObservations.containsKey(id)) {
+      _log('Adding observation to active list: ${obs["bird_name"]} (ID: $id)');
+      _activeObservations[id] = Map<String, dynamic>.from(obs);
+      _activeObservations[id]!["pan"] = pan;
+      _activeObservations[id]!["volume"] = volume;
+
+      // Collect new observations to start sounds with delay
+      if (_isAudioEnabled) {
+        newObservations
+            .add({'observation': obs, 'id': id, 'pan': pan, 'volume': volume});
+      }
+
+      return true; // Changed
+    } else if (_isAudioEnabled) {
+      // Only update sound if significant change
+      return _updateSoundIfNeeded(id, pan, volume);
+    }
+
+    return activeObservationsChanged;
+  }
+
+  /// Update sound panning and volume if there's a significant change
+  bool _updateSoundIfNeeded(String id, double pan, double volume) {
+    final currentPan = _activeObservations[id]!["pan"] ?? 0.0;
+    final currentVolume = _activeObservations[id]!["volume"] ?? 0.5;
+
+    if ((pan - currentPan).abs() > 0.1 ||
+        (volume - currentVolume).abs() > 0.1) {
+      _soundPlayer.updatePanningAndVolume(id, pan, volume);
+
+      // Update stored values
+      _activeObservations[id]!["pan"] = pan;
+      _activeObservations[id]!["volume"] = volume;
+      return true;
+    }
+
+    return false;
+  }
+
+  /// Remove observations that are no longer in range
+  bool _removeOutOfRangeObservations(
+      Set<String> observationsInRange, bool activeObservationsChanged) {
+    final List<String> toRemove = [];
+
     _activeObservations.forEach((id, obs) {
       if (!observationsInRange.contains(id)) {
         toRemove.add(id);
@@ -215,37 +372,27 @@ class LocationService extends ChangeNotifier {
       activeObservationsChanged = true;
     }
 
-    // Start new sounds with randomized delays
-    if (newObservations.isNotEmpty) {
-      _startSoundsWithNaturalDelays(newObservations);
-    }
+    return activeObservationsChanged;
+  }
 
-    if (activeObservationsChanged) {
-      _log('Active observations updated: ${_activeObservations.length} active');
+  /// Log active observations (in debug mode)
+  void _logActiveObservations() {
+    _log('Active observations updated: ${_activeObservations.length} active');
 
-      // Log active observations only in debug
-      if (_debugMode) {
-        _activeObservations.forEach((id, obs) {
-          _log('Active: ${obs["bird_name"]} (ID: $id)');
-        });
-      }
-
-      notifyListeners();
+    if (_DEBUG_MODE) {
+      _activeObservations.forEach((id, obs) {
+        _log('Active: ${obs["bird_name"]} (ID: $id)');
+      });
     }
   }
 
-  // Start sounds with natural delays
+  /// Start sounds with natural delays
   void _startSoundsWithNaturalDelays(List<Map<String, dynamic>> observations) {
-    // Use a more natural pattern for bird sounds starting
-    // Some birds start quickly, others wait a bit longer
-
     // Shuffle the observations for more randomness
     observations.shuffle();
 
     // Add a base delay to avoid all sounds starting immediately
     int baseDelay = 300 + Random().nextInt(700); // 300-1000ms base delay
-
-    // Start each sound with an incremental delay
     int currentDelay = baseDelay;
 
     for (var obsData in observations) {
@@ -255,21 +402,7 @@ class LocationService extends ChangeNotifier {
 
       // Start this sound after delay
       Future.delayed(Duration(milliseconds: currentDelay), () {
-        // Check if observation is still active before starting
-        if (_activeObservations.containsKey(obsData['id'])) {
-          var obs = obsData['observation'];
-          var pan = obsData['pan'];
-          var volume = obsData['volume'];
-
-          // Start with additional random volume variation
-          // for more natural effect (80-100% of calculated volume)
-          double naturalVolume = volume * (0.8 + Random().nextDouble() * 0.2);
-          _startSound(obs, pan, naturalVolume);
-
-          // Log with delay info
-          _log(
-              '🎵 Started sound for ${obs["bird_name"]} with ${currentDelay}ms delay');
-        }
+        _startDelayedSound(obsData);
       });
 
       // Increase delay for next sound
@@ -277,13 +410,27 @@ class LocationService extends ChangeNotifier {
     }
   }
 
-  double _calculateVolume(double distance) {
-    // Steeper, more dramatic falloff
-    const double minVolume = 0.05; // Lower minimum for more contrast
-    const double maxVolume = 0.9; // Higher maximum for nearby sounds
+  /// Start a sound after a delay
+  void _startDelayedSound(Map<String, dynamic> obsData) {
+    // Check if observation is still active before starting
+    if (_activeObservations.containsKey(obsData['id'])) {
+      var obs = obsData['observation'];
+      var pan = obsData['pan'];
+      var volume = obsData['volume'];
 
+      // Start with additional random volume variation (80-100% of calculated volume)
+      double naturalVolume = volume * (0.8 + Random().nextDouble() * 0.2);
+      _startSound(obs, pan, naturalVolume);
+
+      // Log with delay info
+      _log('🎵 Started sound for ${obs["bird_name"]}');
+    }
+  }
+
+  /// Calculate volume based on distance
+  double _calculateVolume(double distance) {
     // Normalized distance (0-1)
-    final normalizedDistance = (distance / _maxRange).clamp(0.0, 1.0);
+    final normalizedDistance = (distance / _MAX_RANGE).clamp(0.0, 1.0);
 
     // Cubic falloff (steeper than quadratic)
     final falloff =
@@ -291,25 +438,33 @@ class LocationService extends ChangeNotifier {
 
     // Add a "close proximity boost" for very nearby sounds
     double volumeBoost = 0.0;
-    if (distance < 5.0) {
-      // Extra boost when very close (within 5 meters)
-      volumeBoost = 0.1 * (1.0 - (distance / 5.0));
+    if (distance < _CLOSE_PROXIMITY_THRESHOLD) {
+      // Extra boost when very close
+      volumeBoost = _CLOSE_PROXIMITY_BOOST *
+          (1.0 - (distance / _CLOSE_PROXIMITY_THRESHOLD));
     }
 
-    final volume = minVolume + falloff * (maxVolume - minVolume) + volumeBoost;
-
-    return volume.clamp(minVolume, maxVolume);
+    final volume =
+        _MIN_VOLUME + falloff * (_MAX_VOLUME - _MIN_VOLUME) + volumeBoost;
+    return volume.clamp(_MIN_VOLUME, _MAX_VOLUME);
   }
 
+  /// Calculate stereo panning based on position
   double _calculatePan(
-      double userLat, double userLng, double soundLat, double soundLng) {
+      Position userPosition, Map<String, dynamic> observation) {
     // Calculate distance
     double distance = _locationManager.calculateDistance(
-        userLat, userLng, soundLat, soundLng);
+        userPosition.latitude,
+        userPosition.longitude,
+        observation["latitude"],
+        observation["longitude"]);
 
     // Calculate bearing to sound
     double bearing = _locationManager.calculateBearing(
-        userLat, userLng, soundLat, soundLng);
+        userPosition.latitude,
+        userPosition.longitude,
+        observation["latitude"],
+        observation["longitude"]);
 
     // Normalize bearing to -180 to 180
     if (bearing > 180) bearing -= 360;
@@ -319,7 +474,7 @@ class LocationService extends ChangeNotifier {
     double basePan = bearing / 90.0;
 
     // Distance factor (closer = more pronounced panning)
-    double distanceFactor = 1.0 - (distance / _maxRange).clamp(0.0, 0.8);
+    double distanceFactor = 1.0 - (distance / _MAX_RANGE).clamp(0.0, 0.8);
 
     // Apply distance factor to make nearby sounds have stronger panning
     double pan = basePan * (0.7 + (distanceFactor * 0.3));
@@ -328,7 +483,7 @@ class LocationService extends ChangeNotifier {
     return pan.clamp(-1.0, 1.0);
   }
 
-  // Start sound for an observation
+  /// Start sound for an observation
   Future<void> _startSound(
       Map<String, dynamic> observation, double pan, double volume) async {
     final String id = '${observation["id"]}';
@@ -354,40 +509,50 @@ class LocationService extends ChangeNotifier {
     }
   }
 
-  // Toggle location tracking
-  void toggleLocationTracking(bool enabled) async {
+  /// Toggle location tracking
+  Future<void> toggleLocationTracking(bool enabled) async {
     if (_locationManager.isLocationTrackingEnabled == enabled) {
       return;
     }
 
     if (enabled) {
-      // Start background service first and ensure it's fully initialized
-      await _backgroundAudioService.startService();
-      await Future.delayed(Duration(milliseconds: 500)); // Give audio service time to initialize
-
-      // Then start location tracking
-      await _locationManager.setLocationTrackingEnabled(true);
+      await _startLocationTracking();
     } else {
-      // Stop all sounds
-      for (var id in _activeObservations.keys) {
-        _soundPlayer.stopSounds(id);
-      }
-      _activeObservations.clear();
-
-      // First stop location tracking
-      await _locationManager.setLocationTrackingEnabled(false);
-      
-      // Then stop background service
-      await _backgroundAudioService.stopService();
-
-      // Cancel any pending updates
-      _batchUpdateTimer?.cancel();
+      await _stopLocationTracking();
     }
 
     notifyListeners();
   }
 
-  // Toggle audio
+  /// Start location tracking and background audio service
+  Future<void> _startLocationTracking() async {
+    // Start background service first and ensure it's fully initialized
+    await _backgroundAudioService.startService();
+
+    // Give audio service time to initialize
+    await Future.delayed(Duration(milliseconds: 500));
+
+    // Then start location tracking
+    await _locationManager.setLocationTrackingEnabled(true);
+  }
+
+  /// Stop location tracking and background audio service
+  Future<void> _stopLocationTracking() async {
+    // Stop all sounds
+    _stopAllSounds();
+    _activeObservations.clear();
+
+    // First stop location tracking
+    await _locationManager.setLocationTrackingEnabled(false);
+
+    // Then stop background service
+    await _backgroundAudioService.stopService();
+
+    // Cancel any pending updates
+    _batchUpdateTimer?.cancel();
+  }
+
+  /// Toggle audio playback
   void toggleAudio(bool enabled) {
     if (_isAudioEnabled == enabled) {
       return;
@@ -396,44 +561,46 @@ class LocationService extends ChangeNotifier {
     _isAudioEnabled = enabled;
 
     if (!enabled) {
-      // Stop all active sounds
-      for (var id in _activeObservations.keys) {
-        _soundPlayer.stopSounds(id);
-      }
+      _stopAllSounds();
     } else if (_locationManager.currentPosition != null) {
-      // Re-add sound for active observations (with throttling)
-      int delay = 0;
-      for (var obs in _activeObservations.values) {
-        final String id = '${obs["id"]}';
-        final double distance = _locationManager.calculateDistance(
-            _locationManager.currentPosition!.latitude,
-            _locationManager.currentPosition!.longitude,
-            obs["latitude"],
-            obs["longitude"]);
-
-        final double volume = _calculateVolume(distance);
-        final double pan = _calculatePan(
-            _locationManager.currentPosition!.latitude,
-            _locationManager.currentPosition!.longitude, 
-            obs["latitude"], 
-            obs["longitude"]);
-
-        // Stagger sound starts to avoid audio overload
-        delay += 500; // Increased from 300ms
-        Future.delayed(Duration(milliseconds: delay), () {
-          if (_isAudioEnabled && _activeObservations.containsKey(id)) {
-            _startSound(obs, pan, volume);
-          }
-        });
-      }
+      _restartSoundsWithDelays();
     }
 
     notifyListeners();
   }
 
+  /// Restart sounds with staggered delays
+  void _restartSoundsWithDelays() {
+    int delay = 0;
+
+    for (var obs in _activeObservations.values) {
+      final String id = '${obs["id"]}';
+
+      final Position position = _locationManager.currentPosition!;
+
+      final double distance = _locationManager.calculateDistance(
+          position.latitude,
+          position.longitude,
+          obs["latitude"],
+          obs["longitude"]);
+
+      final double volume = _calculateVolume(distance);
+      final double pan = _calculatePan(position, obs);
+
+      // Stagger sound starts to avoid audio overload
+      delay += 500; // Increased from 300ms
+      Future.delayed(Duration(milliseconds: delay), () {
+        if (_isAudioEnabled && _activeObservations.containsKey(id)) {
+          _startSound(obs, pan, volume);
+        }
+      });
+    }
+  }
+
   @override
   void dispose() {
     _batchUpdateTimer?.cancel();
+    _seasonService.removeListener(_onSeasonChanged);
     _locationManager.dispose();
     _soundPlayer.dispose();
     _activeObservations.clear();
