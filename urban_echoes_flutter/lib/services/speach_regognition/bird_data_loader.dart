@@ -23,7 +23,7 @@ class BirdDataLoader {
     try {
       // Try to load from assets first (production approach)
       try {
-        String data = await rootBundle.loadString('assets/danish_bird_names.txt');
+        String data = await rootBundle.loadString('assets/all_danish_bird_names.txt');
         _loadFromString(data);
       } catch (e) {
         debugPrint('Could not load bird names from assets: $e');
