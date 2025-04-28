@@ -15,9 +15,9 @@ class NavBarsPage extends StatelessWidget {
       // Body now uses IndexedStack to maintain state across tab switches
       body: IndexedStack(
         index: navigationProvider.currentIndex,
-        children: const [
+        children: [
           BirdHomePage(),
-          MapPage(),
+          const MapPage(),
         ],
       ),
       

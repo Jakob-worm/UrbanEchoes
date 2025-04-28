@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:urban_echoes/pages/bird_regcognition_test_page.dart';
 import 'package:urban_echoes/pages/nav_bars_page.dart';
 import 'package:urban_echoes/pages/intro_screen.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +9,9 @@ import 'package:urban_echoes/services/location_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:urban_echoes/services/season_service.dart';
 import 'package:urban_echoes/services/speach_regognition/bird_regognition_service.dart';
+import 'package:urban_echoes/services/speach_regognition/speech_recognition_service.dart';
+import 'package:urban_echoes/services/speach_regognition/word_recognition.dart';
+import 'package:urban_echoes/services/speach_regognition/speech_coordinator.dart';
 import 'package:urban_echoes/state%20manegers/map_state_manager.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 import 'package:urban_echoes/utils/navigation_provider.dart';
@@ -105,7 +107,46 @@ class MyApp extends StatelessWidget {
           create: (context) => MapStateManager(),
         ),
         ChangeNotifierProvider<NavigationProvider>(
-        create: (context) => NavigationProvider(),
+          create: (context) => NavigationProvider(),
+        ),
+
+        // Base speech recognition service
+        ChangeNotifierProvider<SpeechRecognitionService>(
+          create: (_) => SpeechRecognitionService(debugMode: debugMode),
+          lazy: true,
+        ),
+
+        // Bird recognition service (bird-specific processing)
+        ChangeNotifierProvider<BirdRecognitionService>(
+          create: (_) => BirdRecognitionService(debugMode: debugMode),
+          lazy: true,
+        ),
+
+        // Word recognition service (special words)
+        ChangeNotifierProvider<WordRecognitionService>(
+          create: (_) => WordRecognitionService(debugMode: debugMode),
+          lazy: true,
+        ),
+
+        // Speech coordinator that manages the above services
+        ChangeNotifierProxyProvider3<
+            SpeechRecognitionService,
+            BirdRecognitionService,
+            WordRecognitionService,
+            SpeechCoordinator>(
+          create: (context) => SpeechCoordinator(
+            speechService: Provider.of<SpeechRecognitionService>(context, listen: false),
+            birdService: Provider.of<BirdRecognitionService>(context, listen: false),
+            wordService: Provider.of<WordRecognitionService>(context, listen: false),
+            debugMode: debugMode,
+          ),
+          update: (context, speechService, birdService, wordService, previous) => 
+            SpeechCoordinator(
+              speechService: speechService,
+              birdService: birdService,
+              wordService: wordService,
+              debugMode: debugMode,
+            ),
         ),
 
         // Services
@@ -117,14 +158,6 @@ class MyApp extends StatelessWidget {
         ),
         Provider<AppStartupService>(
           create: (_) => AppStartupService(),
-        ),
-        
-        // Add Bird Recognition Service (lazy initialization)
-        ChangeNotifierProvider<BirdRecognitionService>(
-          // Pass debugMode to the service for detailed logging in test mode
-          create: (_) => BirdRecognitionService(debugMode: debugMode),
-          // Lazy: true ensures it's only created when first accessed
-          lazy: true,
         ),
 
         // Pre-created instances
@@ -287,10 +320,6 @@ class InitialScreenState extends State<InitialScreen>
     // Get debug mode from Provider
     final bool debugMode = Provider.of<bool>(context);
     
-    // Show test page if in test mode
-    if (_showBirdRecognitionTest) {
-      return BirdRecognitionTestPage();
-    }
     
     // Show error state if initialization failed
     if (_initializationError) {
