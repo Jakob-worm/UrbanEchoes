@@ -87,7 +87,9 @@ flutter:
     - assets/audio/Test/XC521615 - Blåmejse - Cyanistes caeruleus.mp3
     - assets/audio/seilent.mp3
     - .env
-    - assets/danish_bird_names.txt
+    - assets/common_danish_bird_names.txt
+    - assets/all_danish_bird_names.txt
+    - assets/all_scientific_bird_names.txt
     
   uses-material-design: true
 

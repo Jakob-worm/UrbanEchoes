@@ -1,0 +1,506 @@
+Urfugl
+Agerhøne
+Vagtel
+Fasan
+Knortegås
+Rødhalset Gås
+Canadagås
+Bramgås
+Indisk Gås
+Dværgsnegås
+Grågås
+Tajgasædgås
+Kortnæbbet Gås
+Tundrasædgås
+Blisgås
+Dværggås
+Sortsvane
+Knopsvane
+Pibesvane
+Sangsvane
+Nilgås
+Gravand
+Rustand
+Mandarinand
+Sibirisk Krikand
+Atlingand
+Blåvinget And
+Skeand
+Knarand
+Pibeand
+Amerikansk Pibeand
+Gråand
+Sortbrun And
+Spidsand
+Krikand
+Amerikansk Krikand
+Rødhovedet And
+Taffeland
+Hvidøjet And
+Halsbåndstroldand
+Troldand
+Bjergand
+Lille Bjergand
+Stellersand
+Kongeederfugl
+Ederfugl
+Brilleand
+Fløjlsand
+Amerikansk Fløjlsand
+Sibirisk Fløjlsand
+Sortand
+Amerikansk Sortand
+Havlit
+Hvinand
+Lille Skallesluger
+Stor Skallesluger
+Toppet Skallesluger
+Amerikansk Skarveand
+Hvidhovedet And
+Natravn
+Ørkennatravn
+Tornhalesejler
+Alpesejler
+Mursejler
+Gråsejler
+Orientsejler
+Lille Sejler
+Kaffersejler
+Stortrappe
+Østlig Kravetrappe
+Dværgtrappe
+Skadegøg
+Gulnæbbet Gøg
+Sortnæbbet Gøg
+Gøg
+Steppehøne
+Klippedue
+Huldue
+Ringdue
+Turteldue
+Østlig Turteldue
+Tyrkerdue
+Sørgedue
+Vandrikse
+Engsnarre
+Lille Rørvagtel
+Dværgrørvagtel
+Plettet Rørvagtel
+Lille Sultanhøne
+Grønbenet Rørhøne
+Blishøne
+Prærietrane
+Jomfrutrane
+Trane
+Lille Lappedykker
+Gråstrubet Lappedykker
+Toppet Lappedykker
+Nordisk Lappedykker
+Sorthalset Lappedykker
+Triel
+Strandskade
+Stylteløber
+Klyde
+Vibe
+Steppevibe
+Sumpvibe
+Hjejle
+Sibirisk Hjejle
+Amerikansk Hjejle
+Strandhjejle
+Stor Præstekrave
+Lille Præstekrave
+Hvidbrystet Præstekrave
+Sibirisk Præstekrave
+Tibetansk Præstekrave
+Ørkenpræstekrave
+Kaspisk Præstekrave
+Pomeransfugl
+Bartramsklire
+Småspove
+Storspove
+Lille Kobbersneppe
+Stor Kobbersneppe
+Canadisk Kobbersneppe
+Stenvender
+Islandsk Ryle
+Brushane
+Kærløber
+Spidshalet Ryle
+Klireryle
+Krumnæbbet Ryle
+Temmincksryle
+Rødhalset Ryle
+Sandløber
+Almindelig Ryle
+Sortgrå Ryle
+Bairdsryle
+Dværgryle
+Hvidrygget Ryle
+Prærieløber
+Stribet Ryle
+Tyknæbbet Dværgryle
+Langnæbbet Sneppeklire
+Skovsneppe
+Enkeltbekkasin
+Tredækker
+Dobbeltbekkasin
+Terekklire
+Amerikansk Svømmesneppe
+Odinshane
+Thorshane
+Mudderklire
+Plettet Mudderklire
+Svaleklire
+Lille Gulben
+Rødben
+Damklire
+Tinksmed
+Sortklire
+Hvidklire
+Stor Gulben
+Ørkenløber
+Rødvinget Braksvale
+Orientbraksvale
+Sortvinget Braksvale
+Ride
+Ismåge
+Sabinemåge
+Tyndnæbbet Måge
+Bonapartemåge
+Hættemåge
+Dværgmåge
+Rosenmåge
+Lattermåge
+Præriemåge
+Audouinsmåge
+Sorthovedet Måge
+Stor Sorthovedet Måge
+Stormmåge
+Ringnæbbet Måge
+Svartbag
+Gråvinget Måge
+Gråmåge
+Hvidvinget Måge
+Sølvmåge
+Kaspisk Måge
+Middelhavssølvmåge
+Armensk Måge
+Sildemåge
+Sandterne
+Rovterne
+Splitterne
+Aztekerterne
+Dværgterne
+Brilleterne
+Rosenterne
+Fjordterne
+Havterne
+Hvidskægget Terne
+Hvidvinget Terne
+Sortterne
+Storkjove
+Mellemkjove
+Almindelig Kjove
+Lille Kjove
+Søkonge
+Polarlomvie
+Lomvie
+Alk
+Tejst
+Lunde
+Rødstrubet Lom
+Sortstrubet Lom
+Stillehavslom
+Islom
+Hvidnæbbet Lom
+Wilsons Stormsvale
+Sortbrynet Albatros
+Lille Stormsvale
+Stor Stormsvale
+Mallemuk
+Scopolis Skråpe
+Atlantisk Skråpe
+Sodfarvet Skråpe
+Storskråpe
+Almindelig Skråpe
+Balearskråpe
+Tropeskråpe
+Sort Stork
+Hvid Stork
+Pragtfregatfugl
+Sule
+Brun Sule
+Dværgskarv
+Topskarv
+Skarv
+Sort Ibis
+Skestork
+Rørdrum
+Amerikansk Rørdrum
+Dværghejre
+Nathejre
+Tophejre
+Kohejre
+Fiskehejre
+Purpurhejre
+Sølvhejre
+Silkehejre
+Krøltoppet Pelikan
+Fiskeørn
+Blå Glente
+Ådselgrib
+Hvepsevåge
+Gåsegrib
+Slangeørn
+Lille Skrigeørn
+Stor Skrigeørn
+Dværgørn
+Steppeørn
+Kejserørn
+Kongeørn
+Høgeørn
+Spurvehøg
+Duehøg
+Rørhøg
+Blå Kærhøg
+Amerikansk Kærhøg
+Steppehøg
+Hedehøg
+Rød Glente
+Sort Glente
+Havørn
+Fjeldvåge
+Ørnevåge
+Musvåge
+Slørugle
+Dværghornugle
+Sneugle
+Stor Hornugle
+Natugle
+Høgeugle
+Spurveugle
+Kirkeugle
+Perleugle
+Skovhornugle
+Mosehornugle
+Hærfugl
+Ellekrage
+Isfugl
+Grøn Biæder
+Biæder
+Vendehals
+Tretået Spætte
+Mellemflagspætte
+Lille Flagspætte
+Stor Flagspætte
+Guldspætte
+Sortspætte
+Grønspætte
+Lille Tårnfalk
+Tårnfalk
+Amerikansk Tårnfalk
+Aftenfalk
+Eleonorafalk
+Dværgfalk
+Lærkefalk
+Slagfalk
+Jagtfalk
+Vandrefalk
+Brun Tornskade
+Rødrygget Tornskade
+Turkestantornskade
+Langhalet Tornskade
+Rosenbrystet Tornskade
+Stor Tornskade
+Rødhovedet Tornskade
+Rødøjet Vireo
+Pirol
+Skovskade
+Husskade
+Nøddekrige
+Allike
+Sibirisk Allike
+Råge
+Sortkrage
+Gråkrage
+Ravn
+Silkehale
+Sortmejse
+Topmejse
+Sumpmejse
+Fyrremejse
+Blåmejse
+Musvit
+Pungmejse
+Skægmejse
+Hedelærke
+Sanglærke
+Toplærke
+Bjerglærke
+Korttået Lærke
+Østlig Kalanderlærke
+Digesvale
+Landsvale
+Klippesvale
+Bysvale
+Rødbrystet Svale
+Rødrygget Svale
+Amursvale
+Halemejse
+Skovsanger
+Bjergløvsanger
+Himalayasanger
+Hvidbrynet Løvsanger
+Fuglekongesanger
+Schwarz' Løvsanger
+Sinkiangløvsanger
+Brun Løvsanger
+Løvsanger
+Gransanger
+Iberisk Gransanger
+Grøn Sanger
+Østlig Lundsanger
+Lundsanger
+Nordsanger
+Drosselrørsanger
+Vandsanger
+Sivsanger
+Lille Rørsanger
+Buskrørsanger
+Rørsanger
+Kærsanger
+Lille Gulbug
+Bleg Gulbug
+Spottesanger
+Gulbug
+Stor Græshoppesanger
+Stribet Græshoppesanger
+Græshoppesanger
+Flodsanger
+Savisanger
+Cistussanger
+Munk
+Havesanger
+Høgesanger
+Gærdesanger
+Asiatisk Ørkensanger
+Tornsanger
+Sardinsk Sanger
+Rødstrubet Sanger
+Iberisk Sanger
+Makisanger
+Sorthovedet Sanger
+Sortstrubet Sanger
+Rødtoppet Fuglekonge
+Fuglekonge
+Gærdesmutte
+Spætmejse
+Træløber
+Korttået Træløber
+Rosenstær
+Stær
+Ensfarvet Stær
+Gulddrossel
+Olivenskovdrossel
+Eremitdrossel
+Ringdrossel
+Solsort
+Gråstrubet Drossel
+Sortstrubet Drossel
+Brundrossel
+Sjagger
+Vindrossel
+Sangdrossel
+Misteldrossel
+Vandredrossel
+Grå Fluesnapper
+Brun Fluesnapper
+Rødhals
+Dværgnattergal
+Blåhals
+Nattergal
+Sydlig Nattergal
+Rubinnattergal
+Blåstjert
+Broget Fluesnapper
+Hvidhalset Fluesnapper
+Lille Fluesnapper
+Tajgafluesnapper
+Husrødstjert
+Rødstjert
+Stendrossel
+Bynkefugl
+Sortstrubet Bynkefugl
+Sibirisk Bynkefugl
+Stejnegers Bynkefugl
+Stenpikker
+Isabellastenpikker
+Ørkenstenpikker
+Vestlig Middelhavsstenpikker
+Østlig Middelhavsstenpikker
+Nonnestenpikker
+Hvidkronet Stenpikker
+Vandstær
+Gråspurv
+Spansk Spurv
+Skovspurv
+Snefinke
+Alpejernspurv
+Sibirisk Jernspurv
+Sortstrubet Jernspurv
+Jernspurv
+Gul Vipstjert
+Østlig Gul Vipstjert
+Citronvipstjert
+Bjergvipstjert
+Hvid Vipstjert
+Storpiber
+Mongolsk Piber
+Markpiber
+Engpiber
+Skovpiber
+Tajgapiber
+Rødstrubet Piber
+Bjergpiber
+Skærpiber
+Bogfinke
+Kvækerfinke
+Kernebider
+Krognæb
+Dompap
+Ørkendompap
+Karmindompap
+Grønirisk
+Bjergirisk
+Tornirisk
+Gråsisken
+Stor Korsnæb
+Lille Korsnæb
+Hvidvinget Korsnæb
+Stillits
+Gulirisk
+Grønsisken
+Lapværling
+Snespurv
+Bomlærke
+Gulspurv
+Hvidkindet Værling
+Klippeværling
+Bjerghortulan
+Gulgrå Værling
+Hortulan
+Gærdeværling
+Dværgværling
+Gulbrynet Værling
+Pileværling
+Gulbrystet Værling
+Hætteværling
+Brunhovedet Værling
+Rørspurv
+Hvidkronet Spurv
+Hvidstrubet Spurv
+Mørkøjet Junco
+Gul Sanger
+Stribet Sanger
+Rosenbrystet Kernebider
