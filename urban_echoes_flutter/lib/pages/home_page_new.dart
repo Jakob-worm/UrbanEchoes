@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:urban_echoes/services/speach_regognition/speech_coordinator.dart';
 
 class BirdHomePage extends StatefulWidget {
+  const BirdHomePage({super.key});
+
   @override
   _BirdHomePageState createState() => _BirdHomePageState();
 }
@@ -60,8 +62,8 @@ class _BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSt
             children: [
               // Status bar
               Container(
-                color: coordinator.isListening 
-                    ? Colors.red.withOpacity(0.8) 
+                color: coordinator.isListening
+                    ? Colors.red.withAlpha((0.8 * 255).toInt())
                     : Colors.transparent,
                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
                 child: Row(
@@ -298,7 +300,7 @@ class _BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSt
               ),
               // Button label
               Text(
-                coordinator.isListening ? 'Stop lytning' : 'Start lytning',
+                coordinator.isListening ? 'Stop observation' : 'Start observation',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 18,

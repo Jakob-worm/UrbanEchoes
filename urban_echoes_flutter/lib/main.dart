@@ -193,8 +193,6 @@ class InitialScreenState extends State<InitialScreen>
   bool _initializationError = false;
   bool _isFirstTime = true;
   bool _isInitializing = true;
-  // Add flag for bird recognition test mode
-  bool _showBirdRecognitionTest = false;
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -384,9 +382,6 @@ class InitialScreenState extends State<InitialScreen>
       // Add a debug FAB only in debug mode
       floatingActionButton: debugMode ? FloatingActionButton(
         onPressed: () {
-          setState(() {
-            _showBirdRecognitionTest = true;
-          });
         },
         backgroundColor: Colors.purple,
         mini: true,
