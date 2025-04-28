@@ -154,7 +154,7 @@ class LocationService extends ChangeNotifier {
 
     return debugMode
         ? 'http://10.0.2.2:8000/observations'
-        : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
+        : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net';
   }
 
   /// Get scaffold messenger for showing error messages

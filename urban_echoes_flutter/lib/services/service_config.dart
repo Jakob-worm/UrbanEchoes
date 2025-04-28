@@ -35,10 +35,11 @@ class ServiceConfig {
   // Debug settings to Default to Flutter's debug mode write debugMode = kDebugMode; //
   bool debugMode = false;
 
-  // API URLs
+  // Fixed API URLs - remove the /observations suffix
   String getApiUrl(bool debugMode) {
+    // IMPORTANT: Removed the /observations suffix from the base URLs
     return debugMode
-      ? 'http://10.0.2.2:8000/observations'
-      : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net/observations';
+      ? 'http://10.0.2.2:8000'
+      : 'https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsites.net';
   }
 }

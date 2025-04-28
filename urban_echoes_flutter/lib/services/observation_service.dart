@@ -5,65 +5,94 @@ import 'package:http/http.dart' as http;
 class ObservationService {
   final String apiUrl;
   
-  // Track the last fetch time
-  DateTime _lastFetchTime = DateTime(2000); // Start with old date to fetch everything first time
+  // Store observations we've already seen (by ID)
+  final Set<int> _knownObservationIds = {};
   
   ObservationService({required this.apiUrl});
   
-  /// Process observation data (convert strings to numbers)
+  /// Process observation data (handle type conversions safely)
   Map<String, dynamic> _processObservation(Map<String, dynamic> observation) {
     final Map<String, dynamic> processed = {...observation};
     
-    // Handle latitude and longitude
-    if (processed.containsKey('latitude') && processed['latitude'] is String) {
-      try {
-        processed['latitude'] = double.parse(processed['latitude']);
-      } catch (e) {
-        debugPrint("Error parsing latitude: ${processed['latitude']}");
-      }
-    }
-    
-    if (processed.containsKey('longitude') && processed['longitude'] is String) {
-      try {
-        processed['longitude'] = double.parse(processed['longitude']);
-      } catch (e) {
-        debugPrint("Error parsing longitude: ${processed['longitude']}");
-      }
-    }
-    
-    // Process other numeric fields
-    ['quantity', 'id'].forEach((field) {
-      if (processed.containsKey(field) && processed[field] is String) {
+    // Safely convert to double
+    void safeConvertToDouble(String key) {
+      if (processed.containsKey(key)) {
         try {
-          processed[field] = double.parse(processed[field]);
+          if (processed[key] is String) {
+            processed[key] = double.parse(processed[key]);
+          }
         } catch (e) {
-          debugPrint("Error parsing $field: ${processed[field]}");
+          debugPrint("Error parsing $key: ${processed[key]} - ${e.toString()}");
         }
       }
-    });
+    }
+    
+    // Safely convert to int
+    void safeConvertToInt(String key) {
+      if (processed.containsKey(key)) {
+        try {
+          if (processed[key] is String) {
+            processed[key] = int.parse(processed[key]);
+          } else if (processed[key] is double) {
+            processed[key] = processed[key].toInt();
+          }
+        } catch (e) {
+          debugPrint("Error parsing $key to int: ${processed[key]} - ${e.toString()}");
+        }
+      }
+    }
+    
+    // Convert location coordinates to double
+    safeConvertToDouble('latitude');
+    safeConvertToDouble('longitude');
+    
+    // Convert id and quantity to int
+    safeConvertToInt('id');
+    safeConvertToInt('quantity');
+    safeConvertToInt('observer_id');
     
     return processed;
   }
 
-  /// Fetch all observations (used on initial load)
+  /// Construct proper endpoint URL
+  String _getEndpointUrl(String endpoint) {
+    // Handle trailing slashes in base URL
+    final baseUrl = apiUrl.endsWith('/') ? apiUrl.substring(0, apiUrl.length - 1) : apiUrl;
+    
+    // Handle leading slashes in endpoint
+    final cleanEndpoint = endpoint.startsWith('/') ? endpoint.substring(1) : endpoint;
+    
+    return '$baseUrl/$cleanEndpoint';
+  }
+
+  /// Fetch all observations
   Future<List<Map<String, dynamic>>> fetchObservations() async {
     try {
-      debugPrint('Fetching all observations from $apiUrl/observations');
-      final response = await http.get(Uri.parse('$apiUrl/observations'));
+      // Construct the proper URL with the observations endpoint
+      final url = _getEndpointUrl('observations');
+      debugPrint('Fetching all observations from $url');
+      
+      final response = await http.get(Uri.parse(url));
       
       if (response.statusCode == 200) {
-        // Update last fetch time 
-        _lastFetchTime = DateTime.now();
-        
         final decodedBody = utf8.decode(response.bodyBytes);
         final data = json.decode(decodedBody);
         
-        List<dynamic> rawObservations = data["observations"];
+        List<dynamic> rawObservations = data["observations"] ?? [];
         debugPrint('Received ${rawObservations.length} observations');
         
-        return rawObservations.map((obs) => 
+        final processedObservations = rawObservations.map((obs) => 
           _processObservation(Map<String, dynamic>.from(obs))
         ).toList();
+        
+        // Update our known observation IDs
+        for (var obs in processedObservations) {
+          if (obs.containsKey('id') && obs['id'] is int) {
+            _knownObservationIds.add(obs['id']);
+          }
+        }
+        
+        return processedObservations;
       } else {
         throw Exception("Failed to load observations (Status ${response.statusCode})");
       }
@@ -73,33 +102,29 @@ class ObservationService {
     }
   }
   
-  /// Fetch only new observations since last fetch
+  /// Fetch only new observations (by comparing with previously seen IDs)
   Future<List<Map<String, dynamic>>> fetchNewObservations() async {
     try {
-      // Format timestamp for API query (ISO format)
-      final timestamp = _lastFetchTime.toIso8601String();
-      debugPrint('Fetching observations added after $timestamp');
+      // Until your API supports after_timestamp, we'll fetch all and filter
+      final allObservations = await fetchObservations();
       
-      final response = await http.get(
-        Uri.parse('$apiUrl/observations?after_timestamp=$timestamp')
-      );
+      // Filter out observations we've already seen
+      final newObservations = allObservations.where((obs) {
+        if (!obs.containsKey('id') || obs['id'] is! int) return false;
+        
+        // Check if this is a new observation
+        final isNew = !_knownObservationIds.contains(obs['id']);
+        
+        // Add to known IDs
+        if (isNew) {
+          _knownObservationIds.add(obs['id']);
+        }
+        
+        return isNew;
+      }).toList();
       
-      if (response.statusCode == 200) {
-        // Update last fetch time
-        _lastFetchTime = DateTime.now();
-        
-        final decodedBody = utf8.decode(response.bodyBytes);
-        final data = json.decode(decodedBody);
-        
-        List<dynamic> rawObservations = data["observations"];
-        debugPrint('Received ${rawObservations.length} new observations');
-        
-        return rawObservations.map((obs) => 
-          _processObservation(Map<String, dynamic>.from(obs))
-        ).toList();
-      } else {
-        throw Exception("Failed to fetch new observations (Status ${response.statusCode})");
-      }
+      debugPrint('Found ${newObservations.length} new observations out of ${allObservations.length} total');
+      return newObservations;
     } catch (e) {
       debugPrint("Error fetching new observations: $e");
       return [];
