@@ -123,8 +123,11 @@ class MakeObservationPageState extends State<MakeObservationPage> {
       orElse: () => Bird(commonName: searchValue, scientificName: ''),
     );
 
+    debugPrint('Submitting observation: $searchValue, ${selectedBird.scientificName}, $_selectedNumber');
+    
+    // Pass the context to the controller to allow it to set the refresh flag
     final success = await _controller.submitObservation(
-        searchValue, selectedBird.scientificName, _selectedNumber!);
+        searchValue, selectedBird.scientificName, _selectedNumber!, context: context);
 
     // Check if the widget is still mounted after the async operation
     if (!mounted) return;
@@ -136,16 +139,26 @@ class MakeObservationPageState extends State<MakeObservationPage> {
     if (success) {
       _showSuccessSnackbar('Observation recorded successfully!');
 
-      // Use the previously stored pageStateManager reference
-      pageStateManager.setNeedsMapRefresh(true);  // Set the refresh flag
-      pageStateManager.setNavRailPage(
-          NavRailPageType.values[1]); // Assuming Map is index 1
+      // Double-check that the flag is set (in case the controller couldn't set it)
+      pageStateManager.setNeedsMapRefresh(true);
+      
+      debugPrint('Navigation to map page will happen after short delay');
+      
+      // Add a small delay to ensure the flag is processed
+      await Future.delayed(const Duration(milliseconds: 200));
+      
+      // Navigate to the map page
+      pageStateManager.setNavRailPage(NavRailPageType.values[1]); // Assuming Map is index 1
+      
+      debugPrint('Navigated to map page');
     } else {
       _showErrorSnackbar('Failed to record observation');
     }
   } catch (e) {
     // Check if the widget is still mounted after the async operation
     if (!mounted) return;
+    
+    debugPrint('Error in handleSubmit: $e');
     
     setState(() {
       _state = ObservationState.error;

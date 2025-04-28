@@ -33,8 +33,7 @@ class DirectionalLocationMarker extends StatelessWidget {
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            color: Colors.blue.withAlpha(
-                76), // Changed from withOpacity(0.3) to withAlpha(76)
+            color: Colors.blue.withAlpha(76), // Changed from withOpacity(0.3) to withAlpha(76)
             shape: BoxShape.circle,
           ),
         ),
@@ -103,17 +102,124 @@ class MapPageState extends State<MapPage> with WidgetsBindingObserver {
   Timer? _positionUpdateTimer;
 
   Future<void> refreshObservations() async {
-    if (!mounted) return;
+  if (!mounted) return;
 
-    debugPrint('Refreshing observations after new submission');
+  debugPrint('Refreshing observations after new submission');
 
-    // Clear existing data to avoid duplicates
-    _observations.clear();
-    _circles.clear();
-
-    // Reload all observations
-    await _loadObservations();
+  // Get debug mode
+  bool debugMode = false;
+  try {
+    debugMode = Provider.of<bool>(context, listen: false);
+  } catch (e) {
+    debugPrint('Error accessing debug mode: $e');
   }
+
+  // Get API URL with current debug mode
+  final String apiUrl = _config.getApiUrl(debugMode);
+  
+  try {
+    // Create a service instance with the current API URL
+    final observationService = ObservationService(apiUrl: apiUrl);
+    
+    // Fetch only new observations since last fetch
+    final newObservations = await observationService.fetchNewObservations();
+    
+    if (!mounted) return;
+    
+    if (newObservations.isNotEmpty) {
+      debugPrint('Found ${newObservations.length} new observation(s)');
+      
+      // Process and add the new observations to the map
+      _addNewObservationsToMap(newObservations);
+      
+      // Show success message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Added ${newObservations.length} new observation(s)'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } else {
+      debugPrint('No new observations found');
+      // Show feedback that we're up to date
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Map is up to date'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  } catch (e) {
+    debugPrint('Error refreshing observations: $e');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error refreshing observations: ${e.toString()}'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+}
+
+// Helper method to add new observations to the map
+void _addNewObservationsToMap(List<Map<String, dynamic>> newObservations) {
+  if (newObservations.isEmpty) return;
+  
+  // Filter by current season
+  final filteredObservations = _filterObservationsBySeason(newObservations);
+  
+  // Lists to store new data
+  List<Map<String, dynamic>> observationsToAdd = [];
+  List<CircleMarker> circlesToAdd = [];
+
+  for (var obs in filteredObservations) {
+    // Skip if missing coordinates
+    if (obs["latitude"] == null || obs["longitude"] == null) continue;
+    
+    // Skip if already in our list (using ID for comparison)
+    if (_observations.any((existingObs) => existingObs["id"] == obs["id"])) continue;
+    
+    // Add to observations list
+    observationsToAdd.add({
+      "id": obs["id"],
+      "bird_name": obs["bird_name"],
+      "scientific_name": obs["scientific_name"],
+      "sound_directory": obs["sound_directory"],
+      "latitude": obs["latitude"],
+      "longitude": obs["longitude"],
+      "observation_date": obs["observation_date"],
+      "observation_time": obs["observation_time"],
+      "observer_id": obs["observer_id"],
+      "is_test_data": obs["is_test_data"],
+    });
+    
+    // Add circle for the map
+    circlesToAdd.add(CircleMarker(
+      point: LatLng(obs["latitude"], obs["longitude"]),
+      radius: _config.maxRange,
+      useRadiusInMeter: true,
+      color: getObservationColor(obs).withAlpha(76),
+      borderColor: getObservationColor(obs).withAlpha(178),
+      borderStrokeWidth: 2,
+    ));
+  }
+  
+  // Update the UI if we have new data
+  if (observationsToAdd.isNotEmpty && mounted) {
+    setState(() {
+      _observations.addAll(observationsToAdd);
+      _circles.addAll(circlesToAdd);
+    });
+  }
+}
 
   // Add this method to filter observations by the current season:
   List<Map<String, dynamic>> _filterObservationsBySeason(
