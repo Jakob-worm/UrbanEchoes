@@ -26,8 +26,8 @@ class LocationService extends ChangeNotifier {
   static final bool debugMode = ServiceConfig().debugMode; // Enable debug logging
 
   // Audio settings
-  static const double _MIN_VOLUME = 0.05;
-  static const double _MAX_VOLUME = 0.9;
+  static final double minVolume = ServiceConfig().minVolume; // Minimum volume for distant sounds
+  static final double maxVolume = ServiceConfig().maxVolume; // Maximum volume for nearby sounds
   static const double _CLOSE_PROXIMITY_THRESHOLD = 5.0; // Meters
   static const double _CLOSE_PROXIMITY_BOOST = 0.1;
 
@@ -444,8 +444,8 @@ class LocationService extends ChangeNotifier {
     }
 
     final volume =
-        _MIN_VOLUME + falloff * (_MAX_VOLUME - _MIN_VOLUME) + volumeBoost;
-    return volume.clamp(_MIN_VOLUME, _MAX_VOLUME);
+        minVolume + falloff * (maxVolume - minVolume) + volumeBoost;
+    return volume.clamp(minVolume, maxVolume);
   }
 
   /// Calculate stereo panning based on position
