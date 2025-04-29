@@ -1,25 +1,30 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-
-import '../state manegers/page_state_maneger.dart';
+import 'package:urban_echoes/pages/home_page_new.dart';
+import 'package:urban_echoes/utils/navigation_provider.dart';
+import '../pages/map_page.dart';
 
 class NavBarsPage extends StatelessWidget {
   const NavBarsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final pageStateManager = Provider.of<PageStateManager>(context);
+    final navigationProvider = Provider.of<NavigationProvider>(context);
     
     return Scaffold(
-      // Main content area - full screen without side rail
-      body: pageStateManager.getCurrentPage(context),
+      // Body now uses IndexedStack to maintain state across tab switches
+      body: IndexedStack(
+        index: navigationProvider.currentIndex,
+        children: [
+          BirdHomePage(),
+          const MapPage(),
+        ],
+      ),
       
       // Bottom navigation bar
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: pageStateManager.selectedNavRailPage.index,
-        onTap: (index) {
-          pageStateManager.setNavRailPage(NavRailPageType.values[index]);
-        },
+        currentIndex: navigationProvider.currentIndex,
+        onTap: (index) => navigationProvider.setIndex(index),
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home_outlined),
@@ -31,7 +36,6 @@ class NavBarsPage extends StatelessWidget {
             activeIcon: Icon(Icons.map),
             label: 'Map',
           ),
-          // Add more items as needed
         ],
       ),
     );

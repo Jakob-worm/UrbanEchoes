@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:urban_echoes/pages/home_page.dart';
+import 'package:urban_echoes/pages/home_page_new.dart';
 import 'package:urban_echoes/pages/make_observation/make_observation_page.dart';
 import 'package:urban_echoes/pages/map_page.dart';
 
@@ -34,7 +34,7 @@ class PageStateManager extends ChangeNotifier {
   Widget getNavRailPage(BuildContext context) {
     switch (selectedNavRailPage) {
       case NavRailPageType.home:
-        return HomePage();
+        return BirdHomePage();
       case NavRailPageType.map:
         return MapPage();
       }

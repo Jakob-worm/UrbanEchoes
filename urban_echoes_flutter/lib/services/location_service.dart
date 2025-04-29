@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:urban_echoes/services/manegers/location_manager.dart';
+import 'package:urban_echoes/services/service_config.dart';
 import 'package:urban_echoes/services/sound/background_audio_service.dart';
 import 'package:urban_echoes/services/sound/bird_sound_player.dart';
 import 'package:urban_echoes/services/storage&database/azure_storage_service.dart';
@@ -20,17 +21,15 @@ import 'observation_service.dart';
 /// - Managing audio settings and playback
 class LocationService extends ChangeNotifier {
   // Constants
-  static const double _MAX_RANGE =
-      50.0; // Maximum range in meters for observation detection
-  static const int _BATCH_UPDATE_MS =
-      500; // Milliseconds for batching UI updates
-  static const bool _DEBUG_MODE = true; // Enable debug logging
+  static final double maxRange = ServiceConfig().maxRange; // 50.0; // Maximum range in meters for observation detection
+  static final int batchUpdateMs = ServiceConfig().batchUpdateMs;
+  static final bool debugMode = ServiceConfig().debugMode; // Enable debug logging
 
   // Audio settings
-  static const double _MIN_VOLUME = 0.05;
-  static const double _MAX_VOLUME = 0.9;
-  static const double _CLOSE_PROXIMITY_THRESHOLD = 5.0; // Meters
-  static const double _CLOSE_PROXIMITY_BOOST = 0.1;
+  static final double minVolume = ServiceConfig().minVolume; // Minimum volume for distant sounds
+  static final double maxVolume = ServiceConfig().maxVolume; // Maximum volume for nearby sounds
+  static final double closeProximityThreashold = ServiceConfig().closeProximityThreshold; // Meters
+  static final double closeProximityBoost = ServiceConfig().closeProximityBoost; // Volume boost for very close sounds
 
   // Services
   final BirdSoundPlayer _soundPlayer;
@@ -73,7 +72,7 @@ class LocationService extends ChangeNotifier {
   void _handlePositionUpdate(Position position) {
     // Schedule a batch update
     _batchUpdateTimer?.cancel();
-    _batchUpdateTimer = Timer(Duration(milliseconds: _BATCH_UPDATE_MS), () {
+    _batchUpdateTimer = Timer(Duration(milliseconds: batchUpdateMs), () {
       _updateActiveObservations(position);
       notifyListeners();
     });
@@ -90,7 +89,7 @@ class LocationService extends ChangeNotifier {
 
   /// Debug logging
   void _log(String message) {
-    if (_DEBUG_MODE) {
+    if (debugMode) {
       debugPrint('[LocationService] $message');
     }
   }
@@ -267,7 +266,7 @@ class LocationService extends ChangeNotifier {
       final double pan = _calculatePan(position, obs);
 
       // Check if in range
-      if (distance <= _MAX_RANGE) {
+      if (distance <= maxRange) {
         observationsInRange.add(id);
         activeObservationsChanged = _processInRangeObservation(
             id, obs, pan, volume, newObservations, activeObservationsChanged);
@@ -379,7 +378,7 @@ class LocationService extends ChangeNotifier {
   void _logActiveObservations() {
     _log('Active observations updated: ${_activeObservations.length} active');
 
-    if (_DEBUG_MODE) {
+    if (debugMode) {
       _activeObservations.forEach((id, obs) {
         _log('Active: ${obs["bird_name"]} (ID: $id)');
       });
@@ -430,7 +429,7 @@ class LocationService extends ChangeNotifier {
   /// Calculate volume based on distance
   double _calculateVolume(double distance) {
     // Normalized distance (0-1)
-    final normalizedDistance = (distance / _MAX_RANGE).clamp(0.0, 1.0);
+    final normalizedDistance = (distance / maxRange).clamp(0.0, 1.0);
 
     // Cubic falloff (steeper than quadratic)
     final falloff =
@@ -438,15 +437,15 @@ class LocationService extends ChangeNotifier {
 
     // Add a "close proximity boost" for very nearby sounds
     double volumeBoost = 0.0;
-    if (distance < _CLOSE_PROXIMITY_THRESHOLD) {
+    if (distance < closeProximityThreashold) {
       // Extra boost when very close
-      volumeBoost = _CLOSE_PROXIMITY_BOOST *
-          (1.0 - (distance / _CLOSE_PROXIMITY_THRESHOLD));
+      volumeBoost = closeProximityBoost *
+          (1.0 - (distance / closeProximityThreashold));
     }
 
     final volume =
-        _MIN_VOLUME + falloff * (_MAX_VOLUME - _MIN_VOLUME) + volumeBoost;
-    return volume.clamp(_MIN_VOLUME, _MAX_VOLUME);
+        minVolume + falloff * (maxVolume - minVolume) + volumeBoost;
+    return volume.clamp(minVolume, maxVolume);
   }
 
   /// Calculate stereo panning based on position
@@ -474,7 +473,7 @@ class LocationService extends ChangeNotifier {
     double basePan = bearing / 90.0;
 
     // Distance factor (closer = more pronounced panning)
-    double distanceFactor = 1.0 - (distance / _MAX_RANGE).clamp(0.0, 0.8);
+    double distanceFactor = 1.0 - (distance / maxRange).clamp(0.0, 0.8);
 
     // Apply distance factor to make nearby sounds have stronger panning
     double pan = basePan * (0.7 + (distanceFactor * 0.3));
