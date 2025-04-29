@@ -279,7 +279,7 @@ class DatabaseService {
         RETURNING id
       ''');
       
-      final deletedCount = results.affectedRowCount ?? 0;
+      final deletedCount = results.affectedRowCount;
       debugPrint('Cleaned up $deletedCount duplicate observations');
       return deletedCount;
     } catch (e) {
