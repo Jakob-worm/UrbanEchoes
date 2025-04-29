@@ -33,7 +33,7 @@ class EBirdService {
   ];
 
   // Maximum number of days in the past to fetch observations
-  static const int _maxDaysBack = 7;
+  static const int _maxDaysBack = 360;
 
   // Keys for SharedPreferences
   static const String _lastSyncTimeKey = 'ebird_last_sync_time';

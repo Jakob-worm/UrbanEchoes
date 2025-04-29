@@ -6,7 +6,6 @@ import 'package:location/location.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter/widgets.dart';
-import 'package:provider/provider.dart';
 import 'package:urban_echoes/services/sound/bird_sound_player.dart';
 import 'package:urban_echoes/services/storage&database/database_service.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
@@ -75,10 +74,10 @@ class BirdObservationController {
     }
   }
 
-  // Main functionality
+  // Main functionality - Completely removed BuildContext usage
   Future<bool> submitObservation(
       String birdName, String scientificName, int quantity,
-      {File? soundFile, BuildContext? context}) async {
+      {File? soundFile, PageStateManager? pageStateManager}) async {
     if (_disposed) return false;
     if (!await initialize()) return false;
 
@@ -105,15 +104,10 @@ class BirdObservationController {
     if (id > 0) {
       debugPrint('$birdName ($quantity) recorded successfully with ID: $id');
       
-      // Set the page state refresh flag if context is provided
-      if (context != null) {
-        try {
-          final pageStateManager = Provider.of<PageStateManager>(context, listen: false);
-          debugPrint('Setting needsMapRefresh flag to true');
-          pageStateManager.setNeedsMapRefresh(true);
-        } catch (e) {
-          debugPrint('Error setting map refresh flag: $e');
-        }
+      // Update the page state refresh flag if PageStateManager was provided
+      if (pageStateManager != null) {
+        debugPrint('Setting needsMapRefresh flag to true');
+        pageStateManager.setNeedsMapRefresh(true);
       }
       
       if (soundUrl != null) await playBirdSound(soundUrl);

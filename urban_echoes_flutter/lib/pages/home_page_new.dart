@@ -289,12 +289,12 @@ class _BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSt
                       }
                     },
                     backgroundColor: coordinator.isListening ? Colors.red : Colors.green[600],
+                    elevation: 8,
                     child: Icon(
                       coordinator.isListening ? Icons.mic_off : Icons.mic,
                       size: 50,
                       color: Colors.white,
                     ),
-                    elevation: 8,
                   ),
                 ),
               ),

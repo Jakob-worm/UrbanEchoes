@@ -16,8 +16,6 @@ import 'package:urban_echoes/services/bird_search_service.dart';
 import 'package:urban_echoes/exceptions/api_exceptions.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 
-// Import state definitions
-
 // Import screen-specific widgets
 import 'package:urban_echoes/wigdets/bird_search_bar.dart';
 import 'package:urban_echoes/wigdets/quantity_selector.dart';
@@ -104,69 +102,70 @@ class MakeObservationPageState extends State<MakeObservationPage> {
   }
 
   Future<void> _handleSubmit() async {
-  final searchValue = _searchController.text;
-  if (searchValue.isEmpty || _selectedNumber == null) {
-    _showErrorSnackbar('Please fill in both the bird name and quantity');
-    return;
-  }
-
-  // Store the PageStateManager reference before any async operations
-  final pageStateManager = Provider.of<PageStateManager>(context, listen: false);
-
-  setState(() {
-    _state = ObservationState.loading;
-  });
-
-  try {
-    final selectedBird = _birds.firstWhere(
-      (bird) => bird.commonName == searchValue,
-      orElse: () => Bird(commonName: searchValue, scientificName: ''),
-    );
-
-    debugPrint('Submitting observation: $searchValue, ${selectedBird.scientificName}, $_selectedNumber');
-    
-    // Pass the context to the controller to allow it to set the refresh flag
-    final success = await _controller.submitObservation(
-        searchValue, selectedBird.scientificName, _selectedNumber!, context: context);
-
-    // Check if the widget is still mounted after the async operation
-    if (!mounted) return;
-
-    setState(() {
-      _state = success ? ObservationState.success : ObservationState.error;
-    });
-
-    if (success) {
-      _showSuccessSnackbar('Observation recorded successfully!');
-
-      // Double-check that the flag is set (in case the controller couldn't set it)
-      pageStateManager.setNeedsMapRefresh(true);
-      
-      debugPrint('Navigation to map page will happen after short delay');
-      
-      // Add a small delay to ensure the flag is processed
-      await Future.delayed(const Duration(milliseconds: 200));
-      
-      // Navigate to the map page
-      pageStateManager.setNavRailPage(NavRailPageType.values[1]); // Assuming Map is index 1
-      
-      debugPrint('Navigated to map page');
-    } else {
-      _showErrorSnackbar('Failed to record observation');
+    final searchValue = _searchController.text;
+    if (searchValue.isEmpty || _selectedNumber == null) {
+      _showErrorSnackbar('Please fill in both the bird name and quantity');
+      return;
     }
-  } catch (e) {
-    // Check if the widget is still mounted after the async operation
-    if (!mounted) return;
-    
-    debugPrint('Error in handleSubmit: $e');
-    
+
+    // Get the PageStateManager reference before any async operations
+    final pageStateManager = Provider.of<PageStateManager>(context, listen: false);
+
     setState(() {
-      _state = ObservationState.error;
-      _errorMessage = 'Error: ${e.toString()}';
+      _state = ObservationState.loading;
     });
-    _showErrorSnackbar('Error: ${e.toString()}');
+
+    try {
+      final selectedBird = _birds.firstWhere(
+        (bird) => bird.commonName == searchValue,
+        orElse: () => Bird(commonName: searchValue, scientificName: ''),
+      );
+
+      debugPrint('Submitting observation: $searchValue, ${selectedBird.scientificName}, $_selectedNumber');
+      
+      // Pass the pageStateManager directly instead of context
+      final success = await _controller.submitObservation(
+          searchValue, selectedBird.scientificName, _selectedNumber!, 
+          pageStateManager: pageStateManager);
+
+      // Check if the widget is still mounted after the async operation
+      if (!mounted) return;
+
+      setState(() {
+        _state = success ? ObservationState.success : ObservationState.error;
+      });
+
+      if (success) {
+        _showSuccessSnackbar('Observation recorded successfully!');
+
+        // Double-check that the flag is set (in case the controller couldn't set it)
+        pageStateManager.setNeedsMapRefresh(true);
+        
+        debugPrint('Navigation to map page will happen after short delay');
+        
+        // Add a small delay to ensure the flag is processed
+        await Future.delayed(const Duration(milliseconds: 200));
+        
+        // Navigate to the map page
+        pageStateManager.setNavRailPage(NavRailPageType.values[1]); // Assuming Map is index 1
+        
+        debugPrint('Navigated to map page');
+      } else {
+        _showErrorSnackbar('Failed to record observation');
+      }
+    } catch (e) {
+      // Check if the widget is still mounted after the async operation
+      if (!mounted) return;
+      
+      debugPrint('Error in handleSubmit: $e');
+      
+      setState(() {
+        _state = ObservationState.error;
+        _errorMessage = 'Error: ${e.toString()}';
+      });
+      _showErrorSnackbar('Error: ${e.toString()}');
+    }
   }
-}
 
   void _showErrorSnackbar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(

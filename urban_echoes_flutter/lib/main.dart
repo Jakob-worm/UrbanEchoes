@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:urban_echoes/pages/nav_bars_page.dart';
 import 'package:urban_echoes/pages/intro_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:urban_echoes/services/AppStartupService.dart';
+import 'package:urban_echoes/services/app_startup_service.dart';
 import 'package:urban_echoes/services/location_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:urban_echoes/services/season_service.dart';
