@@ -28,8 +28,8 @@ class LocationService extends ChangeNotifier {
   // Audio settings
   static final double minVolume = ServiceConfig().minVolume; // Minimum volume for distant sounds
   static final double maxVolume = ServiceConfig().maxVolume; // Maximum volume for nearby sounds
-  static const double _CLOSE_PROXIMITY_THRESHOLD = 5.0; // Meters
-  static const double _CLOSE_PROXIMITY_BOOST = 0.1;
+  static final double closeProximityThreashold = ServiceConfig().closeProximityThreshold; // Meters
+  static final double closeProximityBoost = ServiceConfig().closeProximityBoost; // Volume boost for very close sounds
 
   // Services
   final BirdSoundPlayer _soundPlayer;
@@ -437,10 +437,10 @@ class LocationService extends ChangeNotifier {
 
     // Add a "close proximity boost" for very nearby sounds
     double volumeBoost = 0.0;
-    if (distance < _CLOSE_PROXIMITY_THRESHOLD) {
+    if (distance < closeProximityThreashold) {
       // Extra boost when very close
-      volumeBoost = _CLOSE_PROXIMITY_BOOST *
-          (1.0 - (distance / _CLOSE_PROXIMITY_THRESHOLD));
+      volumeBoost = closeProximityBoost *
+          (1.0 - (distance / closeProximityThreashold));
     }
 
     final volume =
