@@ -12,11 +12,11 @@ import 'package:urban_echoes/services/speach_regognition/bird_regognition_servic
 import 'package:urban_echoes/services/speach_regognition/speech_recognition_service.dart';
 import 'package:urban_echoes/services/speach_regognition/word_recognition.dart';
 import 'package:urban_echoes/services/speach_regognition/speech_coordinator.dart';
+import 'package:urban_echoes/services/tts/tts_service.dart';
 import 'package:urban_echoes/state%20manegers/map_state_manager.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 import 'package:urban_echoes/utils/navigation_provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
-import 'package:urban_echoes/services/tts_service.dart';
 import 'package:urban_echoes/services/service_config.dart';
 
 
@@ -98,85 +98,91 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
-      providers: [
-        // State managers
-        ChangeNotifierProvider<PageStateManager>(
-          create: (context) => PageStateManager(),
-        ),
-        ChangeNotifierProvider<MapStateManager>(
-          create: (context) => MapStateManager(),
-        ),
-        ChangeNotifierProvider<NavigationProvider>(
-          create: (context) => NavigationProvider(),
-        ),
+  providers: [
+    // State managers
+    ChangeNotifierProvider<PageStateManager>(
+      create: (context) => PageStateManager(),
+    ),
+    ChangeNotifierProvider<MapStateManager>(
+      create: (context) => MapStateManager(),
+    ),
+    ChangeNotifierProvider<NavigationProvider>(
+      create: (context) => NavigationProvider(),
+    ),
 
-        // Base speech recognition service
-        ChangeNotifierProvider<SpeechRecognitionService>(
-          create: (_) => SpeechRecognitionService(debugMode: debugMode),
-          lazy: true,
-        ),
+    // TTS Service - moved before speech recognition services
+    ChangeNotifierProvider<TtsService>(
+      create: (_) => TtsService(debugMode: debugMode),
+      lazy: true,
+    ),
 
-        // Bird recognition service (bird-specific processing)
-        ChangeNotifierProvider<BirdRecognitionService>(
-          create: (_) => BirdRecognitionService(debugMode: debugMode),
-          lazy: true,
-        ),
+    // Base speech recognition service
+    ChangeNotifierProvider<SpeechRecognitionService>(
+      create: (_) => SpeechRecognitionService(debugMode: debugMode),
+      lazy: true,
+    ),
 
-        // Word recognition service (special words)
-        ChangeNotifierProvider<WordRecognitionService>(
-          create: (_) => WordRecognitionService(debugMode: debugMode),
-          lazy: true,
-        ),
+    // Bird recognition service (bird-specific processing)
+    ChangeNotifierProvider<BirdRecognitionService>(
+      create: (_) => BirdRecognitionService(debugMode: debugMode),
+      lazy: true,
+    ),
 
-        // Speech coordinator that manages the above services
-        ChangeNotifierProxyProvider3<
-            SpeechRecognitionService,
-            BirdRecognitionService,
-            WordRecognitionService,
-            SpeechCoordinator>(
-          create: (context) => SpeechCoordinator(
-            speechService: Provider.of<SpeechRecognitionService>(context, listen: false),
-            birdService: Provider.of<BirdRecognitionService>(context, listen: false),
-            wordService: Provider.of<WordRecognitionService>(context, listen: false),
-            debugMode: debugMode,
-          ),
-          update: (context, speechService, birdService, wordService, previous) => 
-            SpeechCoordinator(
-              speechService: speechService,
-              birdService: birdService,
-              wordService: wordService,
-              debugMode: debugMode,
-            ),
-        ),
+    // Word recognition service (special words)
+    ChangeNotifierProvider<WordRecognitionService>(
+      create: (_) => WordRecognitionService(debugMode: debugMode),
+      lazy: true,
+    ),
 
-        // Services
-        ChangeNotifierProvider<SeasonService>(
-          create: (_) => SeasonService(),
-        ),
-        ChangeNotifierProvider<TtsService>(
-          create: (_) => TtsService(),
-        ),
-        Provider<AppStartupService>(
-          create: (_) => AppStartupService(),
-        ),
-
-        // Pre-created instances
-        Provider<bool>.value(value: debugMode),
-        ChangeNotifierProvider<LocationService>.value(value: locationService),
-      ],
-      child: MaterialApp(
-        title: 'Urban Echoes',
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
-          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-            backgroundColor: Colors.black,
-            selectedItemColor: Colors.white,
-            unselectedItemColor: Colors.grey,
-          ),
-        ),
-        home: const InitialScreen(),
+    // Speech coordinator that manages the above services
+    ChangeNotifierProxyProvider4<
+        SpeechRecognitionService,
+        BirdRecognitionService,
+        WordRecognitionService,
+        TtsService,
+        SpeechCoordinator>(
+      create: (context) => SpeechCoordinator(
+        speechService: Provider.of<SpeechRecognitionService>(context, listen: false),
+        birdService: Provider.of<BirdRecognitionService>(context, listen: false),
+        wordService: Provider.of<WordRecognitionService>(context, listen: false),
+        ttsService: Provider.of<TtsService>(context, listen: false),
+        debugMode: debugMode,
       ),
-    );
+      update: (context, speechService, birdService, wordService, ttsService, previous) => 
+        SpeechCoordinator(
+          speechService: speechService,
+          birdService: birdService,
+          wordService: wordService,
+          ttsService: ttsService,
+          debugMode: debugMode,
+        ),
+    ),
+
+    // Services
+    ChangeNotifierProvider<SeasonService>(
+      create: (_) => SeasonService(),
+    ),
+    Provider<AppStartupService>(
+      create: (_) => AppStartupService(),
+    ),
+
+    // Pre-created instances
+    Provider<bool>.value(value: debugMode),
+    ChangeNotifierProvider<LocationService>.value(value: locationService),
+  ],
+  child: MaterialApp(
+    title: 'Urban Echoes',
+    theme: ThemeData(
+      primarySwatch: Colors.blue,
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Colors.black,
+        selectedItemColor: Colors.white,
+        unselectedItemColor: Colors.grey,
+      ),
+    ),
+    home: const InitialScreen(),
+  ),
+);
   }
 }
 

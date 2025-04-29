@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:urban_echoes/services/speach_regognition/speech_coordinator.dart';
+import 'package:urban_echoes/services/tts/tts_service.dart';
 
 class BirdHomePage extends StatefulWidget {
   const BirdHomePage({super.key});
@@ -282,10 +283,15 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
                   margin: const EdgeInsets.only(bottom: 30),
                   child: FloatingActionButton(
                     onPressed: () {
+                      final coordinator = Provider.of<SpeechCoordinator>(context, listen: false);
+                      final ttsService = Provider.of<TtsService>(context, listen: false);
+                      
                       if (coordinator.isListening) {
                         coordinator.stopListening();
+                        ttsService.speak("Observation stoppet.");
                       } else {
                         coordinator.startListening();
+                        ttsService.speak("Observation startet. Sig navnet på den fugl du ser eller hører.");
                       }
                     },
                     backgroundColor: coordinator.isListening ? Colors.red : Colors.green[600],
