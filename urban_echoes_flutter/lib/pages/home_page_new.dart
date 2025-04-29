@@ -7,10 +7,10 @@ class BirdHomePage extends StatefulWidget {
   const BirdHomePage({super.key});
 
   @override
-  _BirdHomePageState createState() => _BirdHomePageState();
+  BirdHomePageState createState() => BirdHomePageState();
 }
 
-class _BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderStateMixin {
+class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _pulseAnimation;
 
