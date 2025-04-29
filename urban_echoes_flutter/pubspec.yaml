@@ -90,6 +90,7 @@ flutter:
     - assets/common_danish_bird_names.txt
     - assets/all_danish_bird_names.txt
     - assets/all_scientific_bird_names.txt
+    - assets/audio/recorded/
     
   uses-material-design: true
 

@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:urban_echoes/services/recording_player_service.dart';
 import 'package:urban_echoes/services/service_config.dart';
 import 'package:urban_echoes/services/speach_regognition/bird_regognition_service.dart';
 import 'package:urban_echoes/services/speach_regognition/speech_recognition_service.dart';
@@ -9,7 +10,7 @@ class SpeechCoordinator extends ChangeNotifier {
   final SpeechRecognitionService _speechService;
   final BirdRecognitionService _birdService;
   final WordRecognitionService _wordService;
-  final TtsService _ttsService; // Add TTS service
+  final RecrodingPlayerService _audioService; // Instead of TtsService
   final bool _debugMode;
   
   // State for confirmation workflow
@@ -21,12 +22,12 @@ class SpeechCoordinator extends ChangeNotifier {
     required SpeechRecognitionService speechService,
     required BirdRecognitionService birdService,
     required WordRecognitionService wordService,
-    required TtsService ttsService, // Add TTS service parameter
+    required RecrodingPlayerService audioService,
     bool? debugMode,
   }) : _speechService = speechService,
        _birdService = birdService,
        _wordService = wordService,
-       _ttsService = ttsService,
+       _audioService = audioService,
        _debugMode = debugMode ?? ServiceConfig().debugMode {
     // Listen for speech recognition updates
     _speechService.addListener(_onSpeechUpdate);
@@ -37,11 +38,11 @@ class SpeechCoordinator extends ChangeNotifier {
   SpeechRecognitionService get speechService => _speechService;
   BirdRecognitionService get birdService => _birdService;
   WordRecognitionService get wordService => _wordService;
-  TtsService get ttsService => _ttsService; // Expose TTS service
+  RecrodingPlayerService get audioService => _audioService;
   bool get isListening => _speechService.isListening;
   String get recognizedText => _speechService.recognizedText;
   double get confidence => _speechService.confidence;
-  String? get errorMessage => _speechService.errorMessage ?? 
+  String? get errorMessage => _speechService.errorMessage ??
                              _birdService.errorMessage;
   
   // Confirmation workflow getters
@@ -80,66 +81,71 @@ class SpeechCoordinator extends ChangeNotifier {
     }
   }
   
-  // Handle bird recognition with TTS confirmation
   void handleBirdRecognition(String birdName) {
-    if (birdName.isNotEmpty) {
-      _logDebug('Handling bird recognition: $birdName');
-      
-      // Ask confirmation question using TTS
-      _ttsService.speak("Så du en $birdName?");
-      
-      // Set waiting for confirmation state
-      _isWaitingForConfirmation = true;
-      _currentBirdInQuestion = birdName;
-      notifyListeners();
-    }
-  }
-  
-  // Handle user's confirmation response
-  void handleConfirmationResponse(bool confirmed) {
-    if (!_isWaitingForConfirmation) return;
+  if (birdName.isNotEmpty) {
+    _logDebug('Handling bird recognition: $birdName');
     
-    _logDebug('Handling confirmation response: ${confirmed ? "Yes" : "No"}');
+    // Ask confirmation question using audio
+    _audioService.playPrompt('bird_question');
     
-    if (confirmed) {
-      // User confirmed the bird sighting
-      _ttsService.speak("Flot! Du har observeret en $_currentBirdInQuestion.");
-      // Here you could save the observation to a database
-    } else {
-      // User denied the bird sighting
-      _ttsService.speak("Ok, det var ikke en $_currentBirdInQuestion.");
-    }
-    
-    // Reset confirmation state
-    _isWaitingForConfirmation = false;
-    _currentBirdInQuestion = '';
+    // Set waiting for confirmation state
+    _isWaitingForConfirmation = true;
+    _currentBirdInQuestion = birdName;
     notifyListeners();
   }
+}
+  
+void handleConfirmationResponse(bool confirmed) {
+  if (!_isWaitingForConfirmation) return;
+  
+  _logDebug('Handling confirmation response: ${confirmed ? "Yes" : "No"}');
+  
+  if (confirmed) {
+    // User confirmed the bird sighting
+    _audioService.playPrompt('bird_confirmed');
+    // Here you could save the observation to a database
+  } else {
+    // User denied the bird sighting
+    _audioService.playPrompt('bird_denied');
+  }
+  
+  // Reset confirmation state
+  _isWaitingForConfirmation = false;
+  _currentBirdInQuestion = '';
+  notifyListeners();
+}
   
   // Methods to control speech recognition
   Future<bool> startListening() async {
-    _logDebug('Starting listening through coordinator');
-    
-    // Stop any ongoing TTS before starting to listen
-    if (_ttsService.isSpeaking) {
-      await _ttsService.stop();
-    }
-    
-    // Reset existing results before starting
-    _wordService.reset();
-    _birdService.reset();
-    return await _speechService.startListening();
+  _logDebug('Starting listening through coordinator');
+  
+  // Stop any ongoing audio before starting to listen
+  if (_audioService.isPlaying) {
+    await _audioService.stopAudio();
   }
   
-  Future<bool> stopListening() async {
-    _logDebug('Stopping listening through coordinator');
-    bool result = await _speechService.stopListening();
-    
-    // Process the recognition results after stopping
-    _processRecognitionResults();
-    
-    return result;
-  }
+  // Play the starting audio
+  await _audioService.playPrompt('start_listening');
+  
+  // Reset existing results before starting
+  _wordService.reset();
+  _birdService.reset();
+  return await _speechService.startListening();
+}
+
+Future<bool> stopListening() async {
+  _logDebug('Stopping listening through coordinator');
+  
+  bool result = await _speechService.stopListening();
+  
+  // Play the stopping audio
+  await _audioService.playPrompt('stop_listening');
+  
+  // Process the recognition results after stopping
+  _processRecognitionResults();
+  
+  return result;
+}
   
   // Process the final recognition results
   void _processRecognitionResults() {

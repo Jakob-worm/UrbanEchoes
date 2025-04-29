@@ -1,6 +1,8 @@
 // In your BirdHomePage.build method
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:urban_echoes/services/recording_player_service.dart';
 import 'package:urban_echoes/services/speach_regognition/speech_coordinator.dart';
 import 'package:urban_echoes/services/tts/tts_service.dart';
 
@@ -284,14 +286,14 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
                   child: FloatingActionButton(
                     onPressed: () {
                       final coordinator = Provider.of<SpeechCoordinator>(context, listen: false);
-                      final ttsService = Provider.of<TtsService>(context, listen: false);
+                      final recording_player_service = Provider.of<RecrodingPlayerService>(context, listen: false);
                       
                       if (coordinator.isListening) {
                         coordinator.stopListening();
-                        ttsService.speak("Observation stoppet.");
+                        //audioService.playPrompt('stop_listening');
                       } else {
                         coordinator.startListening();
-                        ttsService.speak("Observation startet. Sig navnet på den fugl du ser eller hører.");
+                        recording_player_service.playPrompt('start_listening');
                       }
                     },
                     backgroundColor: coordinator.isListening ? Colors.red : Colors.green[600],
