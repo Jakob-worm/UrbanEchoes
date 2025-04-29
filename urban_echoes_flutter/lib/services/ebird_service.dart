@@ -52,18 +52,19 @@ class EBirdService {
       _apiKey = dotenv.env['EBIRD_API_KEY'];
 
       if (_apiKey == null || _apiKey!.isEmpty) {
-        debugPrint(
-            'eBird API key is missing. Add EBIRD_API_KEY to your .env file');
+        debugPrint('eBird API key is missing. Add EBIRD_API_KEY to your .env file');
         return false;
       }
 
       // Initialize database service
       final dbInitialized = await _databaseService.initialize();
       if (!dbInitialized) {
-        debugPrint(
-            'Database initialization failed when setting up eBird service');
+        debugPrint('Database initialization failed when setting up eBird service');
         return false;
       }
+      
+      // Ensure database has the required structure
+      await _databaseService.migrateDatabase();
 
       return true;
     } catch (e) {
@@ -72,70 +73,79 @@ class EBirdService {
     }
   }
 
-  // Check and import new observations on app start
-  Future<int> syncNewObservationsOnStartup() async {
-    try {
-      // Initialize the service
-      if (!await initialize()) {
-        debugPrint('Failed to initialize eBird service');
-        return 0;
-      }
 
-      // Get last sync time
-      final prefs = await SharedPreferences.getInstance();
-      final lastSyncTime = prefs.getString(_lastSyncTimeKey);
-
-      // Calculate days back based on last sync time
-      int daysBack = 1; // Default to 1 day if synced recently
-
-      if (lastSyncTime != null) {
-        final lastSync = DateTime.parse(lastSyncTime);
-        final now = DateTime.now();
-        final difference = now.difference(lastSync).inDays;
-
-        // Get data for at least the number of days since last sync
-        daysBack = difference + 1;
-
-        // Cap at maximum days back
-        if (daysBack > _maxDaysBack) {
-          daysBack = _maxDaysBack;
-        }
-      } else {
-        // First time syncing, use max days
-        daysBack = _maxDaysBack;
-      }
-
-      debugPrint('Syncing eBird observations for the last $daysBack days');
-
-      // Use multiple region points to cover all of Denmark
-      int totalImported = 0;
-
-      // Import for each region with enough radius to cover Denmark
-      for (final region in _denmarkRegions) {
-        final count = await importObservationsToDatabase(
-          latitude: region['lat']!,
-          longitude: region['lng']!,
-          radiusKm: 50, // Large enough radius to overlap between regions
-          daysBack: daysBack,
-          maxResults: 200, // Increased result limit
-        );
-
-        totalImported += count;
-
-        // Add a small delay between API calls to avoid rate limiting
-        await Future.delayed(const Duration(milliseconds: 500));
-      }
-
-      // Save the current time as last sync time
-      await prefs.setString(_lastSyncTimeKey, DateTime.now().toIso8601String());
-
-      debugPrint('eBird sync complete. Imported $totalImported observations.');
-      return totalImported;
-    } catch (e) {
-      debugPrint('Error syncing eBird observations: $e');
+Future<int> syncNewObservationsOnStartup() async {
+  try {
+    // Initialize the service
+    if (!await initialize()) {
+      debugPrint('Failed to initialize eBird service');
       return 0;
     }
+
+    // Get last sync time
+    final prefs = await SharedPreferences.getInstance();
+    final lastSyncTime = prefs.getString(_lastSyncTimeKey);
+
+    // Calculate days back based on last sync time
+    int daysBack = 1; // Default to 1 day if synced recently
+
+    if (lastSyncTime != null) {
+      final lastSync = DateTime.parse(lastSyncTime);
+      final now = DateTime.now();
+      final difference = now.difference(lastSync).inDays;
+
+      // Get data for at least the number of days since last sync
+      daysBack = difference + 1;
+
+      // Cap at maximum days back
+      if (daysBack > _maxDaysBack) {
+        daysBack = _maxDaysBack;
+      }
+    } else {
+      // First time syncing, use max days
+      daysBack = _maxDaysBack;
+    }
+
+    debugPrint('Syncing eBird observations for the last $daysBack days');
+
+    // Use multiple region points to cover all of Denmark
+    int totalImported = 0;
+
+    // IMPORTANT: eBird API limits distance to 50km max
+    const radiusKm = 50.0; // Changed from 200 to 50km to comply with API limits
+
+    // Import for each region with maximum allowed radius (50km)
+    for (final region in _denmarkRegions) {
+      final count = await importObservationsToDatabase(
+        latitude: region['lat']!,
+        longitude: region['lng']!,
+        radiusKm: radiusKm, // Now using proper value within API limits
+        daysBack: daysBack,
+        maxResults: 10000,
+      );
+
+      totalImported += count;
+
+      // Add a small delay between API calls to avoid rate limiting
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    // Clean up any existing duplicates that might have been missed
+    final deletedCount = await _databaseService.cleanupDuplicateObservations();
+    if (deletedCount > 0) {
+      debugPrint('Cleaned up $deletedCount duplicate observations');
+    }
+
+    // Save the current time as last sync time
+    await prefs.setString(_lastSyncTimeKey, DateTime.now().toIso8601String());
+
+    debugPrint('eBird sync complete. Imported $totalImported observations.');
+    return totalImported;
+  } catch (e) {
+    debugPrint('Error syncing eBird observations: $e');
+    return 0;
   }
+}
 
   /// Filters a list of observations by the current season setting
   List<BirdObservation> filterObservationsBySeason(
@@ -220,9 +230,6 @@ class EBirdService {
       final List<dynamic> data = json.decode(response.body);
       final observations = <BirdObservation>[];
 
-      // Track the observations we've already seen to avoid duplicates
-      final seenObservations = <String>{};
-
       for (final obs in data) {
         try {
           // Skip observations outside Denmark
@@ -232,14 +239,6 @@ class EBirdService {
           if (!_isInDenmark(lat, lng)) {
             continue;
           }
-
-          // Create a unique key for this observation to avoid duplicates
-          final obsKey =
-              '${obs['sciName']}_${obs['lat']}_${obs['lng']}_${obs['obsDt']}';
-          if (seenObservations.contains(obsKey)) {
-            continue;
-          }
-          seenObservations.add(obsKey);
 
           // Create bird observation from eBird data
           final observation = _mapEBirdObservation(
@@ -287,24 +286,9 @@ class EBirdService {
 
       int importedCount = 0;
 
-      // Get existing observations from the database to avoid duplicates
-      final existingObservations =
-          await _databaseService.getAllBirdObservations();
-      final existingKeys = existingObservations
-          .map((obs) =>
-              '${obs.scientificName}_${obs.latitude}_${obs.longitude}_${obs.observationDate.toIso8601String().split('T')[0]}')
-          .toSet();
-
       for (final observation in observations) {
         try {
-          // Check if this observation already exists
-          final obsKey =
-              '${observation.scientificName}_${observation.latitude}_${observation.longitude}_${observation.observationDate.toIso8601String().split('T')[0]}';
-          if (existingKeys.contains(obsKey)) {
-            // Skip duplicate observation
-            continue;
-          }
-
+          // Let the database service handle duplicate checking
           await _databaseService.addBirdObservation(observation);
           importedCount++;
         } catch (e) {
@@ -358,6 +342,9 @@ class EBirdService {
     // Convert scientific name to directory format
     final scientificName = eBirdObs['sciName'] as String;
     final soundDirectory = _formatSoundDirectory(scientificName);
+    
+    // Get the eBird subId as sourceId
+    final sourceId = eBirdObs['subId'] as String?;
 
     return BirdObservation(
       birdName: eBirdObs['comName'] as String,
@@ -371,6 +358,7 @@ class EBirdService {
       quantity: eBirdObs['howMany'] as int? ?? 1,
       isTestData: false,
       testBatchId: 0,
+      sourceId: sourceId, // Use the eBird subId as sourceId
     );
   }
 
