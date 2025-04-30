@@ -110,8 +110,8 @@ class MyApp extends StatelessWidget {
       create: (context) => NavigationProvider(),
     ),
 
-    ChangeNotifierProvider<RecrodingPlayerService>(
-      create: (_) => RecrodingPlayerService(debugMode: debugMode),
+    ChangeNotifierProvider<RecordingPlayerService>(
+      create: (_) => RecordingPlayerService(debugMode: debugMode),
       lazy: true,
     ),
     
@@ -138,13 +138,13 @@ class MyApp extends StatelessWidget {
         SpeechRecognitionService,
         BirdRecognitionService,
         WordRecognitionService,
-        RecrodingPlayerService,
+        RecordingPlayerService,
         SpeechCoordinator>(
       create: (context) => SpeechCoordinator(
         speechService: Provider.of<SpeechRecognitionService>(context, listen: false),
         birdService: Provider.of<BirdRecognitionService>(context, listen: false),
         wordService: Provider.of<WordRecognitionService>(context, listen: false),
-        audioService: Provider.of<RecrodingPlayerService>(context, listen: false),
+        audioService: Provider.of<RecordingPlayerService>(context, listen: false),
         debugMode: debugMode,
       ),
       update: (context, speechService, birdService, wordService, audioService, previous) => 

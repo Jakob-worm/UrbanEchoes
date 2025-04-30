@@ -9,7 +9,7 @@ class SpeechCoordinator extends ChangeNotifier {
   final SpeechRecognitionService _speechService;
   final BirdRecognitionService _birdService;
   final WordRecognitionService _wordService;
-  final RecrodingPlayerService _audioService;
+  final RecordingPlayerService _audioService;
   final bool _debugMode;
   
   // State for confirmation workflow
@@ -21,7 +21,7 @@ class SpeechCoordinator extends ChangeNotifier {
     required SpeechRecognitionService speechService,
     required BirdRecognitionService birdService,
     required WordRecognitionService wordService,
-    required RecrodingPlayerService audioService,
+    required RecordingPlayerService audioService,
     bool? debugMode,
   }) : _speechService = speechService,
        _birdService = birdService,
@@ -37,7 +37,7 @@ class SpeechCoordinator extends ChangeNotifier {
   SpeechRecognitionService get speechService => _speechService;
   BirdRecognitionService get birdService => _birdService;
   WordRecognitionService get wordService => _wordService;
-  RecrodingPlayerService get audioService => _audioService;
+  RecordingPlayerService get audioService => _audioService;
   bool get isListening => _speechService.isListening;
   String get recognizedText => _speechService.recognizedText;
   double get confidence => _speechService.confidence;

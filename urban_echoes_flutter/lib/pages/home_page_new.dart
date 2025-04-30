@@ -284,7 +284,7 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
                   child: FloatingActionButton(
                     onPressed: () {
                       final coordinator = Provider.of<SpeechCoordinator>(context, listen: false);
-                      final recordingPlayerService = Provider.of<RecrodingPlayerService>(context, listen: false);
+                      final recordingPlayerService = Provider.of<RecordingPlayerService>(context, listen: false);
                       
                       if (coordinator.isListening) {
                         coordinator.stopListening();
