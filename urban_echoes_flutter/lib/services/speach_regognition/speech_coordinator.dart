@@ -31,6 +31,9 @@ class SpeechCoordinator extends ChangeNotifier {
     // Listen for speech recognition updates
     _speechService.addListener(_onSpeechUpdate);
     _wordService.addListener(_onWordUpdate);
+    
+    // Add listener for audio completion events
+    _audioService.addListener(_onAudioStateChanged);
   }
   
   // Getters to expose underlying services
@@ -47,6 +50,61 @@ class SpeechCoordinator extends ChangeNotifier {
   // Confirmation workflow getters
   bool get isWaitingForConfirmation => _isWaitingForConfirmation;
   String get currentBirdInQuestion => _currentBirdInQuestion;
+  
+  // Handle audio state changes
+  void _onAudioStateChanged() {
+    // If audio was playing and has now stopped
+    if (!_audioService.isPlaying && _audioService.lastPlaybackType.isNotEmpty) {
+      _logDebug('Audio completed: ${_audioService.lastPlaybackType}');
+      
+      // Handle different types of audio completion
+      switch (_audioService.lastPlaybackType) {
+        case 'bird_question':
+          _resumeListeningAfterBirdQuestion();
+          break;
+        case 'bird_confirmation':
+          _resumeListeningAfterConfirmation();
+          break;
+        case 'bird_denied':
+          _resumeListeningAfterDenial();
+          break;
+        case 'start_listening':
+          // Start listening after the intro sound has completed
+          if (!_speechService.isListening) {
+            _speechService.startListening();
+          }
+          break;
+        case 'stop_listening':
+          // Process final recognition results after the stop sound
+          _processRecognitionResults();
+          break;
+      }
+    }
+  }
+  
+  // Resume listening after a bird question has played
+  void _resumeListeningAfterBirdQuestion() {
+    if (!_speechService.isListening) {
+      _logDebug('Resuming listening after bird question');
+      _speechService.startListening();
+    }
+  }
+  
+  // Resume listening after confirmation
+  void _resumeListeningAfterConfirmation() {
+    if (!_speechService.isListening) {
+      _logDebug('Resuming listening after confirmation');
+      _speechService.startListening();
+    }
+  }
+  
+  // Resume listening after denial
+  void _resumeListeningAfterDenial() {
+    if (!_speechService.isListening) {
+      _logDebug('Resuming listening after denial');
+      _speechService.startListening();
+    }
+  }
   
   // Handle speech recognition updates
   void _onSpeechUpdate() {
@@ -102,13 +160,7 @@ class SpeechCoordinator extends ChangeNotifier {
       _currentBirdInQuestion = birdName;
       notifyListeners();
       
-      // Resume listening after a short delay to catch the user's confirmation
-      // Delay needs to be long enough for both audio files to play
-      Future.delayed(const Duration(milliseconds: 3000), () {
-        if (!_speechService.isListening) {
-          _speechService.startListening();
-        }
-      });
+      // The audio completion listener will handle resuming the speech recognition
     }
   }
   
@@ -124,35 +176,22 @@ class SpeechCoordinator extends ChangeNotifier {
     
     if (confirmed) {
       // User confirmed the bird sighting
-      
-      // Play "Du har observeret en [bird name]" using new method
+      // Play "Observation for [bird name] er oprettet" using the sequence method
       _audioService.playBirdConfirmation(_currentBirdInQuestion);
       
       // Here you could save the observation to a database
       // Example: _databaseService.saveBirdObservation(_currentBirdInQuestion);
-      
-      // Delay to let the audio complete before resuming listening
-      Future.delayed(const Duration(milliseconds: 3000), () {
-        if (!_speechService.isListening) {
-          _speechService.startListening();
-        }
-      });
     } else {
       // User denied the bird sighting
       _audioService.playPrompt('bird_denied');
-      
-      // Resume listening with less delay for denial
-      Future.delayed(const Duration(milliseconds: 1500), () {
-        if (!_speechService.isListening) {
-          _speechService.startListening();
-        }
-      });
     }
     
     // Reset confirmation state
     _isWaitingForConfirmation = false;
     _currentBirdInQuestion = '';
     notifyListeners();
+    
+    // The audio completion listener will handle resuming the speech recognition
   }
   
   // Methods to control speech recognition
@@ -170,7 +209,10 @@ class SpeechCoordinator extends ChangeNotifier {
     // Reset existing results before starting
     _wordService.reset();
     _birdService.reset();
-    return await _speechService.startListening();
+    
+    // The speech recognition will be started after the audio completes
+    // via the audio state change listener
+    return true;
   }
   
   Future<bool> stopListening() async {
@@ -181,9 +223,8 @@ class SpeechCoordinator extends ChangeNotifier {
     // Play the stopping audio
     await _audioService.playPrompt('stop_listening');
     
-    // Process the recognition results after stopping
-    _processRecognitionResults();
-    
+    // The final recognition results will be processed after the audio completes
+    // via the audio state change listener
     return result;
   }
   
@@ -220,6 +261,7 @@ class SpeechCoordinator extends ChangeNotifier {
   void dispose() {
     _speechService.removeListener(_onSpeechUpdate);
     _wordService.removeListener(_onWordUpdate);
+    _audioService.removeListener(_onAudioStateChanged);
     super.dispose();
   }
 }

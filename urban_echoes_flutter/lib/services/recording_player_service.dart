@@ -7,20 +7,15 @@ class RecordingPlayerService extends ChangeNotifier {
   final AudioPlayer _birdPlayer = AudioPlayer();
   final AudioPlayer _outroPlayer = AudioPlayer(); // New player for the third part
   
-  // Add this state variable - it's used by SpeechCoordinator
+  // State variables
   bool _isPlaying = false;
   bool _isMuted = false;
   final bool _debugMode;
   
-  // Fixed intro durations for timing in milliseconds
-  final Map<String, int> _introDurations = {
-    'har_du_observeret_en': 1500,
-    'observation_for': 1300,
-    'er_oprettet': 1300,
-  };
-  
-  // Counter for tracking which parts have completed
+  // Track what type of audio was last played
+  String _lastPlaybackType = '';
   int _sequenceCompletedCount = 0;
+  int _expectedCompletions = 0;
   
   // Constructor
   RecordingPlayerService({bool debugMode = false}) : _debugMode = debugMode {
@@ -32,144 +27,122 @@ class RecordingPlayerService extends ChangeNotifier {
     _introPlayer.onPlayerComplete.listen((_) {
       _logDebug('Intro playback completed');
       _sequenceCompletedCount++;
-      if (_sequenceCompletedCount >= 3) { // All parts completed
-        _isPlaying = false;
-        _sequenceCompletedCount = 0;
-        notifyListeners();
-      }
+      _checkSequenceCompletion();
     });
     
     _birdPlayer.onPlayerComplete.listen((_) {
       _logDebug('Bird name playback completed');
       _sequenceCompletedCount++;
-      if (_sequenceCompletedCount >= 3) { // All parts completed
-        _isPlaying = false;
-        _sequenceCompletedCount = 0;
-        notifyListeners();
-      }
+      _checkSequenceCompletion();
     });
     
     _outroPlayer.onPlayerComplete.listen((_) {
       _logDebug('Outro playback completed');
       _sequenceCompletedCount++;
-      if (_sequenceCompletedCount >= 3) { // All parts completed
-        _isPlaying = false;
-        _sequenceCompletedCount = 0;
-        notifyListeners();
-      }
+      _checkSequenceCompletion();
     });
     
     _logDebug('Audio players initialized');
   }
   
+  // Check if the sequence is complete and notify listeners
+  void _checkSequenceCompletion() {
+    if (_sequenceCompletedCount >= _expectedCompletions) {
+      _logDebug('Audio sequence completed: $_lastPlaybackType');
+      _isPlaying = false;
+      _sequenceCompletedCount = 0;
+      notifyListeners(); // This will trigger the onAudioStateChanged in SpeechCoordinator
+    }
+  }
+  
   // Getters
   bool get isPlaying => _isPlaying;
   bool get isMuted => _isMuted;
+  String get lastPlaybackType => _lastPlaybackType;
   
-  // Play bird question with precise timing
+  // Play bird question with callback-based timing
   Future<void> playBirdQuestion(String birdName) async {
     if (_isMuted) return;
     
-    _logDebug('Playing bird question for: $birdName with precise timing');
+    _logDebug('Playing bird question for: $birdName with callbacks');
     
     // Stop any current playback
     await stopAudio();
     
     try {
-      // Reset sequence counter
+      // Reset sequence counter and set type
       _sequenceCompletedCount = 0;
+      _expectedCompletions = 2; // Intro + Bird Name
+      _lastPlaybackType = 'bird_question';
       
-      // 1. Prepare audio files
-      _logDebug('Preparing intro and bird audio');
-      
-      // Get duration either from map or use default
-      final introDuration = _introDurations['har_du_observeret_en'] ?? 1500; 
-      
-      // Calculate when to start bird name (milliseconds before intro ends)
-      final birdNameStartOffset = 200; // Adjust this value as needed
-      final birdNameStartTime = introDuration - birdNameStartOffset;
-      
-      _logDebug('Intro duration: ${introDuration}ms, starting bird name ${birdNameStartOffset}ms before end');
+      // 1. Set up the completion handler for the intro
+      _introPlayer.onPlayerComplete.listen((event) {
+        _logDebug('Intro completed, playing bird name immediately');
+        if (!_isMuted) {
+          // Play bird name right after intro completes
+          String simplifiedName = _simplifyName(birdName);
+          String birdPath = 'audio/recorded/birds/$simplifiedName.mp3';
+          _birdPlayer.play(AssetSource(birdPath));
+        }
+      }, cancelOnError: true);
       
       // 2. Start playing intro
       await _introPlayer.play(AssetSource('audio/recorded/har_du_observeret_en.mp3'));
       _isPlaying = true;
       notifyListeners();
       
-      // 3. Set up timer to start bird name at precise moment
-      Future.delayed(Duration(milliseconds: birdNameStartTime), () async {
-        if (!_isMuted) {
-          _logDebug('Starting bird name at timed offset');
-          
-          // Get the bird name file path
-          String simplifiedName = _simplifyName(birdName);
-          String birdPath = 'audio/recorded/birds/$simplifiedName.mp3';
-          
-          // Play bird name on its own player
-          await _birdPlayer.play(AssetSource(birdPath));
-        }
-      });
-      
     } catch (e) {
       _logDebug('Error in playBirdQuestion: $e');
       _isPlaying = false;
+      _lastPlaybackType = '';
       notifyListeners();
     }
   }
   
-  // Play confirmation with the new three-part sequence:
-  // "Observation for" + [bird name] + "er oprettet"
+  // Play confirmation with the callback-based sequence
   Future<void> playBirdConfirmation(String birdName) async {
     if (_isMuted) return;
     
-    _logDebug('Playing new bird confirmation for: $birdName');
+    _logDebug('Playing bird confirmation for: $birdName with callbacks');
     
     // Stop any current playback
     await stopAudio();
     
     try {
-      // Reset sequence counter
+      // Reset sequence counter and set type
       _sequenceCompletedCount = 0;
+      _expectedCompletions = 3; // Part1 + Bird Name + Part3
+      _lastPlaybackType = 'bird_confirmation';
       
-      // 1. Prepare audio files
+      // Prepare files
       String simplifiedName = _simplifyName(birdName);
       String birdPath = 'audio/recorded/birds/$simplifiedName.mp3';
       
-      // Get durations
-      final part1Duration = _introDurations['observation_for'] ?? 1200;
-      final birdNameEstimatedDuration = 1500;
+      // Set up one-time completion handler for part 1
+      _introPlayer.onPlayerComplete.listen((event) {
+        _logDebug('Part 1 completed, playing bird name immediately');
+        if (!_isMuted) {
+          _birdPlayer.play(AssetSource(birdPath));
+        }
+      }, cancelOnError: true);
       
-      // Calculate timing offsets
-      final birdNameStartTime = part1Duration - 200; // 200ms before part1 ends
-      final outroStartTime = birdNameStartTime + birdNameEstimatedDuration - 100; // 100ms before bird name ends
+      // Set up one-time completion handler for bird name
+      _birdPlayer.onPlayerComplete.listen((event) {
+        _logDebug('Bird name completed, playing part 3 immediately');
+        if (!_isMuted) {
+          _outroPlayer.play(AssetSource('audio/recorded/er_oprettet.mp3'));
+        }
+      }, cancelOnError: true);
       
-      _logDebug('Three-part sequence timing: part1=${part1Duration}ms, birdStart=${birdNameStartTime}ms, outroStart=${outroStartTime}ms');
-      
-      // 2. Start playing part 1 - "Observation for"
+      // Start the sequence with part 1
       _isPlaying = true;
       notifyListeners();
       await _introPlayer.play(AssetSource('audio/recorded/observation_for.mp3'));
       
-      // 3. Schedule bird name to start at the right time
-      Future.delayed(Duration(milliseconds: birdNameStartTime), () async {
-        if (!_isMuted) {
-          _logDebug('Playing bird name in confirmation sequence');
-          await _birdPlayer.play(AssetSource(birdPath));
-          
-          // 4. Schedule outro to start at the right time
-          Future.delayed(Duration(milliseconds: outroStartTime - birdNameStartTime), () async {
-            if (!_isMuted) {
-              _logDebug('Playing outro "er oprettet" in confirmation sequence');
-              await _outroPlayer.play(AssetSource('audio/recorded/er_oprettet.mp3'));
-            }
-          });
-        }
-      });
-      
     } catch (e) {
       _logDebug('Error in playBirdConfirmation: $e');
       _isPlaying = false;
-      _sequenceCompletedCount = 0;
+      _lastPlaybackType = '';
       notifyListeners();
     }
   }
@@ -180,6 +153,11 @@ class RecordingPlayerService extends ChangeNotifier {
     
     try {
       _logDebug('Playing prompt: $promptKey');
+      
+      // Reset counters and set the last playback type
+      _sequenceCompletedCount = 0;
+      _expectedCompletions = 1;
+      _lastPlaybackType = promptKey;
       
       // Special case for bird names
       if (promptKey.startsWith('bird_name:')) {
@@ -219,7 +197,7 @@ class RecordingPlayerService extends ChangeNotifier {
           path = 'audio/recorded/bird_denied.mp3';
           break;
         default:
-          path = 'audio/seilent.mp3';
+          path = 'audio/silent.mp3';
       }
       
       await stopAudio();
@@ -229,6 +207,7 @@ class RecordingPlayerService extends ChangeNotifier {
     } catch (e) {
       _logDebug('Error in playPrompt: $e');
       _isPlaying = false;
+      _lastPlaybackType = '';
       notifyListeners();
     }
   }
@@ -253,6 +232,11 @@ class RecordingPlayerService extends ChangeNotifier {
     try {
       _logDebug('Playing bird sound: $birdName');
       
+      // Reset counters and set type
+      _sequenceCompletedCount = 0;
+      _expectedCompletions = 1;
+      _lastPlaybackType = 'bird_sound';
+      
       String simplifiedName = _simplifyName(birdName);
       String path = 'audio/recorded/birds/$simplifiedName.mp3';
       
@@ -263,27 +247,7 @@ class RecordingPlayerService extends ChangeNotifier {
     } catch (e) {
       _logDebug('Error playing bird sound: $e');
       _isPlaying = false;
-      notifyListeners();
-    }
-  }
-  
-  // Try to play a test bird sound from the Test directory
-  Future<void> playTestBirdSound() async {
-    if (_isMuted) return;
-    
-    try {
-      _logDebug('Attempting to play test bird sound');
-      
-      // Try the test bird sound you listed in your assets
-      final path = 'audio/Test/XC521615 - Blåmejse - Cyanistes caeruleus.mp3';
-      
-      await stopAudio();
-      await _birdPlayer.play(AssetSource(path));
-      _isPlaying = true;
-      notifyListeners();
-    } catch (e) {
-      _logDebug('Error playing test bird sound: $e');
-      _isPlaying = false;
+      _lastPlaybackType = '';
       notifyListeners();
     }
   }
@@ -295,8 +259,11 @@ class RecordingPlayerService extends ChangeNotifier {
     await _birdPlayer.stop();
     await _outroPlayer.stop();
     
+    // Reset state
     _isPlaying = false;
     _sequenceCompletedCount = 0;
+    // We don't reset _lastPlaybackType here so that the coordinator can still respond to it
+    
     notifyListeners();
   }
   
@@ -317,6 +284,11 @@ class RecordingPlayerService extends ChangeNotifier {
     if (_debugMode) {
       debugPrint('RecordingPlayerService: $message');
     }
+  }
+  
+  // Reset the last playback type (useful after handling completion)
+  void resetLastPlaybackType() {
+    _lastPlaybackType = '';
   }
   
   // Clean up resources
