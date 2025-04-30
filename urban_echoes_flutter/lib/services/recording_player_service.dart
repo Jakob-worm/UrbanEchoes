@@ -184,6 +184,9 @@ class RecordingPlayerService extends ChangeNotifier {
         case 'er_oprettet':
           path = 'audio/recorded/er_oprettet.mp3';
           break;
+        case 'okay_observation_er_slettet':
+          path = 'audio/recorded/okay_observation_er_slettet.mp3';
+          break;
         case 'start_listening':
           path = 'audio/recorded/start_listening.mp3';
           break;
