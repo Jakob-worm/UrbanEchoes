@@ -125,7 +125,7 @@ class SpeechCoordinator extends ChangeNotifier {
     if (confirmed) {
       // User confirmed the bird sighting
       
-      // Play "Du har observeret en [bird name]" using our new method
+      // Play "Du har observeret en [bird name]" using new method
       _audioService.playBirdConfirmation(_currentBirdInQuestion);
       
       // Here you could save the observation to a database
