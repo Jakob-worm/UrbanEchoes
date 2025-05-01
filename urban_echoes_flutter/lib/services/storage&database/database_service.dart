@@ -8,7 +8,7 @@ import 'package:urban_echoes/models/season.dart';
 import 'package:urban_echoes/services/season_service.dart';
 
 class DatabaseService {
-  PostgreSQLConnection? _connection;
+  late final PostgreSQLConnection _connection;
   bool _isConnected = false;
 
   // Singleton pattern
@@ -38,14 +38,14 @@ class DatabaseService {
   
   // Ensure database connection
   bool connected = await _ensureConnection();
-  if (!connected || _connection == null) {
+  if (!connected) {
     debugPrint('Database connection not available for bird lookup');
     return null;
   }
   
   try {
     // Try exact match first
-    final results = await _connection!.query(
+    final results = await _connection.query(
       '''
       SELECT common_name, scientific_name
       FROM birds
@@ -63,7 +63,7 @@ class DatabaseService {
     }
     
     // Try case-insensitive match as fallback
-    final fuzzyResults = await _connection!.query(
+    final fuzzyResults = await _connection.query(
       '''
       SELECT common_name, scientific_name
       FROM birds
@@ -105,7 +105,7 @@ class DatabaseService {
       _connection = PostgreSQLConnection(dbHost, 5432, 'urban_echoes_db ',
           username: dbUser, password: dbPassword, useSSL: true);
 
-      await _connection!.open();
+      await _connection.open();
       debugPrint('Database connection established successfully');
       _isConnected = true;
       return true;
@@ -119,15 +119,15 @@ class DatabaseService {
 
   // Connection methods (unchanged)
   Future<void> closeConnection() async {
-    if (_isConnected && _connection != null) {
-      await _connection!.close();
+    if (_isConnected) {
+      await _connection.close();
       _isConnected = false;
       debugPrint('Database connection closed');
     }
   }
 
   Future<bool> _ensureConnection() async {
-    if (_connection == null || !_isConnected) {
+    if (!_isConnected) {
       try {
         return await _createConnection();
       } catch (e) {
@@ -346,7 +346,7 @@ class DatabaseService {
   // Add this method to migrate existing database structure if needed
   Future<bool> migrateDatabase() async {
     bool connected = await _ensureConnection();
-    if (!connected || _connection == null) {
+    if (!connected) {
       return false;
     }
     
@@ -362,13 +362,13 @@ class DatabaseService {
       // If column doesn't exist, add it
       if (columnCheck.isEmpty) {
         debugPrint('Adding source_id column to bird_observations table');
-        await _connection!.query('''
+        await _connection.query('''
           ALTER TABLE bird_observations
           ADD COLUMN source_id TEXT
         ''');
         
         // Add index for faster lookups
-        await _connection!.query('''
+        await _connection.query('''
           CREATE INDEX idx_bird_observations_source_id
           ON bird_observations(source_id)
         ''');
