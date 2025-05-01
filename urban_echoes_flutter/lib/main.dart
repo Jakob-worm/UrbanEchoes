@@ -5,6 +5,7 @@ import 'package:urban_echoes/pages/nav_bars_page.dart';
 import 'package:urban_echoes/pages/intro_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:urban_echoes/services/app_startup_service.dart';
+import 'package:urban_echoes/services/recording_player_service.dart';
 import 'package:urban_echoes/services/location_service.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:urban_echoes/services/season_service.dart';
@@ -12,7 +13,6 @@ import 'package:urban_echoes/services/speach_regognition/bird_regognition_servic
 import 'package:urban_echoes/services/speach_regognition/speech_recognition_service.dart';
 import 'package:urban_echoes/services/speach_regognition/word_recognition.dart';
 import 'package:urban_echoes/services/speach_regognition/speech_coordinator.dart';
-import 'package:urban_echoes/services/tts/tts_service.dart';
 import 'package:urban_echoes/state%20manegers/map_state_manager.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 import 'package:urban_echoes/utils/navigation_provider.dart';
@@ -110,12 +110,11 @@ class MyApp extends StatelessWidget {
       create: (context) => NavigationProvider(),
     ),
 
-    // TTS Service - moved before speech recognition services
-    ChangeNotifierProvider<TtsService>(
-      create: (_) => TtsService(debugMode: debugMode),
+    ChangeNotifierProvider<RecordingPlayerService>(
+      create: (_) => RecordingPlayerService(debugMode: debugMode),
       lazy: true,
     ),
-
+    
     // Base speech recognition service
     ChangeNotifierProvider<SpeechRecognitionService>(
       create: (_) => SpeechRecognitionService(debugMode: debugMode),
@@ -139,21 +138,21 @@ class MyApp extends StatelessWidget {
         SpeechRecognitionService,
         BirdRecognitionService,
         WordRecognitionService,
-        TtsService,
+        RecordingPlayerService,
         SpeechCoordinator>(
       create: (context) => SpeechCoordinator(
         speechService: Provider.of<SpeechRecognitionService>(context, listen: false),
         birdService: Provider.of<BirdRecognitionService>(context, listen: false),
         wordService: Provider.of<WordRecognitionService>(context, listen: false),
-        ttsService: Provider.of<TtsService>(context, listen: false),
+        audioService: Provider.of<RecordingPlayerService>(context, listen: false),
         debugMode: debugMode,
       ),
-      update: (context, speechService, birdService, wordService, ttsService, previous) => 
+      update: (context, speechService, birdService, wordService, audioService, previous) => 
         SpeechCoordinator(
           speechService: speechService,
           birdService: birdService,
           wordService: wordService,
-          ttsService: ttsService,
+          audioService: audioService,
           debugMode: debugMode,
         ),
     ),
