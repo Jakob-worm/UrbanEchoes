@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:postgres/postgres.dart';
 import 'dart:async';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:urban_echoes/models/bird.dart';
 import 'package:urban_echoes/models/bird_observation.dart';
 import 'package:urban_echoes/models/season.dart';
 import 'package:urban_echoes/services/season_service.dart';
@@ -32,6 +33,60 @@ class DatabaseService {
       return false;
     }
   }
+  Future<Bird?> getBirdByCommonName(String commonName) async {
+  if (commonName.isEmpty) return null;
+  
+  // Ensure database connection
+  bool connected = await _ensureConnection();
+  if (!connected || _connection == null) {
+    debugPrint('Database connection not available for bird lookup');
+    return null;
+  }
+  
+  try {
+    // Try exact match first
+    final results = await _connection!.query(
+      '''
+      SELECT common_name, scientific_name
+      FROM birds
+      WHERE common_name = @commonName
+      LIMIT 1
+      ''',
+      substitutionValues: {'commonName': commonName},
+    );
+    
+    if (results.isNotEmpty) {
+      return Bird(
+        commonName: results.first[0] as String,
+        scientificName: results.first[1] as String,
+      );
+    }
+    
+    // Try case-insensitive match as fallback
+    final fuzzyResults = await _connection!.query(
+      '''
+      SELECT common_name, scientific_name
+      FROM birds
+      WHERE LOWER(common_name) = LOWER(@commonName)
+      LIMIT 1
+      ''',
+      substitutionValues: {'commonName': commonName},
+    );
+    
+    if (fuzzyResults.isNotEmpty) {
+      return Bird(
+        commonName: fuzzyResults.first[0] as String,
+        scientificName: fuzzyResults.first[1] as String,
+      );
+    }
+    
+    debugPrint('No bird found with common name: $commonName');
+    return null;
+  } catch (e) {
+    debugPrint('Error looking up bird by common name: $e');
+    return null;
+  }
+}
 
   // Create connection (unchanged)
   Future<bool> _createConnection() async {

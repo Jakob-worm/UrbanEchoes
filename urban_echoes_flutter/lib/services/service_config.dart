@@ -8,8 +8,8 @@ class ServiceConfig {
   double maxRange = 50.0; // Default point radius in meters
   double hyperlocalRadius = 10.0; // Hyperlocal point radius
   int gridSize = 1000; // Grid size in meters
-  double distanceFilter = 5.0; // Minimum distance between location updates
-  int updateIntervalSeconds = 15; // Time between location updates
+  double distanceFilter = 2.0; // Minimum distance between location updates
+  int updateIntervalSeconds = 3; // Time between location updates
   int batchUpdateMs = 500; // UI update batching time
   int maxFailuresBeforeFallback = 3; // Number of failures before using fallback
   

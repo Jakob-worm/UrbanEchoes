@@ -130,4 +130,47 @@ class ObservationService {
       return [];
     }
   }
+  
+  /// Upload an observation to the API
+  Future<bool> uploadObservation(Map<String, dynamic> observationData) async {
+    try {
+      // Construct the proper URL with the observations endpoint
+      final url = _getEndpointUrl('observations');
+      debugPrint('Uploading observation to $url');
+      debugPrint('Observation data: $observationData');
+      
+      // Send the POST request
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: json.encode(observationData),
+      );
+      
+      // Check if the request was successful
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        debugPrint('Observation uploaded successfully');
+        
+        // Parse the response
+        final decodedBody = utf8.decode(response.bodyBytes);
+        final responseData = json.decode(decodedBody);
+        debugPrint('API response: $responseData');
+        
+        // Add the new observation ID to known IDs if it's returned
+        if (responseData.containsKey('id') && responseData['id'] is int) {
+          _knownObservationIds.add(responseData['id']);
+        }
+        
+        return true;
+      } else {
+        debugPrint('Failed to upload observation: ${response.statusCode}');
+        debugPrint('Response body: ${response.body}');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('Error uploading observation: $e');
+      return false;
+    }
+  }
 }
