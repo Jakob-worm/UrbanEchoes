@@ -42,7 +42,6 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
       
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Dansk Fugle Genkendelse'),
           backgroundColor: Colors.green[700],
           elevation: 0,
         ),
