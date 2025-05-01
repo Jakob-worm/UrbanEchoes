@@ -99,7 +99,7 @@ class ObservationUploader extends ChangeNotifier {
       
       // 5. Show success notification
       if (_notificationService != null) {
-        _notificationService!.showSuccessNotification(observation);
+        _notificationService.showSuccessNotification(observation);
       }
       
       _isUploading = false;
@@ -111,7 +111,7 @@ class ObservationUploader extends ChangeNotifier {
       
       // Show error notification
       if (_notificationService != null) {
-        _notificationService!.showErrorNotification(_errorMessage!);
+        _notificationService.showErrorNotification(_errorMessage!);
       }
       
       _isUploading = false;
