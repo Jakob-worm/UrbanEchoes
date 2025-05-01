@@ -25,7 +25,7 @@ class DatabaseService {
   // Initialize connection (unchanged)
   Future<bool> initialize() async {
     try {
-      if (_isConnected && _connection != null) return true;
+      if (_isConnected) return true;
 
       return await _createConnection();
     } catch (e) {
@@ -137,7 +137,7 @@ class DatabaseService {
     }
 
     try {
-      await _connection!.query('SELECT 1');
+      await _connection.query('SELECT 1');
       return true;
     } catch (e) {
       debugPrint('Connection test failed, reconnecting: $e');
@@ -149,14 +149,14 @@ class DatabaseService {
   // Updated method to add bird observation with sourceId
   Future<int> addBirdObservation(BirdObservation observation) async {
     bool connected = await _ensureConnection();
-    if (!connected || _connection == null) {
+    if (!connected) {
       throw Exception('Database connection not available');
     }
 
     try {
       // First check if sourceId exists (for eBird observations)
       if (observation.sourceId != null && observation.sourceId!.isNotEmpty) {
-        final existingRecords = await _connection!.query(
+        final existingRecords = await _connection.query(
           'SELECT id FROM bird_observations WHERE source_id = @sourceId',
           substitutionValues: {'sourceId': observation.sourceId},
         );
@@ -167,7 +167,7 @@ class DatabaseService {
         }
       }
 
-      final results = await _connection!.query(
+      final results = await _connection.query(
         '''
         INSERT INTO bird_observations (
           bird_name, 
@@ -227,12 +227,12 @@ class DatabaseService {
   // Updated method to get observations including sourceId
   Future<List<BirdObservation>> getAllBirdObservations({Season? seasonFilter}) async {
     bool connected = await _ensureConnection();
-    if (!connected || _connection == null) {
+    if (!connected) {
       return [];
     }
 
     try {
-      final results = await _connection!.query('''
+      final results = await _connection.query('''
         SELECT 
           id, 
           bird_name, 
@@ -296,13 +296,13 @@ class DatabaseService {
   // New method to clean up duplicate observations in database
   Future<int> cleanupDuplicateObservations() async {
     bool connected = await _ensureConnection();
-    if (!connected || _connection == null) {
+    if (!connected) {
       return 0;
     }
     
     try {
       // First handle observations with source_id (keep only one record for each source_id)
-      await _connection!.query('''
+      await _connection.query('''
         WITH duplicates AS (
           SELECT id, source_id, 
             ROW_NUMBER() OVER (PARTITION BY source_id ORDER BY created_at) as row_num
@@ -316,7 +316,7 @@ class DatabaseService {
       ''');
       
       // Then handle observations without source_id based on composite key
-      final results = await _connection!.query('''
+      final results = await _connection.query('''
         WITH duplicates AS (
           SELECT id,
             ROW_NUMBER() OVER (
@@ -352,7 +352,7 @@ class DatabaseService {
     
     try {
       // Check if source_id column exists
-      final columnCheck = await _connection!.query('''
+      final columnCheck = await _connection.query('''
         SELECT column_name 
         FROM information_schema.columns 
         WHERE table_name = 'bird_observations'

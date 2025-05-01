@@ -1,7 +1,6 @@
 // In your BirdHomePage.build method
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:urban_echoes/services/recording_player_service.dart';
 import 'package:urban_echoes/services/speach_regognition/speech_coordinator.dart';
 
 class BirdHomePage extends StatefulWidget {
@@ -284,14 +283,11 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
                   child: FloatingActionButton(
                     onPressed: () {
                       final coordinator = Provider.of<SpeechCoordinator>(context, listen: false);
-                      final recordingPlayerService = Provider.of<RecordingPlayerService>(context, listen: false);
                       
                       if (coordinator.isListening) {
                         coordinator.stopListening();
-                        //audioService.playPrompt('stop_listening');
                       } else {
                         coordinator.startListening();
-                        //recordingPlayerService.playPrompt('start_listening');
                       }
                     },
                     backgroundColor: coordinator.isListening ? Colors.red : Colors.green[600],
