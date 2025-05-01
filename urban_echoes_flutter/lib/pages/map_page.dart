@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 
 import 'package:geolocator/geolocator.dart';
 import 'package:urban_echoes/services/location_service.dart';
-import 'package:urban_echoes/services/observation_service.dart';
+import 'package:urban_echoes/services/observation/observation_service.dart';
 import 'package:urban_echoes/services/season_service.dart';
 import 'package:urban_echoes/models/season.dart';
 import 'package:urban_echoes/services/service_config.dart'; // Import ServiceConfig

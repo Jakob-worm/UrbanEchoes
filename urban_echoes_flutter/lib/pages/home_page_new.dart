@@ -37,7 +37,6 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
   Widget build(BuildContext context) {
   return Consumer<SpeechCoordinator>(
     builder: (context, coordinator, child) {
-      final speechService = coordinator.speechService;
       final birdService = coordinator.birdService;
       final wordService = coordinator.wordService;
       

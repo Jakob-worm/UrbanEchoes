@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
-import 'package:urban_echoes/models/bird_observation.dart';
-import 'package:urban_echoes/services/observation_service.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:intl/intl.dart';
+import 'package:urban_echoes/models/bird_observation.dart';
+import 'package:urban_echoes/services/observation/observation_service.dart';
+import 'package:urban_echoes/services/observation/upload_notification_service.dart';
 import 'package:urban_echoes/services/service_config.dart';
 import 'package:urban_echoes/services/storage&database/database_service.dart';
-import 'package:urban_echoes/services/upload_notification_service.dart';
 
 class ObservationUploader extends ChangeNotifier {
   final DatabaseService _databaseService;

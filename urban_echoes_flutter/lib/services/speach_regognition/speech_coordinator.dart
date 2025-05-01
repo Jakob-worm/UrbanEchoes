@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:urban_echoes/services/observation_uploader.dart';
+import 'package:urban_echoes/services/observation/observation_uploader.dart';
 import 'package:urban_echoes/services/recording_player_service.dart';
 import 'package:urban_echoes/services/service_config.dart';
 import 'package:urban_echoes/services/speach_regognition/bird_regognition_service.dart';

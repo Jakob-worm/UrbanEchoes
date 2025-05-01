@@ -13,15 +13,16 @@ import 'package:urban_echoes/services/speach_regognition/bird_regognition_servic
 import 'package:urban_echoes/services/speach_regognition/speech_recognition_service.dart';
 import 'package:urban_echoes/services/speach_regognition/word_recognition.dart';
 import 'package:urban_echoes/services/speach_regognition/speech_coordinator.dart';
-import 'package:urban_echoes/services/upload_notification_service.dart';
+import 'package:urban_echoes/services/observation/upload_notification_service.dart';
 import 'package:urban_echoes/state%20manegers/map_state_manager.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 import 'package:urban_echoes/utils/navigation_provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:urban_echoes/services/service_config.dart';
 import 'package:urban_echoes/services/storage&database/database_service.dart';
-import 'package:urban_echoes/services/observation_service.dart';
-import 'package:urban_echoes/services/observation_uploader.dart';
+
+import 'services/observation/observation_service.dart';
+import 'services/observation/observation_uploader.dart';
 
 
 Future<void> main() async {
