@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 
@@ -17,26 +19,39 @@ class RecordingPlayerService extends ChangeNotifier {
   int _sequenceCompletedCount = 0;
   int _expectedCompletions = 0;
   
+  // Subscription declarations
+  StreamSubscription<void>? _introPlayerSubscription;
+  StreamSubscription<void>? _birdPlayerSubscription;
+  StreamSubscription<void>? _outroPlayerSubscription;
+  // Add the missing subscription declarations
+  StreamSubscription<void>? _introCompleteSubscription;
+  StreamSubscription<void>? _birdCompleteSubscription;
+  
   // Constructor
   RecordingPlayerService({bool debugMode = false}) : _debugMode = debugMode {
     _initAudioPlayers();
   }
   
   void _initAudioPlayers() {
+    // Cancel any existing subscriptions
+    _introPlayerSubscription?.cancel();
+    _birdPlayerSubscription?.cancel();
+    _outroPlayerSubscription?.cancel();
+    
     // Setup completion listeners
-    _introPlayer.onPlayerComplete.listen((_) {
+    _introPlayerSubscription = _introPlayer.onPlayerComplete.listen((_) {
       _logDebug('Intro playback completed');
       _sequenceCompletedCount++;
       _checkSequenceCompletion();
     });
     
-    _birdPlayer.onPlayerComplete.listen((_) {
+    _birdPlayerSubscription = _birdPlayer.onPlayerComplete.listen((_) {
       _logDebug('Bird name playback completed');
       _sequenceCompletedCount++;
       _checkSequenceCompletion();
     });
     
-    _outroPlayer.onPlayerComplete.listen((_) {
+    _outroPlayerSubscription = _outroPlayer.onPlayerComplete.listen((_) {
       _logDebug('Outro playback completed');
       _sequenceCompletedCount++;
       _checkSequenceCompletion();
@@ -75,8 +90,11 @@ class RecordingPlayerService extends ChangeNotifier {
       _expectedCompletions = 2; // Intro + Bird Name
       _lastPlaybackType = 'bird_question';
       
-      // 1. Set up the completion handler for the intro
-      _introPlayer.onPlayerComplete.listen((event) {
+      // Cancel any existing subscriptions first
+      _introCompleteSubscription?.cancel();
+      
+      // 1. Set up the completion handler for the intro (one-time listener)
+      _introCompleteSubscription = _introPlayer.onPlayerComplete.listen((event) {
         _logDebug('Intro completed, playing bird name immediately');
         if (!_isMuted) {
           // Play bird name right after intro completes
@@ -84,6 +102,10 @@ class RecordingPlayerService extends ChangeNotifier {
           String birdPath = 'audio/recorded/birds/$simplifiedName.mp3';
           _birdPlayer.play(AssetSource(birdPath));
         }
+        
+        // Cancel this subscription after it's used
+        _introCompleteSubscription?.cancel();
+        _introCompleteSubscription = null;
       }, cancelOnError: true);
       
       // 2. Start playing intro
@@ -118,20 +140,28 @@ class RecordingPlayerService extends ChangeNotifier {
       String simplifiedName = _simplifyName(birdName);
       String birdPath = 'audio/recorded/birds/$simplifiedName.mp3';
       
+      // Cancel any existing subscriptions
+      _introCompleteSubscription?.cancel();
+      _birdCompleteSubscription?.cancel();
+      
       // Set up one-time completion handler for part 1
-      _introPlayer.onPlayerComplete.listen((event) {
+      _introCompleteSubscription = _introPlayer.onPlayerComplete.listen((event) {
         _logDebug('Part 1 completed, playing bird name immediately');
         if (!_isMuted) {
           _birdPlayer.play(AssetSource(birdPath));
         }
+        _introCompleteSubscription?.cancel();
+        _introCompleteSubscription = null;
       }, cancelOnError: true);
       
       // Set up one-time completion handler for bird name
-      _birdPlayer.onPlayerComplete.listen((event) {
+      _birdCompleteSubscription = _birdPlayer.onPlayerComplete.listen((event) {
         _logDebug('Bird name completed, playing part 3 immediately');
         if (!_isMuted) {
           _outroPlayer.play(AssetSource('audio/recorded/er_oprettet.mp3'));
         }
+        _birdCompleteSubscription?.cancel();
+        _birdCompleteSubscription = null;
       }, cancelOnError: true);
       
       // Start the sequence with part 1
@@ -298,6 +328,11 @@ class RecordingPlayerService extends ChangeNotifier {
   @override
   void dispose() {
     _logDebug('Disposing audio players');
+    _introPlayerSubscription?.cancel();
+    _birdPlayerSubscription?.cancel();
+    _outroPlayerSubscription?.cancel();
+    _introCompleteSubscription?.cancel();
+    _birdCompleteSubscription?.cancel();
     _introPlayer.dispose();
     _birdPlayer.dispose();
     _outroPlayer.dispose();
