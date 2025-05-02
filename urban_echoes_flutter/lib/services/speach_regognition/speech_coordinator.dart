@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:urban_echoes/models/bird_observation.dart';
 import 'package:urban_echoes/services/observation/observation_uploader.dart';
 import 'package:urban_echoes/services/recording_player_service.dart';
 import 'package:urban_echoes/services/service_config.dart';
@@ -31,14 +32,20 @@ class SpeechCoordinator extends ChangeNotifier {
 
   final RecordingPlayerService _audioService;
   final BirdRecognitionService _birdService;
-  final ObservationUploader _observationUploader; // Add this line
+  final ObservationUploader _observationUploader;
   String _currentBirdInQuestion = '';
   final bool _debugMode;
   // State for confirmation workflow
   bool _isWaitingForConfirmation = false;
+  // Flag to track if we're currently processing a bird recognition
+  bool _isProcessingBirdRecognition = false;
 
   final SpeechRecognitionService _speechService;
   final WordRecognitionService _wordService;
+  
+  // Observation tracking
+  BirdObservation? _latestObservation;
+  BirdObservation? get latestObservation => _latestObservation;
 
   @override
   void dispose() {
@@ -50,25 +57,17 @@ class SpeechCoordinator extends ChangeNotifier {
 
   // Getters to expose underlying services
   SpeechRecognitionService get speechService => _speechService;
-
   BirdRecognitionService get birdService => _birdService;
-
   WordRecognitionService get wordService => _wordService;
-
   RecordingPlayerService get audioService => _audioService;
-
   bool get isListening => _speechService.isListening;
-
   String get recognizedText => _speechService.recognizedText;
-
   double get confidence => _speechService.confidence;
-
   String? get errorMessage => _speechService.errorMessage ??
                              _birdService.errorMessage;
 
   // Confirmation workflow getters
   bool get isWaitingForConfirmation => _isWaitingForConfirmation;
-
   String get currentBirdInQuestion => _currentBirdInQuestion;
 
   // Handle deletion of the last observation
@@ -90,10 +89,13 @@ class SpeechCoordinator extends ChangeNotifier {
   }
 
   void handleBirdRecognition(String birdName) {
-  if (birdName.isNotEmpty) {
-    _logDebug('Handling bird recognition: $birdName');
+    // Skip if we're already processing a bird recognition or the bird name is empty
+    if (_isProcessingBirdRecognition || birdName.isEmpty) return;
     
-    // Set waiting for confirmation state FIRST
+    _logDebug('Handling bird recognition: $birdName');
+    _isProcessingBirdRecognition = true; // Set the flag
+    
+    // Set waiting for confirmation state FIRST, before playing audio
     _isWaitingForConfirmation = true;
     _currentBirdInQuestion = birdName;
     notifyListeners();
@@ -108,10 +110,8 @@ class SpeechCoordinator extends ChangeNotifier {
     
     // The audio completion listener will handle resuming the speech recognition
   }
-}
 
-  // Updated handleConfirmationResponse method in SpeechCoordinator class
-  void handleConfirmationResponse(bool confirmed) {
+  void handleConfirmationResponse(bool confirmed) async {
     if (!_isWaitingForConfirmation) return;
     
     _logDebug('Handling confirmation response: ${confirmed ? "Yes" : "No"}');
@@ -127,37 +127,48 @@ class SpeechCoordinator extends ChangeNotifier {
       _audioService.playBirdConfirmation(_currentBirdInQuestion);
       
       // Save and upload the observation using ObservationUploader
-      _observationUploader.saveAndUploadObservation(
+      BirdObservation? createdObservation = await _observationUploader.saveAndUploadObservation(
         _currentBirdInQuestion,
         quantity: 1,  // Default quantity
-        observerId: 1 // Default observer ID (you might want to make this configurable)
-      ).then((success) {
-        if (success != null) {
-          _logDebug('Successfully saved and uploaded observation for $_currentBirdInQuestion');
-        } else {
-          _logDebug('Failed to save/upload observation: ${_observationUploader.errorMessage}');
-          // Optionally, you could play an error sound or show a notification to the user
-        }
-      });
+        observerId: 1 // Default observer ID
+      );
+      
+      if (createdObservation != null) {
+        _logDebug('Successfully saved and uploaded observation for $_currentBirdInQuestion');
+        
+        // Notify the UI to display the new observation
+        _broadcastNewObservation(createdObservation);
+      } else {
+        _logDebug('Failed to save/upload observation: ${_observationUploader.errorMessage}');
+        // Optionally, you could play an error sound or show a notification to the user
+      }
     } else {
       // User denied the bird sighting - play the deletion confirmation sound
       _audioService.playPrompt('okay_observation_er_slettet');
-      
-      // Optionally, if you need to do something when an observation is rejected
-      // For example, logging that a suggestion was declined
     }
     
-    // Reset confirmation state
+    // Reset confirmation state and flags
     _isWaitingForConfirmation = false;
+    _isProcessingBirdRecognition = false;
     _currentBirdInQuestion = '';
     notifyListeners();
     
     // The audio completion listener will handle resuming the speech recognition
   }
 
+  // Method to broadcast new observation
+  void _broadcastNewObservation(BirdObservation observation) {
+    _latestObservation = observation;
+    notifyListeners();
+  }
+
   // Methods to control speech recognition
   Future<bool> startListening() async {
     _logDebug('Starting listening through coordinator');
+    
+    // Reset all flags to ensure clean state
+    _isProcessingBirdRecognition = false;
+    _isWaitingForConfirmation = false;
     
     // Stop any ongoing audio before starting to listen
     if (_audioService.isPlaying) {
@@ -187,37 +198,71 @@ class SpeechCoordinator extends ChangeNotifier {
 
   // Handle audio state changes
   void _onAudioStateChanged() {
-  // If audio was playing and has now stopped
-  if (!_audioService.isPlaying && _audioService.lastPlaybackType.isNotEmpty) {
-    _logDebug('Audio completed: ${_audioService.lastPlaybackType}');
-    
-    // Handle different types of audio completion
-    switch (_audioService.lastPlaybackType) {
-      case 'bird_question':
-        // Make sure we're in the waiting for confirmation state
-        if (!_isWaitingForConfirmation && _currentBirdInQuestion.isNotEmpty) {
-          _isWaitingForConfirmation = true;
-          notifyListeners();
-        }
-        _resumeListeningAfterBirdQuestion();
-        break;
+    // If audio was playing and has now stopped
+    if (!_audioService.isPlaying && _audioService.lastPlaybackType.isNotEmpty) {
+      _logDebug('Audio completed: ${_audioService.lastPlaybackType}');
       
-      // Other cases remain the same...
+      // Handle different types of audio completion
+      switch (_audioService.lastPlaybackType) {
+        case 'bird_question':
+          // Clear the processing flag but keep the waiting flag
+          _isProcessingBirdRecognition = false;
+          _resumeListeningAfterBirdQuestion();
+          break;
+          
+        case 'bird_confirmation':
+          // Clear all flags
+          _isProcessingBirdRecognition = false;
+          _isWaitingForConfirmation = false;
+          _resumeListeningAfterConfirmation();
+          break;
+          
+        case 'bird_denied':
+          // Clear all flags
+          _isProcessingBirdRecognition = false;
+          _isWaitingForConfirmation = false;
+          _resumeListeningAfterDenial();
+          break;
+          
+        case 'okay_observation_er_slettet':
+          // Clear all flags
+          _isProcessingBirdRecognition = false;
+          _isWaitingForConfirmation = false;
+          _resumeListeningAfterObservationDeleted();
+          break;
+          
+        case 'start_listening':
+          // Start listening after the intro sound has completed
+          // Make sure no confirmation flow is active
+          _isProcessingBirdRecognition = false;
+          _isWaitingForConfirmation = false;
+          
+          if (!_speechService.isListening) {
+            _speechService.startListening();
+          }
+          break;
+          
+        case 'stop_listening':
+          // Process final recognition results after the stop sound
+          _processRecognitionResults();
+          break;
+      }
+      
+      // Reset the last playback type after handling it
+      _audioService.resetLastPlaybackType();
     }
-    
-    // Reset the last playback type after handling it
-    _audioService.resetLastPlaybackType();
   }
-}
 
   // Resume listening after a bird question has played
   void _resumeListeningAfterBirdQuestion() {
-  if (!_speechService.isListening && _isWaitingForConfirmation) {
-    _logDebug('Resuming listening for confirmation after bird question');
-    
-    _speechService.startListening();
+    // Only resume listening if we're waiting for confirmation and not already listening
+    if (!_speechService.isListening && _isWaitingForConfirmation) {
+      _logDebug('Resuming listening for confirmation after bird question');
+      _speechService.startListening();
+    } else {
+      _logDebug('Not resuming listening after bird question - not in confirmation state');
+    }
   }
-}
 
   // Resume listening after confirmation
   void _resumeListeningAfterConfirmation() {
@@ -248,6 +293,12 @@ class SpeechCoordinator extends ChangeNotifier {
     if (_speechService.recognizedText.isNotEmpty) {
       _logDebug('Processing recognized text: ${_speechService.recognizedText}');
       
+      // Skip bird name processing if we're already in a confirmation flow
+      if (_isWaitingForConfirmation || _isProcessingBirdRecognition) {
+        _logDebug('Skipping recognition processing - already in confirmation flow');
+        return;
+      }
+      
       // First try special words
       _wordService.processText(_speechService.recognizedText);
       
@@ -277,7 +328,10 @@ class SpeechCoordinator extends ChangeNotifier {
       _logDebug('Processing confirmation word: ${_wordService.recognizedSpecialWord}');
       
       // Handle Yes/No response
-      if (_wordService.recognizedSpecialWord == 'ja') {
+      if (_wordService.recognizedSpecialWord == 'ja' ||
+          _wordService.recognizedSpecialWord == 'yes' ||
+          _wordService.recognizedSpecialWord == 'jeps' ||
+          _wordService.recognizedSpecialWord == 'yeah') {
         handleConfirmationResponse(true);
       } else if (_wordService.recognizedSpecialWord == 'nej') {
         handleConfirmationResponse(false);
@@ -302,7 +356,7 @@ class SpeechCoordinator extends ChangeNotifier {
       // Else continue waiting for confirmation
     } 
     // If not waiting for confirmation and a bird was recognized
-    else if (_birdService.matchedBird.isNotEmpty) {
+    else if (_birdService.matchedBird.isNotEmpty && !_isProcessingBirdRecognition) {
       handleBirdRecognition(_birdService.matchedBird);
     }
   }

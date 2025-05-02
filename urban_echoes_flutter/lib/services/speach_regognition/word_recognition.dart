@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 
 class WordRecognitionService extends ChangeNotifier {
   final List<String> _seasonWords = ['sommer', 'forår', 'efterår', 'vinter'];
-  final List<String> _confirmationWords = ['ja', 'nej'];
+  final List<String> _confirmationWords = ['ja','yes','jeps','yeah', 'nej'];
   String _recognizedSpecialWord = '';
   String _wordType = ''; // 'season', 'confirmation', or ''
   bool _debugMode = false;
