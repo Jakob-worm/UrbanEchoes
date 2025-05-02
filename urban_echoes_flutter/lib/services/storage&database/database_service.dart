@@ -8,19 +8,18 @@ import 'package:urban_echoes/models/season.dart';
 import 'package:urban_echoes/services/season_service.dart';
 
 class DatabaseService {
-  late final PostgreSQLConnection _connection;
-  bool _isConnected = false;
-
-  // Singleton pattern
-  static final DatabaseService _instance = DatabaseService._internal();
-
-  final SeasonService _seasonService = SeasonService();
-
   factory DatabaseService() {
     return _instance;
   }
 
   DatabaseService._internal();
+
+  // Singleton pattern
+  static final DatabaseService _instance = DatabaseService._internal();
+
+  late final PostgreSQLConnection _connection;
+  bool _isConnected = false;
+  final SeasonService _seasonService = SeasonService();
 
   // Initialize connection (unchanged)
   Future<bool> initialize() async {
@@ -33,6 +32,7 @@ class DatabaseService {
       return false;
     }
   }
+
   Future<Bird?> getBirdByCommonName(String commonName) async {
   if (commonName.isEmpty) return null;
   
@@ -88,61 +88,12 @@ class DatabaseService {
   }
 }
 
-  // Create connection (unchanged)
-  Future<bool> _createConnection() async {
-    try {
-      debugPrint('Reading environment variables...');
-      final dbHost = dotenv.env['DB_HOST'] ?? '';
-      final dbUser = dotenv.env['DB_USER'] ?? '';
-      final dbPassword = dotenv.env['DB_PASSWORD'] ?? '';
-
-      if (dbHost.isEmpty || dbUser.isEmpty || dbPassword.isEmpty) {
-        debugPrint('Missing database credentials: host=$dbHost, user=$dbUser');
-        return false;
-      }
-
-      debugPrint('Creating database connection...');
-      _connection = PostgreSQLConnection(dbHost, 5432, 'urban_echoes_db ',
-          username: dbUser, password: dbPassword, useSSL: true);
-
-      await _connection.open();
-      debugPrint('Database connection established successfully');
-      _isConnected = true;
-      return true;
-    } catch (e, stackTrace) {
-      debugPrint('Database connection failed: $e');
-      debugPrint(stackTrace as String?);
-      _isConnected = false;
-      return false;
-    }
-  }
-
   // Connection methods (unchanged)
   Future<void> closeConnection() async {
     if (_isConnected) {
       await _connection.close();
       _isConnected = false;
       debugPrint('Database connection closed');
-    }
-  }
-
-  Future<bool> _ensureConnection() async {
-    if (!_isConnected) {
-      try {
-        return await _createConnection();
-      } catch (e) {
-        debugPrint('Failed to reconnect to database: $e');
-        return false;
-      }
-    }
-
-    try {
-      await _connection.query('SELECT 1');
-      return true;
-    } catch (e) {
-      debugPrint('Connection test failed, reconnecting: $e');
-      _isConnected = false;
-      return await _createConnection();
     }
   }
 
@@ -292,7 +243,61 @@ class DatabaseService {
   Future<List<BirdObservation>> getBirdObservationsForSeason(Season season) async {
     return getAllBirdObservations(seasonFilter: season);
   }
-  
+
+  Future<BirdObservation?> getBirdObservationById(int id) async {
+  bool connected = await _ensureConnection();
+  if (!connected) {
+    return null;
+  }
+
+  try {
+    final results = await _connection.query('''
+      SELECT 
+        id, 
+        bird_name, 
+        scientific_name, 
+        sound_directory, 
+        latitude, 
+        longitude, 
+        observation_date, 
+        observation_time, 
+        observer_id, 
+        quantity, 
+        is_test_data, 
+        test_batch_id,
+        source_id
+      FROM bird_observations 
+      WHERE id = @id
+      ''',
+      substitutionValues: {'id': id},
+    );
+
+    if (results.isEmpty) {
+      return null;
+    }
+
+    final row = results.first;
+    return BirdObservation(
+      id: row[0] as int,
+      birdName: row[1] as String,
+      scientificName: row[2] as String,
+      soundDirectory: row[3] as String,
+      latitude: (row[4] as num).toDouble(),
+      longitude: (row[5] as num).toDouble(),
+      observationDate: row[6] as DateTime,
+      observationTime: row[7].toString(),
+      observerId: row[8] as int,
+      quantity: row[9] as int,
+      isTestData: row[10] as bool,
+      testBatchId: row[11] as int,
+      sourceId: row[12] as String?,
+    );
+  } catch (e) {
+    debugPrint('Error fetching bird observation by ID: $e');
+    return null;
+  }
+}
+
   // New method to clean up duplicate observations in database
   Future<int> cleanupDuplicateObservations() async {
     bool connected = await _ensureConnection();
@@ -342,7 +347,7 @@ class DatabaseService {
       return 0;
     }
   }
-  
+
   // Add this method to migrate existing database structure if needed
   Future<bool> migrateDatabase() async {
     bool connected = await _ensureConnection();
@@ -378,6 +383,55 @@ class DatabaseService {
     } catch (e) {
       debugPrint('Database migration failed: $e');
       return false;
+    }
+  }
+
+  // Create connection (unchanged)
+  Future<bool> _createConnection() async {
+    try {
+      debugPrint('Reading environment variables...');
+      final dbHost = dotenv.env['DB_HOST'] ?? '';
+      final dbUser = dotenv.env['DB_USER'] ?? '';
+      final dbPassword = dotenv.env['DB_PASSWORD'] ?? '';
+
+      if (dbHost.isEmpty || dbUser.isEmpty || dbPassword.isEmpty) {
+        debugPrint('Missing database credentials: host=$dbHost, user=$dbUser');
+        return false;
+      }
+
+      debugPrint('Creating database connection...');
+      _connection = PostgreSQLConnection(dbHost, 5432, 'urban_echoes_db ',
+          username: dbUser, password: dbPassword, useSSL: true);
+
+      await _connection.open();
+      debugPrint('Database connection established successfully');
+      _isConnected = true;
+      return true;
+    } catch (e, stackTrace) {
+      debugPrint('Database connection failed: $e');
+      debugPrint(stackTrace as String?);
+      _isConnected = false;
+      return false;
+    }
+  }
+
+  Future<bool> _ensureConnection() async {
+    if (!_isConnected) {
+      try {
+        return await _createConnection();
+      } catch (e) {
+        debugPrint('Failed to reconnect to database: $e');
+        return false;
+      }
+    }
+
+    try {
+      await _connection.query('SELECT 1');
+      return true;
+    } catch (e) {
+      debugPrint('Connection test failed, reconnecting: $e');
+      _isConnected = false;
+      return await _createConnection();
     }
   }
 }

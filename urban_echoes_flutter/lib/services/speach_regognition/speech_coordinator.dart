@@ -132,7 +132,7 @@ class SpeechCoordinator extends ChangeNotifier {
         quantity: 1,  // Default quantity
         observerId: 1 // Default observer ID (you might want to make this configurable)
       ).then((success) {
-        if (success) {
+        if (success != null) {
           _logDebug('Successfully saved and uploaded observation for $_currentBirdInQuestion');
         } else {
           _logDebug('Failed to save/upload observation: ${_observationUploader.errorMessage}');
