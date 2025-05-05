@@ -12,7 +12,14 @@ class BirdHomePage extends StatefulWidget {
 
 class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
+  bool _isProcessing = false;
   late Animation<double> _pulseAnimation;
+
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -25,12 +32,6 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
-  }
-
-  @override
-  void dispose() {
-    _animationController.dispose();
-    super.dispose();
   }
 
   @override
@@ -280,15 +281,23 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
                   margin: const EdgeInsets.only(bottom: 30),
                   child: FloatingActionButton(
                     onPressed: () {
-                      final coordinator = Provider.of<SpeechCoordinator>(context, listen: false);
-                      
-                      if (coordinator.isListening) {
-                        coordinator.stopListening();
-                      } else {
-                        coordinator.startListening();
-                      }
-                    },
-                    backgroundColor: coordinator.isListening ? Colors.red : Colors.green[600],
+                        if (_isProcessing) return; // Prevent rapid multiple presses
+                        setState(() => _isProcessing = true);
+                        
+                        final coordinator = Provider.of<SpeechCoordinator>(context, listen: false);
+                        
+                        if (coordinator.isListening) {
+                          coordinator.stopListening();
+                        } else {
+                          coordinator.startListening();
+                        }
+                        
+                        // Reset after a short delay
+                        Future.delayed(const Duration(milliseconds: 500), () {
+                          if (mounted) setState(() => _isProcessing = false);
+                        });
+                      },
+                                 backgroundColor: coordinator.isListening ? Colors.red : Colors.green[600],
                     elevation: 8,
                     child: Icon(
                       coordinator.isListening ? Icons.mic_off : Icons.mic,
