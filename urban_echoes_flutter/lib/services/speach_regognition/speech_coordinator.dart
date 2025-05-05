@@ -1,4 +1,4 @@
-import 'dart:async'; // Add this import at the top
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:urban_echoes/models/bird_observation.dart';
 import 'package:urban_echoes/services/observation/observation_uploader.dart';
@@ -159,6 +159,14 @@ class SpeechCoordinator extends ChangeNotifier {
     }
     
     if (confirmed) {
+      // Check if observation uploader is still valid
+      if (_observationUploader.isDisposed) {
+        _logDebug('Cannot upload observation - uploader is disposed');
+        // Reset state and return
+        _resetConfirmationState();
+        return;
+      }
+      
       // User confirmed the bird sighting
       // Play "Observation for [bird name] er oprettet" using the sequence method
       _audioService.playBirdConfirmation(_currentBirdInQuestion);

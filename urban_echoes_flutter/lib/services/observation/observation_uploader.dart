@@ -28,10 +28,28 @@ class ObservationUploader extends ChangeNotifier {
   String? _lastUploadBirdName;
   DateTime? _lastUploadTime;
   bool _processingUpload = false;
+  
+  // Track disposal state
+  bool _isDisposed = false;
+  bool get isDisposed => _isDisposed;
 
   // Getters
   bool get isUploading => _isUploading;
   String? get errorMessage => _errorMessage;
+
+  @override
+  void dispose() {
+    _isDisposed = true;
+    super.dispose();
+  }
+
+  // Override notifyListeners to check for disposal
+  @override
+  void notifyListeners() {
+    if (!_isDisposed) {
+      super.notifyListeners();
+    }
+  }
 
   // Save and upload a bird observation
   Future<BirdObservation?> saveAndUploadObservation(
@@ -46,6 +64,12 @@ class ObservationUploader extends ChangeNotifier {
     bool isTestData = false,
     String? sourceId,
   }) async {
+    // Check if already disposed
+    if (_isDisposed) {
+      debugPrint('ObservationUploader: Cannot upload observation - uploader is disposed');
+      return null;
+    }
+    
     // Check if this is a duplicate of a very recent upload
     if (_processingUpload) {
       _logDebug('Upload already in progress, ignoring duplicate request');
@@ -122,7 +146,7 @@ class ObservationUploader extends ChangeNotifier {
       _logDebug('Uploaded observation to remote API');
       
       // 5. Show success notification
-      if (_notificationService != null) {
+      if (_notificationService != null && !_isDisposed) {
         _notificationService.showSuccessNotification(observation);
       }
       
@@ -132,16 +156,18 @@ class ObservationUploader extends ChangeNotifier {
       _errorMessage = 'Failed to save observation: $e';
       
       // Show error notification
-      if (_notificationService != null) {
+      if (_notificationService != null && !_isDisposed) {
         _notificationService.showErrorNotification(_errorMessage!);
       }
       
       return null;
     } finally {
       // Always reset the flags when done, regardless of success or failure
-      _isUploading = false;
-      _processingUpload = false;
-      notifyListeners();
+      if (!_isDisposed) {
+        _isUploading = false;
+        _processingUpload = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -158,10 +184,8 @@ class ObservationUploader extends ChangeNotifier {
     return "https://urbanechostorage.blob.core.windows.net/bird-sounds/$formattedName";
   }
 
-  // Rest of your methods remain the same...
   // Get the current location
   Future<Position> _getCurrentLocation() async {
-    // Same implementation as before
     bool serviceEnabled;
     LocationPermission permission;
 
@@ -202,7 +226,6 @@ class ObservationUploader extends ChangeNotifier {
     int testBatchId = 0,
     String? sourceId,
   }) async {
-    // Same implementation as before
     // Get current date and time if not provided
     final now = DateTime.now();
     final date = observationDate ?? now;
@@ -227,7 +250,6 @@ class ObservationUploader extends ChangeNotifier {
 
   // Upload observation to remote API
   Future<void> _uploadObservationToApi(BirdObservation observation) async {
-    // Same implementation as before
     try {
       _logDebug('Uploading observation for ${observation.birdName} (${observation.scientificName}) to API');
       
@@ -266,7 +288,7 @@ class ObservationUploader extends ChangeNotifier {
 
   // Debug logging
   void _logDebug(String message) {
-    if (_debugMode) {
+    if (_debugMode && !_isDisposed) {
       debugPrint('ObservationUploader: $message');
     }
   }
