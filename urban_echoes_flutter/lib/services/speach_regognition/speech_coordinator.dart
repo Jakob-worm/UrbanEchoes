@@ -1,3 +1,4 @@
+import 'dart:async'; // Add this import at the top
 import 'package:flutter/foundation.dart';
 import 'package:urban_echoes/models/bird_observation.dart';
 import 'package:urban_echoes/services/observation/observation_uploader.dart';
@@ -35,10 +36,16 @@ class SpeechCoordinator extends ChangeNotifier {
   final ObservationUploader _observationUploader;
   String _currentBirdInQuestion = '';
   final bool _debugMode;
+  
   // State for confirmation workflow
   bool _isWaitingForConfirmation = false;
   // Flag to track if we're currently processing a bird recognition
   bool _isProcessingBirdRecognition = false;
+  // Flag to prevent duplicate confirmation processing
+  bool _processingConfirmation = false;
+  // Timer for confirmation timeout
+  Timer? _confirmationTimer;
+  final int _confirmationTimeoutSeconds = 15;
 
   final SpeechRecognitionService _speechService;
   final WordRecognitionService _wordService;
@@ -52,6 +59,7 @@ class SpeechCoordinator extends ChangeNotifier {
     _speechService.removeListener(_onSpeechUpdate);
     _wordService.removeListener(_onWordUpdate);
     _audioService.removeListener(_onAudioStateChanged);
+    _confirmationTimer?.cancel();
     super.dispose();
   }
 
@@ -69,6 +77,16 @@ class SpeechCoordinator extends ChangeNotifier {
   // Confirmation workflow getters
   bool get isWaitingForConfirmation => _isWaitingForConfirmation;
   String get currentBirdInQuestion => _currentBirdInQuestion;
+
+  // Helper method to reset all confirmation state
+  void _resetConfirmationState() {
+    _isWaitingForConfirmation = false;
+    _isProcessingBirdRecognition = false;
+    _processingConfirmation = false;
+    _currentBirdInQuestion = '';
+    _confirmationTimer?.cancel();
+    notifyListeners();
+  }
 
   // Handle deletion of the last observation
   void handleDeleteObservation() {
@@ -105,6 +123,18 @@ class SpeechCoordinator extends ChangeNotifier {
       _speechService.stopListening();
     }
     
+    // Start a timeout timer
+    _confirmationTimer?.cancel();
+    _confirmationTimer = Timer(Duration(seconds: _confirmationTimeoutSeconds), () {
+      if (_isWaitingForConfirmation) {
+        _logDebug('Confirmation timed out for bird: $_currentBirdInQuestion');
+        _resetConfirmationState();
+        
+        // Optionally play a timeout sound
+        _audioService.playPrompt('confirmation_timeout');
+      }
+    });
+    
     // Play the bird question announcement with the two audio files in sequence
     _audioService.playBirdQuestion(birdName);
     
@@ -112,7 +142,14 @@ class SpeechCoordinator extends ChangeNotifier {
   }
 
   void handleConfirmationResponse(bool confirmed) async {
-    if (!_isWaitingForConfirmation) return;
+    // Add this check at the beginning to prevent duplicate processing
+    if (!_isWaitingForConfirmation || _processingConfirmation) return;
+    
+    // Cancel the timeout timer
+    _confirmationTimer?.cancel();
+    
+    // Set flag to prevent duplicate processing
+    _processingConfirmation = true;
     
     _logDebug('Handling confirmation response: ${confirmed ? "Yes" : "No"}');
     
@@ -147,11 +184,8 @@ class SpeechCoordinator extends ChangeNotifier {
       _audioService.playPrompt('okay_observation_er_slettet');
     }
     
-    // Reset confirmation state and flags
-    _isWaitingForConfirmation = false;
-    _isProcessingBirdRecognition = false;
-    _currentBirdInQuestion = '';
-    notifyListeners();
+    // Reset confirmation state and flags using the helper method
+    _resetConfirmationState();
     
     // The audio completion listener will handle resuming the speech recognition
   }
@@ -169,6 +203,7 @@ class SpeechCoordinator extends ChangeNotifier {
     // Reset all flags to ensure clean state
     _isProcessingBirdRecognition = false;
     _isWaitingForConfirmation = false;
+    _processingConfirmation = false;
     
     // Stop any ongoing audio before starting to listen
     if (_audioService.isPlaying) {
@@ -212,30 +247,26 @@ class SpeechCoordinator extends ChangeNotifier {
           
         case 'bird_confirmation':
           // Clear all flags
-          _isProcessingBirdRecognition = false;
-          _isWaitingForConfirmation = false;
+          _resetConfirmationState();
           _resumeListeningAfterConfirmation();
           break;
           
         case 'bird_denied':
           // Clear all flags
-          _isProcessingBirdRecognition = false;
-          _isWaitingForConfirmation = false;
+          _resetConfirmationState();
           _resumeListeningAfterDenial();
           break;
           
         case 'okay_observation_er_slettet':
           // Clear all flags
-          _isProcessingBirdRecognition = false;
-          _isWaitingForConfirmation = false;
+          _resetConfirmationState();
           _resumeListeningAfterObservationDeleted();
           break;
           
         case 'start_listening':
           // Start listening after the intro sound has completed
           // Make sure no confirmation flow is active
-          _isProcessingBirdRecognition = false;
-          _isWaitingForConfirmation = false;
+          _resetConfirmationState();
           
           if (!_speechService.isListening) {
             _speechService.startListening();
@@ -245,6 +276,13 @@ class SpeechCoordinator extends ChangeNotifier {
         case 'stop_listening':
           // Process final recognition results after the stop sound
           _processRecognitionResults();
+          break;
+          
+        case 'confirmation_timeout':
+          // Resume listening after timeout
+          if (!_speechService.isListening) {
+            _speechService.startListening();
+          }
           break;
       }
       
@@ -346,12 +384,29 @@ class SpeechCoordinator extends ChangeNotifier {
       // Check for confirmation words in the recognized text
       String text = _speechService.recognizedText.toLowerCase();
       
-      if (text.contains('ja') || text.contains('jo') || text.contains('yes') || 
-          text.contains('jep') || text.contains('rigtigt')) {
+      // Improved word detection
+      bool isPositive = text.contains('ja') || text.contains('jo') || 
+                        text.contains('yes') || text.contains('jep') || 
+                        text.contains('rigtigt') || text.contains('okay') || 
+                        text.contains('selvfølgelig') || text.contains('naturligvis');
+                        
+      bool isNegative = text.contains('nej') || text.contains('no') || 
+                        text.contains('ikke') || text.contains('forkert') || 
+                        text.contains('næppe');
+      
+      // Handle repeat request
+      bool isRepeatRequest = text.contains('gentag') || text.contains('hvad') || 
+                             text.contains('repeat') || text.contains('what') || 
+                             text.contains('undskyld');
+      
+      if (isPositive) {
         handleConfirmationResponse(true);
-      } else if (text.contains('nej') || text.contains('no') || text.contains('ikke') || 
-                text.contains('forkert')) {
+      } else if (isNegative) {
         handleConfirmationResponse(false);
+      } else if (isRepeatRequest) {
+        // Repeat the bird question
+        _logDebug('Repeating bird question for: $_currentBirdInQuestion');
+        _audioService.playBirdQuestion(_currentBirdInQuestion);
       }
       // Else continue waiting for confirmation
     } 

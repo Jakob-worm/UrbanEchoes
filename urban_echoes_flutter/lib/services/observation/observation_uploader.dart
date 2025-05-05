@@ -23,105 +23,127 @@ class ObservationUploader extends ChangeNotifier {
   bool _isUploading = false;
   final UploadNotificationService? _notificationService;
   final ObservationService _observationService;
+  
+  // Add tracking variables for duplicate detection
+  String? _lastUploadBirdName;
+  DateTime? _lastUploadTime;
+  bool _processingUpload = false;
 
   // Getters
   bool get isUploading => _isUploading;
-
   String? get errorMessage => _errorMessage;
 
   // Save and upload a bird observation
   Future<BirdObservation?> saveAndUploadObservation(
-  String birdName, {
-  String? scientificName,
-  String? soundDirectory,
-  int quantity = 1,
-  int observerId = 1,
-  DateTime? observationDate,
-  String? observationTime,
-  int testBatchId = 0,
-  bool isTestData = false,
-  String? sourceId,
-}) async {
-  try {
-    _isUploading = true;
-    _errorMessage = null;
-    notifyListeners();
+    String birdName, {
+    String? scientificName,
+    String? soundDirectory,
+    int quantity = 1,
+    int observerId = 1,
+    DateTime? observationDate,
+    String? observationTime,
+    int testBatchId = 0,
+    bool isTestData = false,
+    String? sourceId,
+  }) async {
+    // Check if this is a duplicate of a very recent upload
+    if (_processingUpload) {
+      _logDebug('Upload already in progress, ignoring duplicate request');
+      return null;
+    }
     
-    _logDebug('Saving and uploading observation for bird: $birdName');
+    if (_lastUploadBirdName != null && 
+        _lastUploadTime != null &&
+        DateTime.now().difference(_lastUploadTime!).inSeconds < 5 &&
+        _lastUploadBirdName == birdName) {
+      _logDebug('Ignoring potential duplicate upload for $birdName (less than 5 seconds since last upload)');
+      return null;
+    }
     
-    // If scientific name is not provided, look it up from the birds database
-    String finalScientificName = scientificName ?? '';
-    if (finalScientificName.isEmpty) {
-      final bird = await _databaseService.getBirdByCommonName(birdName);
-      if (bird != null) {
-        finalScientificName = bird.scientificName;
-        _logDebug('Found scientific name: $finalScientificName for $birdName');
-      } else {
-        _logDebug('No scientific name found for $birdName');
+    // Set tracking variables
+    _lastUploadBirdName = birdName;
+    _lastUploadTime = DateTime.now();
+    _processingUpload = true;
+    
+    try {
+      _isUploading = true;
+      _errorMessage = null;
+      notifyListeners();
+      
+      _logDebug('Saving and uploading observation for bird: $birdName');
+      
+      // If scientific name is not provided, look it up from the birds database
+      String finalScientificName = scientificName ?? '';
+      if (finalScientificName.isEmpty) {
+        final bird = await _databaseService.getBirdByCommonName(birdName);
+        if (bird != null) {
+          finalScientificName = bird.scientificName;
+          _logDebug('Found scientific name: $finalScientificName for $birdName');
+        } else {
+          _logDebug('No scientific name found for $birdName');
+        }
       }
+      
+      // Generate sound directory if not provided
+      String finalSoundDirectory = soundDirectory ?? '';
+      if (finalSoundDirectory.isEmpty && finalScientificName.isNotEmpty) {
+        finalSoundDirectory = _generateSoundDirectory(finalScientificName);
+        _logDebug('Generated sound directory: $finalSoundDirectory');
+      }
+      
+      // 1. Get current location
+      Position position = await _getCurrentLocation();
+      
+      // 2. Create BirdObservation object
+      BirdObservation observation = await _createBirdObservation(
+        birdName: birdName,
+        scientificName: finalScientificName,
+        soundDirectory: finalSoundDirectory,
+        latitude: position.latitude,
+        longitude: position.longitude,
+        quantity: quantity,
+        observerId: observerId,
+        observationDate: observationDate,
+        observationTime: observationTime,
+        isTestData: isTestData,
+        testBatchId: testBatchId,
+        sourceId: sourceId,
+      );
+      
+      // 3. Save to local database
+      int observationId = await _databaseService.addBirdObservation(observation);
+      _logDebug('Saved observation to local database with ID: $observationId');
+      
+      // Create a copy with the database ID
+      observation = observation.copyWith(id: observationId);
+      
+      // 4. Upload to remote API
+      await _uploadObservationToApi(observation);
+      _logDebug('Uploaded observation to remote API');
+      
+      // 5. Show success notification
+      if (_notificationService != null) {
+        _notificationService.showSuccessNotification(observation);
+      }
+      
+      return observation;
+    } catch (e) {
+      _logDebug('Error saving/uploading observation: $e');
+      _errorMessage = 'Failed to save observation: $e';
+      
+      // Show error notification
+      if (_notificationService != null) {
+        _notificationService.showErrorNotification(_errorMessage!);
+      }
+      
+      return null;
+    } finally {
+      // Always reset the flags when done, regardless of success or failure
+      _isUploading = false;
+      _processingUpload = false;
+      notifyListeners();
     }
-    
-    // Generate sound directory if not provided
-    String finalSoundDirectory = soundDirectory ?? '';
-    if (finalSoundDirectory.isEmpty && finalScientificName.isNotEmpty) {
-      finalSoundDirectory = _generateSoundDirectory(finalScientificName);
-      _logDebug('Generated sound directory: $finalSoundDirectory');
-    }
-    
-    // 1. Get current location
-    Position position = await _getCurrentLocation();
-    
-    // 2. Create BirdObservation object
-    BirdObservation observation = await _createBirdObservation(
-      birdName: birdName,
-      scientificName: finalScientificName,
-      soundDirectory: finalSoundDirectory,
-      latitude: position.latitude,
-      longitude: position.longitude,
-      quantity: quantity,
-      observerId: observerId,
-      observationDate: observationDate,
-      observationTime: observationTime,
-      isTestData: isTestData,
-      testBatchId: testBatchId,
-      sourceId: sourceId,
-    );
-    
-    // 3. Save to local database
-    int observationId = await _databaseService.addBirdObservation(observation);
-    _logDebug('Saved observation to local database with ID: $observationId');
-    
-    // Create a copy with the database ID
-    observation = observation.copyWith(id: observationId);
-    
-    // 4. Upload to remote API
-    await _uploadObservationToApi(observation);
-    _logDebug('Uploaded observation to remote API');
-    
-    // 5. Show success notification
-    if (_notificationService != null) {
-      _notificationService.showSuccessNotification(observation);
-    }
-    
-    _isUploading = false;
-    notifyListeners();
-    
-    // Return the created observation object
-    return observation;
-  } catch (e) {
-    _logDebug('Error saving/uploading observation: $e');
-    _errorMessage = 'Failed to save observation: $e';
-    
-    // Show error notification
-    if (_notificationService != null) {
-      _notificationService.showErrorNotification(_errorMessage!);
-    }
-    
-    _isUploading = false;
-    notifyListeners();
-    return null;
   }
-}
 
   // Generate the sound directory path based on scientific name
   String _generateSoundDirectory(String scientificName) {
@@ -136,8 +158,10 @@ class ObservationUploader extends ChangeNotifier {
     return "https://urbanechostorage.blob.core.windows.net/bird-sounds/$formattedName";
   }
 
+  // Rest of your methods remain the same...
   // Get the current location
   Future<Position> _getCurrentLocation() async {
+    // Same implementation as before
     bool serviceEnabled;
     LocationPermission permission;
 
@@ -178,6 +202,7 @@ class ObservationUploader extends ChangeNotifier {
     int testBatchId = 0,
     String? sourceId,
   }) async {
+    // Same implementation as before
     // Get current date and time if not provided
     final now = DateTime.now();
     final date = observationDate ?? now;
@@ -202,6 +227,7 @@ class ObservationUploader extends ChangeNotifier {
 
   // Upload observation to remote API
   Future<void> _uploadObservationToApi(BirdObservation observation) async {
+    // Same implementation as before
     try {
       _logDebug('Uploading observation for ${observation.birdName} (${observation.scientificName}) to API');
       
