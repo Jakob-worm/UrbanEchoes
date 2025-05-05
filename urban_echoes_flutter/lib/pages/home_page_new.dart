@@ -281,21 +281,23 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
                   margin: const EdgeInsets.only(bottom: 30),
                   child: FloatingActionButton(
                     onPressed: () {
-                        if (_isProcessing) return; // Prevent rapid multiple presses
-                        setState(() => _isProcessing = true);
-                        
+                        // Only prevent multiple calls to the SAME function
                         final coordinator = Provider.of<SpeechCoordinator>(context, listen: false);
                         
                         if (coordinator.isListening) {
+                          // If already listening, stop listening without debounce
                           coordinator.stopListening();
                         } else {
+                          // When starting to listen, apply debounce
+                          if (_isProcessing) return; // Only prevent rapid start listening
+                          setState(() => _isProcessing = true);
                           coordinator.startListening();
+                          
+                          // Reset after a short delay
+                          Future.delayed(const Duration(milliseconds: 500), () {
+                            if (mounted) setState(() => _isProcessing = false);
+                          });
                         }
-                        
-                        // Reset after a short delay
-                        Future.delayed(const Duration(milliseconds: 500), () {
-                          if (mounted) setState(() => _isProcessing = false);
-                        });
                       },
                                  backgroundColor: coordinator.isListening ? Colors.red : Colors.green[600],
                     elevation: 8,
