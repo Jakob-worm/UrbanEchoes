@@ -1,4 +1,3 @@
-// In your BirdHomePage.build method
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:urban_echoes/services/speach_regognition/speech_coordinator.dart';
@@ -13,6 +12,7 @@ class BirdHomePage extends StatefulWidget {
 class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   bool _isProcessing = false;
+
   late Animation<double> _pulseAnimation;
 
   @override
@@ -38,13 +38,14 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
   Widget build(BuildContext context) {
     return Consumer<SpeechCoordinator>(
       builder: (context, coordinator, child) {
-        final birdService = coordinator.birdService;
-        final wordService = coordinator.wordService;
-
         return Scaffold(
           appBar: AppBar(
             backgroundColor: Colors.green[700],
             elevation: 0,
+            title: const Text(
+              'Urban Echoes',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+            ),
           ),
           body: Container(
             decoration: BoxDecoration(
@@ -96,7 +97,7 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
                       children: [
                         const SizedBox(height: 30),
 
-                        // Recognized text card
+                        // Combined speech recognition card
                         Card(
                           elevation: 4,
                           shape: RoundedRectangleBorder(
@@ -107,13 +108,27 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  'Genkendt tale:',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green[800],
-                                  ),
+                                // Recognized text section
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      'Genkendt tale:',
+                                      style: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.green[800],
+                                      ),
+                                    ),
+                                    if (coordinator.recognizedText.isNotEmpty)
+                                      IconButton(
+                                        icon: const Icon(Icons.clear, size: 18),
+                                        onPressed: () {
+                                          coordinator.clearRecognizedText();
+                                        },
+                                        tooltip: 'Ryd tekst',
+                                      ),
+                                  ],
                                 ),
                                 const SizedBox(height: 10),
                                 Container(
@@ -133,6 +148,38 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
                                     ),
                                   ),
                                 ),
+                                
+                                // Matched bird section (only if a bird is matched)
+                                if (coordinator.birdService.matchedBird.isNotEmpty) ...[
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Genkendt fugl:',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue[800],
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue[50],
+                                      borderRadius: BorderRadius.circular(10),
+                                      border: Border.all(color: Colors.blue.shade300),
+                                    ),
+                                    child: Text(
+                                      coordinator.birdService.matchedBird,
+                                      style: const TextStyle(
+                                        fontSize: 22,
+                                        fontWeight: FontWeight.bold,
+                                        height: 1.3,
+                                        color: Colors.blue,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
@@ -221,19 +268,16 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
                     margin: const EdgeInsets.only(bottom: 30),
                     child: FloatingActionButton(
                       onPressed: () {
-                        // Only prevent multiple calls to the SAME function
                         final coordinator = Provider.of<SpeechCoordinator>(context, listen: false);
 
                         if (coordinator.isListening) {
-                          // If already listening, stop listening without debounce
                           coordinator.stopListening();
                         } else {
-                          // When starting to listen, apply debounce
-                          if (_isProcessing) return; // Only prevent rapid start listening
+                          if (_isProcessing) return;
                           setState(() => _isProcessing = true);
+
                           coordinator.startListening();
 
-                          // Reset after a short delay
                           Future.delayed(const Duration(milliseconds: 500), () {
                             if (mounted) setState(() => _isProcessing = false);
                           });
@@ -249,7 +293,6 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
                     ),
                   ),
                 ),
-                // Button label
                 Text(
                   coordinator.isListening ? 'Stop observation' : 'Start observation',
                   style: const TextStyle(
