@@ -29,26 +29,34 @@ class ObservationUploader extends ChangeNotifier {
   DateTime? _lastUploadTime;
   bool _processingUpload = false;
   
-  // Track disposal state
-  bool _isDisposed = false;
-  bool get isDisposed => _isDisposed;
+  // Track active state - always start as active
+  bool _isActive = true;
 
   // Getters
   bool get isUploading => _isUploading;
   String? get errorMessage => _errorMessage;
+  
+  // For compatibility with existing code checking isDisposed
+  bool get isDisposed => !_isActive;
 
   @override
   void dispose() {
-    _isDisposed = true;
-    super.dispose();
+    _logDebug('ObservationUploader dispose called - marking as inactive');
+    // We don't call super.dispose() here - this is intentional to keep listeners active
+    
+    // Mark as inactive, but don't fully dispose
+    _isActive = false;
+    
+    // We still need to notify listeners of the state change
+    notifyListeners();
   }
 
-  // Override notifyListeners to check for disposal
+  // Override notifyListeners to check for active state
   @override
   void notifyListeners() {
-    if (!_isDisposed) {
-      super.notifyListeners();
-    }
+    // Always notify listeners, even if inactive
+    // This ensures that components depending on this uploader still get updates
+    super.notifyListeners();
   }
 
   // Save and upload a bird observation
@@ -64,10 +72,10 @@ class ObservationUploader extends ChangeNotifier {
     bool isTestData = false,
     String? sourceId,
   }) async {
-    // Check if already disposed
-    if (_isDisposed) {
-      debugPrint('ObservationUploader: Cannot upload observation - uploader is disposed');
-      return null;
+    // If marked inactive, reactivate
+    if (!_isActive) {
+      _logDebug('Reactivating inactive uploader for new observation');
+      _isActive = true;
     }
     
     // Check if this is a duplicate of a very recent upload
@@ -146,8 +154,8 @@ class ObservationUploader extends ChangeNotifier {
       _logDebug('Uploaded observation to remote API');
       
       // 5. Show success notification
-      if (_notificationService != null && !_isDisposed) {
-        _notificationService.showSuccessNotification(observation);
+      if (_notificationService != null) {
+        _notificationService!.showSuccessNotification(observation);
       }
       
       return observation;
@@ -156,18 +164,16 @@ class ObservationUploader extends ChangeNotifier {
       _errorMessage = 'Failed to save observation: $e';
       
       // Show error notification
-      if (_notificationService != null && !_isDisposed) {
-        _notificationService.showErrorNotification(_errorMessage!);
+      if (_notificationService != null) {
+        _notificationService!.showErrorNotification(_errorMessage!);
       }
       
       return null;
     } finally {
       // Always reset the flags when done, regardless of success or failure
-      if (!_isDisposed) {
-        _isUploading = false;
-        _processingUpload = false;
-        notifyListeners();
-      }
+      _isUploading = false;
+      _processingUpload = false;
+      notifyListeners();
     }
   }
 
@@ -278,7 +284,7 @@ class ObservationUploader extends ChangeNotifier {
         throw Exception('API rejected the upload');
       }
       
-      _logDebug('Successfully uploaded observation to API');
+      _logDebug('Successfully uploaded observation to remote API');
     } catch (e) {
       _logDebug('Error uploading to API: $e');
       // We don't rethrow here because we want local storage to succeed even if API upload fails
@@ -288,7 +294,7 @@ class ObservationUploader extends ChangeNotifier {
 
   // Debug logging
   void _logDebug(String message) {
-    if (_debugMode && !_isDisposed) {
+    if (_debugMode) {
       debugPrint('ObservationUploader: $message');
     }
   }

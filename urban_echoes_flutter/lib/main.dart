@@ -132,22 +132,19 @@ class MyApp extends StatelessWidget {
         ),
         
         // Add ObservationUploader with notification service
-        ChangeNotifierProxyProvider3<
-            DatabaseService, 
-            ObservationService, 
-            UploadNotificationService, 
-            ObservationUploader>(
+        ListenableProvider<ObservationUploader>(
           create: (context) => ObservationUploader(
             databaseService: Provider.of<DatabaseService>(context, listen: false),
             observationService: Provider.of<ObservationService>(context, listen: false),
             notificationService: Provider.of<UploadNotificationService>(context, listen: false),
           ),
-          update: (context, databaseService, observationService, notificationService, previous) => 
-            ObservationUploader(
-              databaseService: databaseService,
-              observationService: observationService,
-              notificationService: notificationService,
-            ),
+          // Custom dispose function that preserves functionality
+          dispose: (context, uploader) {
+            // Minimal cleanup that doesn't fully disable the uploader
+            // Do not call uploader.dispose() here as that would set the _isDisposed flag
+            // Instead, just do minimal cleanup if needed
+            debugPrint('ObservationUploader provider dispose called - keeping uploader active');
+          },
         ),
 
         ChangeNotifierProvider<RecordingPlayerService>(
@@ -174,31 +171,44 @@ class MyApp extends StatelessWidget {
         ),
 
         // Speech coordinator that manages the above services
-        ChangeNotifierProxyProvider5<
-            SpeechRecognitionService,
-            BirdRecognitionService,
-            WordRecognitionService,
-            RecordingPlayerService,
-            ObservationUploader,
-            SpeechCoordinator>(
-          create: (context) => SpeechCoordinator(
-            speechService: Provider.of<SpeechRecognitionService>(context, listen: false),
-            birdService: Provider.of<BirdRecognitionService>(context, listen: false),
-            wordService: Provider.of<WordRecognitionService>(context, listen: false),
-            audioService: Provider.of<RecordingPlayerService>(context, listen: false),
-            observationUploader: Provider.of<ObservationUploader>(context, listen: false),
-            debugMode: debugMode,
-          ),
-          update: (context, speechService, birdService, wordService, audioService, observationUploader, previous) => 
-            SpeechCoordinator(
-              speechService: speechService,
-              birdService: birdService,
-              wordService: wordService,
-              audioService: audioService,
-              observationUploader: observationUploader,
-              debugMode: debugMode,
-            ),
-        ),
+        ChangeNotifierProxyProvider4<
+    SpeechRecognitionService,
+    BirdRecognitionService,
+    WordRecognitionService,
+    RecordingPlayerService,
+    SpeechCoordinator>(
+  create: (context) => SpeechCoordinator(
+    speechService: Provider.of<SpeechRecognitionService>(context, listen: false),
+    birdService: Provider.of<BirdRecognitionService>(context, listen: false),
+    wordService: Provider.of<WordRecognitionService>(context, listen: false),
+    audioService: Provider.of<RecordingPlayerService>(context, listen: false),
+    observationUploader: Provider.of<ObservationUploader>(context, listen: false),
+    debugMode: debugMode,
+  ),
+  update: (context, speechService, birdService, wordService, audioService, previous) {
+    if (previous == null) {
+      return SpeechCoordinator(
+        speechService: speechService,
+        birdService: birdService,
+        wordService: wordService,
+        audioService: audioService,
+        observationUploader: Provider.of<ObservationUploader>(context, listen: false),
+        debugMode: debugMode,
+      );
+    }
+    
+    // Update only the services that change, not the uploader
+    previous.updateServices(
+      speechService: speechService,
+      birdService: birdService,
+      wordService: wordService,
+      audioService: audioService
+    );
+    
+    return previous;
+  },
+),
+
 
         // Services
         ChangeNotifierProvider<SeasonService>(

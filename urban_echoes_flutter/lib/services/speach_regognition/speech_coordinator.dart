@@ -31,28 +31,31 @@ class SpeechCoordinator extends ChangeNotifier {
     _audioService.addListener(_onAudioStateChanged);
   }
 
-  final RecordingPlayerService _audioService;
-  final BirdRecognitionService _birdService;
-  final ObservationUploader _observationUploader;
-  String _currentBirdInQuestion = '';
-  final bool _debugMode;
-  
-  // State for confirmation workflow
-  bool _isWaitingForConfirmation = false;
-  // Flag to track if we're currently processing a bird recognition
-  bool _isProcessingBirdRecognition = false;
-  // Flag to prevent duplicate confirmation processing
-  bool _processingConfirmation = false;
+  // Services - now use late instead of final to allow updates
+  late RecordingPlayerService _audioService;
+
+  late BirdRecognitionService _birdService;
+  final int _confirmationTimeoutSeconds = 15;
   // Timer for confirmation timeout
   Timer? _confirmationTimer;
-  final int _confirmationTimeoutSeconds = 15;
 
-  final SpeechRecognitionService _speechService;
-  final WordRecognitionService _wordService;
-  
+  String _currentBirdInQuestion = '';
+  final bool _debugMode;
+  // Flag to track if we're currently processing a bird recognition
+  bool _isProcessingBirdRecognition = false;
+
+  // State for confirmation workflow
+  bool _isWaitingForConfirmation = false;
+
   // Observation tracking
   BirdObservation? _latestObservation;
-  BirdObservation? get latestObservation => _latestObservation;
+
+  final ObservationUploader _observationUploader;
+  // Flag to prevent duplicate confirmation processing
+  bool _processingConfirmation = false;
+
+  late SpeechRecognitionService _speechService;
+  late WordRecognitionService _wordService;
 
   @override
   void dispose() {
@@ -63,30 +66,62 @@ class SpeechCoordinator extends ChangeNotifier {
     super.dispose();
   }
 
+  BirdObservation? get latestObservation => _latestObservation;
+
+  // Method to update services without recreating the coordinator
+  void updateServices({
+    SpeechRecognitionService? speechService,
+    BirdRecognitionService? birdService,
+    WordRecognitionService? wordService,
+    RecordingPlayerService? audioService,
+  }) {
+    _logDebug('Updating services in SpeechCoordinator');
+    
+    if (speechService != null && speechService != _speechService) {
+      _speechService.removeListener(_onSpeechUpdate);
+      _speechService = speechService;
+      _speechService.addListener(_onSpeechUpdate);
+    }
+    
+    if (birdService != null) {
+      _birdService = birdService;
+    }
+    
+    if (wordService != null && wordService != _wordService) {
+      _wordService.removeListener(_onWordUpdate);
+      _wordService = wordService;
+      _wordService.addListener(_onWordUpdate);
+    }
+    
+    if (audioService != null && audioService != _audioService) {
+      _audioService.removeListener(_onAudioStateChanged);
+      _audioService = audioService;
+      _audioService.addListener(_onAudioStateChanged);
+    }
+  }
+
   // Getters to expose underlying services
   SpeechRecognitionService get speechService => _speechService;
+
   BirdRecognitionService get birdService => _birdService;
+
   WordRecognitionService get wordService => _wordService;
+
   RecordingPlayerService get audioService => _audioService;
+
   bool get isListening => _speechService.isListening;
+
   String get recognizedText => _speechService.recognizedText;
+
   double get confidence => _speechService.confidence;
+
   String? get errorMessage => _speechService.errorMessage ??
                              _birdService.errorMessage;
 
   // Confirmation workflow getters
   bool get isWaitingForConfirmation => _isWaitingForConfirmation;
-  String get currentBirdInQuestion => _currentBirdInQuestion;
 
-  // Helper method to reset all confirmation state
-  void _resetConfirmationState() {
-    _isWaitingForConfirmation = false;
-    _isProcessingBirdRecognition = false;
-    _processingConfirmation = false;
-    _currentBirdInQuestion = '';
-    _confirmationTimer?.cancel();
-    notifyListeners();
-  }
+  String get currentBirdInQuestion => _currentBirdInQuestion;
 
   // Handle deletion of the last observation
   void handleDeleteObservation() {
@@ -141,68 +176,56 @@ class SpeechCoordinator extends ChangeNotifier {
     // The audio completion listener will handle resuming the speech recognition
   }
 
-  void handleConfirmationResponse(bool confirmed) async {
-    // Add this check at the beginning to prevent duplicate processing
-    if (!_isWaitingForConfirmation || _processingConfirmation) return;
+  // Replace the handleConfirmationResponse method in SpeechCoordinator with this version
+void handleConfirmationResponse(bool confirmed) async {
+  // Add this check at the beginning to prevent duplicate processing
+  if (!_isWaitingForConfirmation || _processingConfirmation) return;
+  
+  // Cancel the timeout timer
+  _confirmationTimer?.cancel();
+  
+  // Set flag to prevent duplicate processing
+  _processingConfirmation = true;
+  
+  _logDebug('Handling confirmation response: ${confirmed ? "Yes" : "No"}');
+  
+  // Stop listening temporarily while playing the audio response
+  if (_speechService.isListening) {
+    _speechService.stopListening();
+  }
+  
+  if (confirmed) {
+    // User confirmed the bird sighting
+    // Play "Observation for [bird name] er oprettet" using the sequence method
+    _audioService.playBirdConfirmation(_currentBirdInQuestion);
     
-    // Cancel the timeout timer
-    _confirmationTimer?.cancel();
+    // Save and upload the observation using ObservationUploader
+    // Note: We removed the isDisposed check since our ListenableProvider handles that
+    BirdObservation? createdObservation = await _observationUploader.saveAndUploadObservation(
+      _currentBirdInQuestion,
+      quantity: 1,  // Default quantity
+      observerId: 1 // Default observer ID
+    );
     
-    // Set flag to prevent duplicate processing
-    _processingConfirmation = true;
-    
-    _logDebug('Handling confirmation response: ${confirmed ? "Yes" : "No"}');
-    
-    // Stop listening temporarily while playing the audio response
-    if (_speechService.isListening) {
-      _speechService.stopListening();
-    }
-    
-    if (confirmed) {
-      // Check if observation uploader is still valid
-      if (_observationUploader.isDisposed) {
-        _logDebug('Cannot upload observation - uploader is disposed');
-        // Reset state and return
-        _resetConfirmationState();
-        return;
-      }
+    if (createdObservation != null) {
+      _logDebug('Successfully saved and uploaded observation for $_currentBirdInQuestion');
       
-      // User confirmed the bird sighting
-      // Play "Observation for [bird name] er oprettet" using the sequence method
-      _audioService.playBirdConfirmation(_currentBirdInQuestion);
-      
-      // Save and upload the observation using ObservationUploader
-      BirdObservation? createdObservation = await _observationUploader.saveAndUploadObservation(
-        _currentBirdInQuestion,
-        quantity: 1,  // Default quantity
-        observerId: 1 // Default observer ID
-      );
-      
-      if (createdObservation != null) {
-        _logDebug('Successfully saved and uploaded observation for $_currentBirdInQuestion');
-        
-        // Notify the UI to display the new observation
-        _broadcastNewObservation(createdObservation);
-      } else {
-        _logDebug('Failed to save/upload observation: ${_observationUploader.errorMessage}');
-        // Optionally, you could play an error sound or show a notification to the user
-      }
+      // Notify the UI to display the new observation
+      _broadcastNewObservation(createdObservation);
     } else {
-      // User denied the bird sighting - play the deletion confirmation sound
-      _audioService.playPrompt('okay_observation_er_slettet');
+      _logDebug('Failed to save/upload observation: ${_observationUploader.errorMessage}');
+      // Optionally, you could play an error sound or show a notification to the user
     }
-    
-    // Reset confirmation state and flags using the helper method
-    _resetConfirmationState();
-    
-    // The audio completion listener will handle resuming the speech recognition
+  } else {
+    // User denied the bird sighting - play the deletion confirmation sound
+    _audioService.playPrompt('okay_observation_er_slettet');
   }
-
-  // Method to broadcast new observation
-  void _broadcastNewObservation(BirdObservation observation) {
-    _latestObservation = observation;
-    notifyListeners();
-  }
+  
+  // Reset confirmation state and flags using the helper method
+  _resetConfirmationState();
+  
+  // The audio completion listener will handle resuming the speech recognition
+}
 
   // Methods to control speech recognition
   Future<bool> startListening() async {
@@ -237,6 +260,35 @@ class SpeechCoordinator extends ChangeNotifier {
     // The final recognition results will be processed after the audio completes
     // via the audio state change listener
     return result;
+  }
+
+  void clearRecognizedText() {
+    _logDebug('Clearing recognized text');
+    
+    // Clear the text in the speech service
+    _speechService.clearRecognizedText();
+    
+    // Also make sure the bird service is reset
+    _birdService.reset();
+    
+    // Notify listeners that the text has been cleared
+    notifyListeners();
+  }
+
+  // Helper method to reset all confirmation state
+  void _resetConfirmationState() {
+    _isWaitingForConfirmation = false;
+    _isProcessingBirdRecognition = false;
+    _processingConfirmation = false;
+    _currentBirdInQuestion = '';
+    _confirmationTimer?.cancel();
+    notifyListeners();
+  }
+
+  // Method to broadcast new observation
+  void _broadcastNewObservation(BirdObservation observation) {
+    _latestObservation = observation;
+    notifyListeners();
   }
 
   // Handle audio state changes
@@ -298,21 +350,6 @@ class SpeechCoordinator extends ChangeNotifier {
       _audioService.resetLastPlaybackType();
     }
   }
-
-  void clearRecognizedText() {
-  _logDebug('Clearing recognized text');
-  
-  // Clear the text in the speech service
-  // This assumes the speech service has a way to clear or set the text
-  // You might need to implement this method in SpeechRecognitionService as well
-  _speechService.clearRecognizedText();
-  
-  // Also make sure the bird service is reset
-  _birdService.reset();
-  
-  // Notify listeners that the text has been cleared
-  notifyListeners();
-}
 
   // Resume listening after a bird question has played
   void _resumeListeningAfterBirdQuestion() {
