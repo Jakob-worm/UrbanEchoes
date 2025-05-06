@@ -52,7 +52,6 @@ class BirdDataLoader {
 
   // Fallback method - load from hardcoded list
   void _loadHardcodedBirdNames() {
-    // This is the complete list from paste.txt
     _danishBirdNames = [
       'Aftenfalk', 'Agerhøne', 'Alexanderparakit', 'Alk', 'Allike',
       'Almindelig Kjove', 'Almindelig Ryle', 'Almindelig Skråpe',
@@ -118,7 +117,16 @@ class BirdDataLoader {
       'Tornsanger', 'Trane', 'Tredækker', 'Triel', 'Troldand', 'Træløber',
       'Tundrasædgås', 'Turteldue', 'Tyrkerdue', 'Tårnfalk', 'Urfugl', 'Vagtel',
       'Vandrefalk', 'Vandrikse', 'Vandsanger', 'Vandstær', 'Vendehals', 'Vibe',
-      'Vindrossel'
+      'Vindrossel', 'Urfugl', 'Vagtel', 'Sortsvane', 'Pibesvane', 'Sangsvane', 'Nilgås', 'Rustand',
+    'Mandarinand', 'Sibirisk Krikand', 'Blåvinget And', 'Skeand', 'Pibeand',
+    'Amerikansk Pibeand', 'Sortbrun And', 'Spidsand', 'Krikand',
+    'Rødhovedet And', 'Taffeland', 'Halsbåndstroldand', 'Troldand',
+    'Lille Bjergand', 'Stellersand', 'Amerikansk Fløjlsand',
+    'Sibirisk Fløjlsand', 'Sortand', 'Amerikansk Sortand', 'Lille Skallesluger',
+    'Stor Skallesluger', 'Toppet Skallesluger', 'Amerikansk Skarveand',
+    'Hvidhovedet And', 'Natravn', 'Ørkennatravn', 'Tornhalesejler',
+    'Alpesejler', 'Mursejler', 'Gråsejler', 'Orientsejler', 'Lille Sejler',
+    'Kaffersejler', 'Stortrappe', 'Østlig Kravetrappe', 'Dværgtrappe',
     ];
     
     debugPrint('Loaded ${_danishBirdNames.length} Danish bird names from hardcoded list');
