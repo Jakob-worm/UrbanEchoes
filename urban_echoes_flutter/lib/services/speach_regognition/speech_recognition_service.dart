@@ -68,6 +68,14 @@ class SpeechRecognitionService extends ChangeNotifier {
       return false;
     }
   }
+
+  void clearRecognizedText() {
+  // Clear the recognized text
+  _recognizedText = '';
+  
+  // Notify listeners of the change
+  notifyListeners();
+}
   
   // Start listening for speech
   Future<bool> startListening() async {

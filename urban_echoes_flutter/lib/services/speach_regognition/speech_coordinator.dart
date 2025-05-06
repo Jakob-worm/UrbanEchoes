@@ -299,6 +299,21 @@ class SpeechCoordinator extends ChangeNotifier {
     }
   }
 
+  void clearRecognizedText() {
+  _logDebug('Clearing recognized text');
+  
+  // Clear the text in the speech service
+  // This assumes the speech service has a way to clear or set the text
+  // You might need to implement this method in SpeechRecognitionService as well
+  _speechService.clearRecognizedText();
+  
+  // Also make sure the bird service is reset
+  _birdService.reset();
+  
+  // Notify listeners that the text has been cleared
+  notifyListeners();
+}
+
   // Resume listening after a bird question has played
   void _resumeListeningAfterBirdQuestion() {
     // Only resume listening if we're waiting for confirmation and not already listening
