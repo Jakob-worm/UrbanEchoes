@@ -8,17 +8,14 @@ Dværggås
 Pibesvane
 Sangsvane
 Nilgås
-Gravand
 Rustand
 Mandarinand
 Sibirisk Krikand
 Atlingand
 Blåvinget And
-Skeand
 Knarand
 Pibeand
 Amerikansk Pibeand
-Gråand
 Sortbrun And
 Spidsand
 Krikand
@@ -30,7 +27,6 @@ Bjergand
 Lille Bjergand
 Stellersand
 Kongeederfugl
-Brilleand
 Fløjlsand
 Amerikansk Fløjlsand
 Sibirisk Fløjlsand
@@ -141,11 +137,9 @@ Rødvinget Braksvale
 Orientbraksvale
 Sortvinget Braksvale
 Ride
-Ismåge
 Sabinemåge
 Tyndnæbbet Måge
 Bonapartemåge
-Hættemåge
 Dværgmåge
 Rosenmåge
 Lattermåge
@@ -159,7 +153,6 @@ Svartbag
 Gråvinget Måge
 Gråmåge
 Hvidvinget Måge
-Sølvmåge
 Kaspisk Måge
 Middelhavssølvmåge
 Armensk Måge
@@ -172,7 +165,6 @@ Dværgterne
 Brilleterne
 Rosenterne
 Fjordterne
-Havterne
 Hvidskægget Terne
 Hvidvinget Terne
 Sortterne
@@ -183,8 +175,6 @@ Lille Kjove
 Søkonge
 Polarlomvie
 Lomvie
-Tejst
-Lunde
 Rødstrubet Lom
 Sortstrubet Lom
 Stillehavslom
@@ -209,7 +199,6 @@ Sule
 Brun Sule
 Dværgskarv
 Topskarv
-Skarv
 Sort Ibis
 Skestork
 Rørdrum
@@ -218,7 +207,6 @@ Dværghejre
 Nathejre
 Tophejre
 Kohejre
-Fiskehejre
 Purpurhejre
 Sølvhejre
 Silkehejre
@@ -248,10 +236,8 @@ Sort Glente
 Havørn
 Fjeldvåge
 Ørnevåge
-Musvåge
 Slørugle
 Dværghornugle
-Sneugle
 Stor Hornugle
 Natugle
 Høgeugle
@@ -272,7 +258,6 @@ Lille Flagspætte
 Stor Flagspætte
 Guldspætte
 Sortspætte
-Grønspætte
 Lille Tårnfalk
 Amerikansk Tårnfalk
 Aftenfalk
@@ -290,11 +275,8 @@ Rosenbrystet Tornskade
 Stor Tornskade
 Rødhovedet Tornskade
 Rødøjet Vireo
-Pirol
 Skovskade
-Husskade
 Nøddekrige
-Allike
 Sibirisk Allike
 Råge
 Sortkrage
@@ -328,7 +310,6 @@ Fuglekongesanger
 Schwarz' Løvsanger
 Sinkiangløvsanger
 Brun Løvsanger
-Løvsanger
 Gransanger
 Iberisk Gransanger
 Grøn Sanger
