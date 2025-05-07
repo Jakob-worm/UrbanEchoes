@@ -37,51 +37,26 @@ class SpeechCoordinator extends ChangeNotifier {
     _initializeListeners();
   }
 
-  // Services
-  late SpeechRecognitionService _speechService;
-  late BirdRecognitionService _birdService;
-  late WordRecognitionService _wordService;
   late RecordingPlayerService _audioService;
-  final ObservationUploader _observationUploader;
-  
-  // Configuration
-  final bool _debugMode;
+  late BirdRecognitionService _birdService;
   final int _confirmationTimeoutSeconds = 15;
-  
+  Timer? _confirmationTimer;
+  String _currentBirdInQuestion = '';
   // State management
   RecognitionState _currentState = RecognitionState.idle;
-  String _currentBirdInQuestion = '';
-  List<String> _possibleBirds = [];
-  Timer? _confirmationTimer;
-  
+
+  // Configuration
+  final bool _debugMode;
+
   // Observation tracking
   BirdObservation? _latestObservation;
 
-  // Getters
-  RecognitionState get currentState => _currentState;
-  bool get isListening => _speechService.isListening;
-  String get recognizedText => _speechService.recognizedText;
-  double get confidence => _speechService.confidence;
-  String? get errorMessage => _speechService.errorMessage ?? _birdService.errorMessage;
-  bool get isWaitingForConfirmation => _currentState == RecognitionState.waitingForConfirmation;
-  bool get isSystemInDoubt => _currentState == RecognitionState.systemInDoubt;
-  String get currentBirdInQuestion => _currentBirdInQuestion;
-  List<String> get possibleBirds => _possibleBirds;
-  BirdObservation? get latestObservation => _latestObservation;
-  
-  // Service access (for testing and external control)
-  SpeechRecognitionService get speechService => _speechService;
-  BirdRecognitionService get birdService => _birdService;
-  WordRecognitionService get wordService => _wordService;
-  RecordingPlayerService get audioService => _audioService;
+  final ObservationUploader _observationUploader;
+  List<String> _possibleBirds = [];
+  // Services
+  late SpeechRecognitionService _speechService;
 
-  /// Initialize all service listeners
-  void _initializeListeners() {
-    _speechService.addListener(_onSpeechUpdate);
-    _wordService.addListener(_onWordUpdate);
-    _audioService.addListener(_onAudioStateChanged);
-    _logDebug('Service listeners initialized');
-  }
+  late WordRecognitionService _wordService;
 
   @override
   void dispose() {
@@ -90,13 +65,35 @@ class SpeechCoordinator extends ChangeNotifier {
     super.dispose();
   }
 
-  /// Remove all service listeners
-  void _removeListeners() {
-    _speechService.removeListener(_onSpeechUpdate);
-    _wordService.removeListener(_onWordUpdate);
-    _audioService.removeListener(_onAudioStateChanged);
-    _logDebug('Service listeners removed');
-  }
+  // Getters
+  RecognitionState get currentState => _currentState;
+
+  bool get isListening => _speechService.isListening;
+
+  String get recognizedText => _speechService.recognizedText;
+
+  double get confidence => _speechService.confidence;
+
+  String? get errorMessage => _speechService.errorMessage ?? _birdService.errorMessage;
+
+  bool get isWaitingForConfirmation => _currentState == RecognitionState.waitingForConfirmation;
+
+  bool get isSystemInDoubt => _currentState == RecognitionState.systemInDoubt;
+
+  String get currentBirdInQuestion => _currentBirdInQuestion;
+
+  List<String> get possibleBirds => _possibleBirds;
+
+  BirdObservation? get latestObservation => _latestObservation;
+
+  // Service access (for testing and external control)
+  SpeechRecognitionService get speechService => _speechService;
+
+  BirdRecognitionService get birdService => _birdService;
+
+  WordRecognitionService get wordService => _wordService;
+
+  RecordingPlayerService get audioService => _audioService;
 
   /// Update services without recreating the coordinator
   void updateServices({
@@ -356,6 +353,58 @@ Future<void> handleConfirmationResponse(bool confirmed) async {
   }
 }
 
+  void resetConfirmationState() {
+  _logDebug('Resetting confirmation state');
+  _confirmationTimer?.cancel();
+  _currentBirdInQuestion = '';
+  _possibleBirds = [];
+  _transitionToState(RecognitionState.idle);
+  notifyListeners();
+}
+
+/// Process voice command in system in doubt state
+void processVoiceCommandInDoubtState(String command) {
+  if (_currentState != RecognitionState.systemInDoubt) return;
+  
+  _logDebug('Processing voice command in doubt state: $command');
+  
+  String lowerCommand = command.toLowerCase();
+  
+  // Check if the command contains any bird name from the possible birds list
+  for (String bird in _possibleBirds) {
+    if (lowerCommand.contains(bird.toLowerCase())) {
+      _logDebug('Found bird name in command: $bird');
+      handleBirdSelection(bird);
+      return;
+    }
+  }
+  
+  // If no bird name found, check for dismissal commands
+  if (lowerCommand.contains('ingen') || 
+      lowerCommand.contains('none') || 
+      lowerCommand.contains('annuller') || 
+      lowerCommand.contains('cancel')) {
+    _logDebug('Dismiss command detected');
+    resetConfirmationState();
+  }
+}
+
+  /// Initialize all service listeners
+  void _initializeListeners() {
+    _speechService.addListener(_onSpeechUpdate);
+    _wordService.addListener(_onWordUpdate);
+    _audioService.addListener(_onAudioStateChanged);
+    _logDebug('Service listeners initialized');
+  }
+
+  /// Remove all service listeners
+  void _removeListeners() {
+    _speechService.removeListener(_onSpeechUpdate);
+    _wordService.removeListener(_onWordUpdate);
+    _audioService.removeListener(_onAudioStateChanged);
+    _logDebug('Service listeners removed');
+  }
+
 // Helper method to get fallback birds based on phonetic similarity
 List<String> _getFallbackBirdsBasedOnPhonetics(String birdName) {
   // This is a simplified approach - in a real implementation, you'd want
@@ -417,49 +466,59 @@ List<String> _getFallbackBirdsBasedOnPhonetics(String birdName) {
   }
 
   /// Handle speech recognition updates
-  void _onSpeechUpdate() {
-    String recognizedText = _speechService.recognizedText;
-    if (recognizedText.isEmpty) return;
-    
-    _logDebug('Processing recognized text: $recognizedText');
-    
-    // Skip processing if in confirmation or doubt flow
-    if (_currentState == RecognitionState.waitingForConfirmation || 
-        _currentState == RecognitionState.processingBirdRecognition || 
-        _currentState == RecognitionState.systemInDoubt) {
-      _logDebug('Skipping recognition processing - already in confirmation or doubt flow');
-      return;
-    }
-    
-    // Process for special words first
-    _wordService.processText(recognizedText);
-    
-    // If no special word found, try bird names
-    if (_wordService.recognizedSpecialWord.isEmpty) {
-      _processBirdNames(recognizedText);
-    } else {
-      _processSpecialWords(_wordService.recognizedSpecialWord);
-    }
+void _onSpeechUpdate() {
+  String recognizedText = _speechService.recognizedText;
+  if (recognizedText.isEmpty) return;
+  
+  _logDebug('Processing recognized text: $recognizedText');
+  
+  // Handle system in doubt state specially
+  if (_currentState == RecognitionState.systemInDoubt) {
+    processVoiceCommandInDoubtState(recognizedText);
+    return;
   }
+  
+  // Skip processing if in confirmation or doubt flow
+  if (_currentState == RecognitionState.waitingForConfirmation || 
+      _currentState == RecognitionState.processingBirdRecognition) {
+    _logDebug('Skipping recognition processing - already in confirmation flow');
+    return;
+  }
+  
+  // Process for special words first
+  _wordService.processText(recognizedText);
+  
+  // If no special word found, try bird names
+  if (_wordService.recognizedSpecialWord.isEmpty) {
+    _processBirdNames(recognizedText);
+  } else {
+    _processSpecialWords(_wordService.recognizedSpecialWord);
+  }
+}
 
   /// Handle special word updates
-  void _onWordUpdate() {
-    // Only process confirmation words when waiting for confirmation
-    if (_wordService.isConfirmationWord && _currentState == RecognitionState.waitingForConfirmation) {
-      _logDebug('Processing confirmation word: ${_wordService.recognizedSpecialWord}');
-      
-      String word = _wordService.recognizedSpecialWord;
-      
-      // Process positive responses
-      if (_isPositiveResponse(word)) {
-        handleConfirmationResponse(true);
-      } 
-      // Process negative responses
-      else if (_isNegativeResponse(word)) {
-        handleConfirmationResponse(false);
-      }
+  /// Handle special word updates
+void _onWordUpdate() {
+  // Process confirmation words when waiting for confirmation
+  if (_wordService.isConfirmationWord && 
+      (_currentState == RecognitionState.waitingForConfirmation || 
+       _currentState == RecognitionState.systemInDoubt)) {
+    _logDebug('Processing confirmation word: ${_wordService.recognizedSpecialWord}');
+    
+    String word = _wordService.recognizedSpecialWord;
+    
+    // Process positive responses
+    if (_isPositiveResponse(word)) {
+      _logDebug('Positive response detected: $word');
+      handleConfirmationResponse(true);
+    } 
+    // Process negative responses
+    else if (_isNegativeResponse(word)) {
+      _logDebug('Negative response detected: $word');
+      handleConfirmationResponse(false);
     }
   }
+}
 
   //
   // ----- Helper Methods -----
@@ -533,15 +592,6 @@ List<String> _getFallbackBirdsBasedOnPhonetics(String birdName) {
       // Optional error handling here
     }
   }
-
-  void resetConfirmationState() {
-  _logDebug('Resetting confirmation state');
-  _confirmationTimer?.cancel();
-  _currentBirdInQuestion = '';
-  _possibleBirds = [];
-  _transitionToState(RecognitionState.idle);
-  notifyListeners();
-}
 
   /// Process bird names in recognized text
   void _processBirdNames(String text) {
@@ -644,14 +694,17 @@ List<String> _getFallbackBirdsBasedOnPhonetics(String birdName) {
   }
 
   /// Check if a single word is a positive response
-  bool _isPositiveResponse(String word) {
-    return word == 'ja' || word == 'yes' || word == 'jeps' || word == 'yeah';
-  }
+bool _isPositiveResponse(String word) {
+  return word == 'ja' || word == 'yes' || word == 'jeps' || word == 'yeah' || 
+         word == 'jo' || word == 'okay' || word == 'ok' || word == 'jep' || 
+         word == 'correct' || word == 'rigtigt';
+}
 
-  /// Check if a single word is a negative response
-  bool _isNegativeResponse(String word) {
-    return word == 'nej' || word == 'no';
-  }
+/// Check if a single word is a negative response
+bool _isNegativeResponse(String word) {
+  return word == 'nej' || word == 'no' || word == 'ikke' || 
+         word == 'forkert' || word == 'næppe';
+}
 
   /// Check if text contains a positive response
   bool _containsPositiveResponse(String text) {
