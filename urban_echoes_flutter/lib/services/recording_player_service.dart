@@ -4,77 +4,58 @@ import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 
 class RecordingPlayerService extends ChangeNotifier {
-  // Two dedicated players for precise control
-  final AudioPlayer _introPlayer = AudioPlayer();
-  final AudioPlayer _birdPlayer = AudioPlayer();
-  final AudioPlayer _outroPlayer = AudioPlayer(); // New player for the third part
-  
-  // State variables
-  bool _isPlaying = false;
-  bool _isMuted = false;
-  final bool _debugMode;
-  
-  // Track what type of audio was last played
-  String _lastPlaybackType = '';
-  int _sequenceCompletedCount = 0;
-  int _expectedCompletions = 0;
-  
-  // Subscription declarations
-  StreamSubscription<void>? _introPlayerSubscription;
-  StreamSubscription<void>? _birdPlayerSubscription;
-  StreamSubscription<void>? _outroPlayerSubscription;
-  // Add the missing subscription declarations
-  StreamSubscription<void>? _introCompleteSubscription;
-  StreamSubscription<void>? _birdCompleteSubscription;
-  
   // Constructor
   RecordingPlayerService({bool debugMode = false}) : _debugMode = debugMode {
     _initAudioPlayers();
   }
-  
-  void _initAudioPlayers() {
-    // Cancel any existing subscriptions
+
+  StreamSubscription<void>? _birdCompleteSubscription;
+  final AudioPlayer _birdPlayer = AudioPlayer();
+  StreamSubscription<void>? _birdPlayerSubscription;
+  final bool _debugMode;
+  int _expectedCompletions = 0;
+  // Add the missing subscription declarations
+  StreamSubscription<void>? _introCompleteSubscription;
+
+  // Two dedicated players for precise control
+  final AudioPlayer _introPlayer = AudioPlayer();
+
+  // Subscription declarations
+  StreamSubscription<void>? _introPlayerSubscription;
+
+  bool _isMuted = false;
+  // State variables
+  bool _isPlaying = false;
+
+  // Track what type of audio was last played
+  String _lastPlaybackType = '';
+
+  final AudioPlayer _outroPlayer = AudioPlayer(); // New player for the third part
+  StreamSubscription<void>? _outroPlayerSubscription;
+  int _sequenceCompletedCount = 0;
+
+  // Clean up resources
+  @override
+  void dispose() {
+    _logDebug('Disposing audio players');
     _introPlayerSubscription?.cancel();
     _birdPlayerSubscription?.cancel();
     _outroPlayerSubscription?.cancel();
-    
-    // Setup completion listeners
-    _introPlayerSubscription = _introPlayer.onPlayerComplete.listen((_) {
-      _logDebug('Intro playback completed');
-      _sequenceCompletedCount++;
-      _checkSequenceCompletion();
-    });
-    
-    _birdPlayerSubscription = _birdPlayer.onPlayerComplete.listen((_) {
-      _logDebug('Bird name playback completed');
-      _sequenceCompletedCount++;
-      _checkSequenceCompletion();
-    });
-    
-    _outroPlayerSubscription = _outroPlayer.onPlayerComplete.listen((_) {
-      _logDebug('Outro playback completed');
-      _sequenceCompletedCount++;
-      _checkSequenceCompletion();
-    });
-    
-    _logDebug('Audio players initialized');
+    _introCompleteSubscription?.cancel();
+    _birdCompleteSubscription?.cancel();
+    _introPlayer.dispose();
+    _birdPlayer.dispose();
+    _outroPlayer.dispose();
+    super.dispose();
   }
-  
-  // Check if the sequence is complete and notify listeners
-  void _checkSequenceCompletion() {
-    if (_sequenceCompletedCount >= _expectedCompletions) {
-      _logDebug('Audio sequence completed: $_lastPlaybackType');
-      _isPlaying = false;
-      _sequenceCompletedCount = 0;
-      notifyListeners(); // This will trigger the onAudioStateChanged in SpeechCoordinator
-    }
-  }
-  
+
   // Getters
   bool get isPlaying => _isPlaying;
+
   bool get isMuted => _isMuted;
+
   String get lastPlaybackType => _lastPlaybackType;
-  
+
   // Play bird question with callback-based timing
   Future<void> playBirdQuestion(String birdName) async {
     if (_isMuted) return;
@@ -120,7 +101,7 @@ class RecordingPlayerService extends ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   // Play confirmation with the callback-based sequence
   Future<void> playBirdConfirmation(String birdName) async {
     if (_isMuted) return;
@@ -176,7 +157,7 @@ class RecordingPlayerService extends ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   // Regular prompt playback
   Future<void> playPrompt(String promptKey) async {
     if (_isMuted) return;
@@ -229,6 +210,9 @@ class RecordingPlayerService extends ChangeNotifier {
         case 'bird_denied':
           path = 'audio/recorded/bird_denied.mp3';
           break;
+        case 'systemet_er_i_tvil':
+          path = 'audio/recorded/systemet_er_i_tvil.mp3';
+          break;
         default:
           path = 'audio/silent.mp3';
       }
@@ -244,20 +228,7 @@ class RecordingPlayerService extends ChangeNotifier {
       notifyListeners();
     }
   }
-  
-  // Simplify Danish characters for filenames
-  String _simplifyName(String name) {
-    return name
-        .replaceAll('æ', 'ae')
-        .replaceAll('ø', 'o')
-        .replaceAll('å', 'a')
-        .replaceAll('Æ', 'Ae')
-        .replaceAll('Ø', 'O')
-        .replaceAll('Å', 'A')
-        .toLowerCase()
-        .trim();
-  }
-  
+
   // Play a specific bird sound directly
   Future<void> playBirdSound(String birdName) async {
     if (_isMuted) return;
@@ -284,7 +255,7 @@ class RecordingPlayerService extends ChangeNotifier {
       notifyListeners();
     }
   }
-  
+
   // Stop audio playback
   Future<void> stopAudio() async {
     // Stop all players
@@ -299,7 +270,7 @@ class RecordingPlayerService extends ChangeNotifier {
     
     notifyListeners();
   }
-  
+
   // Toggle mute state
   void toggleMute() {
     _isMuted = !_isMuted;
@@ -311,31 +282,67 @@ class RecordingPlayerService extends ChangeNotifier {
     
     notifyListeners();
   }
-  
+
+  // Reset the last playback type (useful after handling completion)
+  void resetLastPlaybackType() {
+    _lastPlaybackType = '';
+  }
+
+  void _initAudioPlayers() {
+    // Cancel any existing subscriptions
+    _introPlayerSubscription?.cancel();
+    _birdPlayerSubscription?.cancel();
+    _outroPlayerSubscription?.cancel();
+    
+    // Setup completion listeners
+    _introPlayerSubscription = _introPlayer.onPlayerComplete.listen((_) {
+      _logDebug('Intro playback completed');
+      _sequenceCompletedCount++;
+      _checkSequenceCompletion();
+    });
+    
+    _birdPlayerSubscription = _birdPlayer.onPlayerComplete.listen((_) {
+      _logDebug('Bird name playback completed');
+      _sequenceCompletedCount++;
+      _checkSequenceCompletion();
+    });
+    
+    _outroPlayerSubscription = _outroPlayer.onPlayerComplete.listen((_) {
+      _logDebug('Outro playback completed');
+      _sequenceCompletedCount++;
+      _checkSequenceCompletion();
+    });
+    
+    _logDebug('Audio players initialized');
+  }
+
+  // Check if the sequence is complete and notify listeners
+  void _checkSequenceCompletion() {
+    if (_sequenceCompletedCount >= _expectedCompletions) {
+      _logDebug('Audio sequence completed: $_lastPlaybackType');
+      _isPlaying = false;
+      _sequenceCompletedCount = 0;
+      notifyListeners(); // This will trigger the onAudioStateChanged in SpeechCoordinator
+    }
+  }
+
+  // Simplify Danish characters for filenames
+  String _simplifyName(String name) {
+    return name
+        .replaceAll('æ', 'ae')
+        .replaceAll('ø', 'o')
+        .replaceAll('å', 'a')
+        .replaceAll('Æ', 'Ae')
+        .replaceAll('Ø', 'O')
+        .replaceAll('Å', 'A')
+        .toLowerCase()
+        .trim();
+  }
+
   // Debug logging
   void _logDebug(String message) {
     if (_debugMode) {
       debugPrint('RecordingPlayerService: $message');
     }
-  }
-  
-  // Reset the last playback type (useful after handling completion)
-  void resetLastPlaybackType() {
-    _lastPlaybackType = '';
-  }
-  
-  // Clean up resources
-  @override
-  void dispose() {
-    _logDebug('Disposing audio players');
-    _introPlayerSubscription?.cancel();
-    _birdPlayerSubscription?.cancel();
-    _outroPlayerSubscription?.cancel();
-    _introCompleteSubscription?.cancel();
-    _birdCompleteSubscription?.cancel();
-    _introPlayer.dispose();
-    _birdPlayer.dispose();
-    _outroPlayer.dispose();
-    super.dispose();
   }
 }
