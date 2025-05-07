@@ -397,17 +397,8 @@ class SystemInDoubtCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(
-              'Systemet er i tvivl - hvilken fugl så du?',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.purple[800],
-              ),
-              textAlign: TextAlign.center,
-            ),
             const SizedBox(height: 16),
-            ...possibleBirds.map((bird) => _buildBirdOption(bird)).toList(),
+            ...possibleBirds.map((bird) => _buildBirdOption(bird)),
             const SizedBox(height: 10),
             TextButton.icon(
               icon: const Icon(Icons.cancel),

@@ -267,37 +267,136 @@ class SpeechCoordinator extends ChangeNotifier {
     // Example: _databaseService.deleteLastObservation();
   }
 
-  /// Handle user's confirmation response (yes/no)
-  Future<void> handleConfirmationResponse(bool confirmed) async {
-    // Validate state
-    if (_currentState != RecognitionState.waitingForConfirmation) {
-      return;
-    }
-    
-    // Cancel timeout timer
-    _confirmationTimer?.cancel();
-    
-    // Transition to confirmation processing state
+/// Handle user's confirmation response (yes/no)
+Future<void> handleConfirmationResponse(bool confirmed) async {
+  // Validate state
+  if (_currentState != RecognitionState.waitingForConfirmation) {
+    return;
+  }
+  
+  // Cancel timeout timer
+  _confirmationTimer?.cancel();
+  
+  _logDebug('Handling confirmation response: ${confirmed ? "Yes" : "No"}');
+  
+  // Stop listening while playing audio
+  _pauseListeningForAudio();
+  
+  if (confirmed) {
+    // Transition to confirmation processing state for "yes"
     _transitionToState(RecognitionState.processingConfirmation);
     
-    _logDebug('Handling confirmation response: ${confirmed ? "Yes" : "No"}');
+    // User confirmed bird sighting
+    _audioService.playBirdConfirmation(_currentBirdInQuestion);
     
-    // Stop listening while playing audio
-    _pauseListeningForAudio();
+    // Save and upload observation
+    await _createAndUploadObservation();
+  } else {
+    // For "no" response, we want to find birds with similar phonetic patterns
     
-    if (confirmed) {
-      // User confirmed bird sighting
-      _audioService.playBirdConfirmation(_currentBirdInQuestion);
+    // First, check if we already have multiple possible matches from previous processing
+    if (_birdService.possibleMatches.length > 1) {
+      // Use the existing possible matches, which are already sorted by confidence
+      _possibleBirds = _birdService.possibleMatches
+          .where((bird) => bird != _currentBirdInQuestion)
+          .take(3)
+          .toList();
       
-      // Save and upload observation
-      await _createAndUploadObservation();
+      _logDebug('Using existing matches sorted by confidence: ${_possibleBirds.join(", ")}');
     } else {
-      // User denied bird sighting
-      _audioService.playPrompt('okay_observation_er_slettet');
+      // We need to find phonetically similar birds
+      // Process the current bird name to find phonetically similar birds
+      _birdService.processText(_currentBirdInQuestion);
+      
+      // Now check if we have matches again
+      if (_birdService.possibleMatches.length > 1) {
+        _possibleBirds = _birdService.possibleMatches
+            .where((bird) => bird != _currentBirdInQuestion)
+            .take(3)
+            .toList();
+        
+        _logDebug('Using phonetic matches: ${_possibleBirds.join(", ")}');
+      } else {
+        // As a last resort, process the entire recognized text again
+        _birdService.processText(_speechService.recognizedText);
+        
+        _possibleBirds = _birdService.possibleMatches
+            .where((bird) => bird != _currentBirdInQuestion)
+            .take(3)
+            .toList();
+        
+        _logDebug('Using text processing matches: ${_possibleBirds.join(", ")}');
+      }
     }
     
-    // State will reset after audio completes
+    // If we still don't have enough options, add some phonetically similar birds
+    if (_possibleBirds.length < 3) {
+      // Get some fallback birds
+      List<String> fallbackBirds = _getFallbackBirdsBasedOnPhonetics(_currentBirdInQuestion);
+      
+      // Add them to our list without duplicates
+      for (String bird in fallbackBirds) {
+        if (!_possibleBirds.contains(bird) && bird != _currentBirdInQuestion) {
+          _possibleBirds.add(bird);
+          if (_possibleBirds.length >= 3) break;
+        }
+      }
+    }
+    
+    _logDebug('Final possible birds by confidence: ${_possibleBirds.join(", ")}');
+    
+    // Set the state and then play the audio
+    _transitionToState(RecognitionState.systemInDoubt);
+    
+    // Play the system in doubt prompt
+    _audioService.playPrompt('systemet_er_i_tvil');
+    
+    // Extra notification to ensure UI updates
+    notifyListeners();
   }
+}
+
+// Helper method to get fallback birds based on phonetic similarity
+List<String> _getFallbackBirdsBasedOnPhonetics(String birdName) {
+  // This is a simplified approach - in a real implementation, you'd want
+  // to use a more sophisticated phonetic algorithm
+  
+  // Get all available birds
+  List<String> allBirds = _birdService.birdNames;
+  
+  // Simple logic: prefer birds that start with the same first letter
+  String firstLetter = birdName.isNotEmpty ? birdName[0].toLowerCase() : '';
+  
+  // Filter birds that start with the same letter and aren't the original bird
+  List<String> similarBirds = allBirds
+      .where((bird) => 
+          bird != birdName && 
+          bird.isNotEmpty && 
+          bird[0].toLowerCase() == firstLetter)
+      .toList();
+  
+  // If we don't have enough, add more birds
+  if (similarBirds.length < 5) {
+    // Add birds that have similar length
+    int targetLength = birdName.length;
+    List<String> lengthSimilarBirds = allBirds
+        .where((bird) => 
+            bird != birdName && 
+            !similarBirds.contains(bird) &&
+            (bird.length >= targetLength - 2 && bird.length <= targetLength + 2))
+        .toList();
+    
+    // Shuffle these to get some variety
+    lengthSimilarBirds.shuffle();
+    
+    // Add them to our similar birds list
+    similarBirds.addAll(lengthSimilarBirds.take(5 - similarBirds.length));
+  }
+  
+  // Shuffle and return
+  similarBirds.shuffle();
+  return similarBirds;
+}
 
   //
   // ----- Event Handlers -----

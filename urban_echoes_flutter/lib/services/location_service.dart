@@ -45,9 +45,6 @@ class LocationService extends ChangeNotifier {
   Timer? _batchUpdateTimer;
   bool _isAudioEnabled = true;
 
-  // Listen for season changes
-  StreamSubscription? _seasonSubscription;
-
   /// Constructor with optional dependency injection for testing
   LocationService({
     BirdSoundPlayer? soundPlayer,
