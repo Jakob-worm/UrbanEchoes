@@ -3,19 +3,23 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class BirdDataLoader {
+  factory BirdDataLoader() => _instance;
+
+  BirdDataLoader._internal();
+
   // Singleton pattern
   static final BirdDataLoader _instance = BirdDataLoader._internal();
-  factory BirdDataLoader() => _instance;
-  BirdDataLoader._internal();
-  
+
   // Bird data
   List<String> _danishBirdNames = [];
+
   bool _isLoaded = false;
-  
+
   // Getters
   List<String> get danishBirdNames => _danishBirdNames;
+
   bool get isLoaded => _isLoaded;
-  
+
   // Load the bird names from assets
   Future<List<String>> loadBirdNames() async {
     if (_isLoaded) return _danishBirdNames;
@@ -38,7 +42,111 @@ class BirdDataLoader {
       return [];
     }
   }
-  
+
+  // Search for birds by partial name
+  List<String> searchBirds(String query) {
+    if (!_isLoaded) {
+      debugPrint('Warning: Attempting to search before birds are loaded');
+      return [];
+    }
+    
+    if (query.isEmpty) {
+      return _danishBirdNames;
+    }
+    
+    final lowercaseQuery = query.toLowerCase();
+    return _danishBirdNames
+        .where((name) => name.toLowerCase().contains(lowercaseQuery))
+        .toList();
+  }
+
+  // Get a random bird name
+  String getRandomBirdName() {
+    if (!_isLoaded || _danishBirdNames.isEmpty) {
+      debugPrint('Warning: Attempting to get random bird before birds are loaded');
+      return '';
+    }
+    
+    final random = DateTime.now().millisecondsSinceEpoch % _danishBirdNames.length;
+    return _danishBirdNames[random];
+  }
+
+  // Get birds sorted alphabetically
+  List<String> getSortedBirdNames() {
+    if (!_isLoaded) {
+      debugPrint('Warning: Attempting to sort before birds are loaded');
+      return [];
+    }
+    
+    final sortedList = List<String>.from(_danishBirdNames);
+    sortedList.sort();
+    return sortedList;
+  }
+
+  // Clear the loaded data (useful for testing)
+  void clearData() {
+    _danishBirdNames = [];
+    _isLoaded = false;
+    debugPrint('Bird data cleared');
+  }
+
+  // Export the bird names to a string format
+  String exportBirdNamesToString() {
+    return _danishBirdNames.join('\n');
+  }
+
+  // Get statistics about the bird names
+  Map<String, dynamic> getBirdNameStatistics() {
+    if (!_isLoaded) {
+      debugPrint('Warning: Attempting to get statistics before birds are loaded');
+      return {};
+    }
+    
+    // Get the first letter distribution
+    final Map<String, int> firstLetterCount = {};
+    for (final name in _danishBirdNames) {
+      if (name.isNotEmpty) {
+        final firstLetter = name[0].toUpperCase();
+        firstLetterCount[firstLetter] = (firstLetterCount[firstLetter] ?? 0) + 1;
+      }
+    }
+    
+    // Get the length statistics
+    final lengths = _danishBirdNames.map((name) => name.length).toList();
+    lengths.sort();
+    
+    final int totalBirds = _danishBirdNames.length;
+    final double averageLength = totalBirds > 0 
+        ? lengths.reduce((a, b) => a + b) / totalBirds 
+        : 0;
+    
+    final int shortestLength = lengths.isNotEmpty ? lengths.first : 0;
+    final int longestLength = lengths.isNotEmpty ? lengths.last : 0;
+    
+    // Find shortest and longest bird names
+    String shortestBird = '';
+    String longestBird = '';
+    
+    for (final name in _danishBirdNames) {
+      if (name.length == shortestLength && (shortestBird.isEmpty || name.compareTo(shortestBird) < 0)) {
+        shortestBird = name;
+      }
+      if (name.length == longestLength && (longestBird.isEmpty || name.compareTo(longestBird) < 0)) {
+        longestBird = name;
+      }
+    }
+    
+    return {
+      'totalBirds': totalBirds,
+      'averageNameLength': averageLength,
+      'shortestName': shortestBird,
+      'shortestLength': shortestLength,
+      'longestName': longestBird,
+      'longestLength': longestLength,
+      'firstLetterDistribution': firstLetterCount,
+    };
+  }
+
   // Parse bird names from a string
   void _loadFromString(String data) {
     _danishBirdNames = data
@@ -130,109 +238,5 @@ class BirdDataLoader {
     ];
     
     debugPrint('Loaded ${_danishBirdNames.length} Danish bird names from hardcoded list');
-  }
-  
-  // Search for birds by partial name
-  List<String> searchBirds(String query) {
-    if (!_isLoaded) {
-      debugPrint('Warning: Attempting to search before birds are loaded');
-      return [];
-    }
-    
-    if (query.isEmpty) {
-      return _danishBirdNames;
-    }
-    
-    final lowercaseQuery = query.toLowerCase();
-    return _danishBirdNames
-        .where((name) => name.toLowerCase().contains(lowercaseQuery))
-        .toList();
-  }
-  
-  // Get a random bird name
-  String getRandomBirdName() {
-    if (!_isLoaded || _danishBirdNames.isEmpty) {
-      debugPrint('Warning: Attempting to get random bird before birds are loaded');
-      return '';
-    }
-    
-    final random = DateTime.now().millisecondsSinceEpoch % _danishBirdNames.length;
-    return _danishBirdNames[random];
-  }
-  
-  // Get birds sorted alphabetically
-  List<String> getSortedBirdNames() {
-    if (!_isLoaded) {
-      debugPrint('Warning: Attempting to sort before birds are loaded');
-      return [];
-    }
-    
-    final sortedList = List<String>.from(_danishBirdNames);
-    sortedList.sort();
-    return sortedList;
-  }
-  
-  // Clear the loaded data (useful for testing)
-  void clearData() {
-    _danishBirdNames = [];
-    _isLoaded = false;
-    debugPrint('Bird data cleared');
-  }
-  
-  // Export the bird names to a string format
-  String exportBirdNamesToString() {
-    return _danishBirdNames.join('\n');
-  }
-  
-  // Get statistics about the bird names
-  Map<String, dynamic> getBirdNameStatistics() {
-    if (!_isLoaded) {
-      debugPrint('Warning: Attempting to get statistics before birds are loaded');
-      return {};
-    }
-    
-    // Get the first letter distribution
-    final Map<String, int> firstLetterCount = {};
-    for (final name in _danishBirdNames) {
-      if (name.isNotEmpty) {
-        final firstLetter = name[0].toUpperCase();
-        firstLetterCount[firstLetter] = (firstLetterCount[firstLetter] ?? 0) + 1;
-      }
-    }
-    
-    // Get the length statistics
-    final lengths = _danishBirdNames.map((name) => name.length).toList();
-    lengths.sort();
-    
-    final int totalBirds = _danishBirdNames.length;
-    final double averageLength = totalBirds > 0 
-        ? lengths.reduce((a, b) => a + b) / totalBirds 
-        : 0;
-    
-    final int shortestLength = lengths.isNotEmpty ? lengths.first : 0;
-    final int longestLength = lengths.isNotEmpty ? lengths.last : 0;
-    
-    // Find shortest and longest bird names
-    String shortestBird = '';
-    String longestBird = '';
-    
-    for (final name in _danishBirdNames) {
-      if (name.length == shortestLength && (shortestBird.isEmpty || name.compareTo(shortestBird) < 0)) {
-        shortestBird = name;
-      }
-      if (name.length == longestLength && (longestBird.isEmpty || name.compareTo(longestBird) < 0)) {
-        longestBird = name;
-      }
-    }
-    
-    return {
-      'totalBirds': totalBirds,
-      'averageNameLength': averageLength,
-      'shortestName': shortestBird,
-      'shortestLength': shortestLength,
-      'longestName': longestBird,
-      'longestLength': longestLength,
-      'firstLetterDistribution': firstLetterCount,
-    };
   }
 }

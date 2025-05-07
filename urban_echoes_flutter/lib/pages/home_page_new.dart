@@ -234,14 +234,6 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 10),
-                                  TextButton.icon(
-                                    icon: const Icon(Icons.refresh, size: 18),
-                                    label: const Text('Gentag spørgsmål'),
-                                    onPressed: () {
-                                      coordinator.audioService.playBirdQuestion(coordinator.currentBirdInQuestion);
-                                    },
-                                  ),
                                 ],
                               ),
                             ),
