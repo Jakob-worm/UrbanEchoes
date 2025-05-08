@@ -502,29 +502,32 @@ void _onSpeechUpdate() {
   }
 }
 
+
   /// Handle special word updates
-  /// Handle special word updates
-void _onWordUpdate() {
-  // Process confirmation words when waiting for confirmation
-  if (_wordService.isConfirmationWord && 
-      (_currentState == RecognitionState.waitingForConfirmation || 
-       _currentState == RecognitionState.systemInDoubt)) {
-    _logDebug('Processing confirmation word: ${_wordService.recognizedSpecialWord}');
-    
-    String word = _wordService.recognizedSpecialWord;
-    
-    // Process positive responses
-    if (_isPositiveResponse(word)) {
-      _logDebug('Positive response detected: $word');
-      handleConfirmationResponse(true);
-    } 
-    // Process negative responses
-    else if (_isNegativeResponse(word)) {
-      _logDebug('Negative response detected: $word');
-      handleConfirmationResponse(false);
+  void _onWordUpdate() {
+    // Process confirmation words when waiting for confirmation
+    if (_wordService.isConfirmationWord) {
+      _logDebug('Processing confirmation word: ${_wordService.recognizedSpecialWord}');
+      
+      String word = _wordService.recognizedSpecialWord;
+      
+      // Check if we're in a state where confirmation is relevant
+      if (_currentState == RecognitionState.waitingForConfirmation || 
+          _currentState == RecognitionState.systemInDoubt) {
+        
+        // Process positive responses
+        if (_isPositiveResponse(word)) {
+          _logDebug('Positive response detected: $word');
+          handleConfirmationResponse(true);
+        } 
+        // Process negative responses
+        else if (_isNegativeResponse(word)) {
+          _logDebug('Negative response detected: $word');
+          handleConfirmationResponse(false);
+        }
+      }
     }
   }
-}
 
   //
   // ----- Helper Methods -----

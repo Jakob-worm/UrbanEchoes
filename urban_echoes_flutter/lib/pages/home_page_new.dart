@@ -327,16 +327,16 @@ class SpeechRecognitionCard extends StatelessWidget {
 
 /// Card for confirming bird observations
 class ConfirmationCard extends StatelessWidget {
+  final String birdName;
+  final VoidCallback onConfirm;
+  final VoidCallback onDeny;
+
   const ConfirmationCard({
     super.key,
     required this.birdName,
     required this.onConfirm,
     required this.onDeny,
   });
-
-  final String birdName;
-  final VoidCallback onConfirm;
-  final VoidCallback onDeny;
 
   @override
   Widget build(BuildContext context) {
@@ -361,6 +361,19 @@ class ConfirmationCard extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 10),
+            
+            // Add a subtitle to indicate voice confirmation is possible
+            Text(
+              'Sig "ja" eller "nej", eller tryk på knapperne',
+              style: TextStyle(
+                fontSize: 14,
+                fontStyle: FontStyle.italic,
+                color: Colors.amber[800],
+              ),
+              textAlign: TextAlign.center,
+            ),
+            
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -385,6 +398,27 @@ class ConfirmationCard extends StatelessWidget {
                 ),
               ],
             ),
+            
+            // Visual indicator that microphone is active
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.mic, 
+                  color: Colors.amber[700],
+                  size: 16,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Lytter efter svar...',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.amber[700],
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -392,7 +426,6 @@ class ConfirmationCard extends StatelessWidget {
   }
 }
 
-/// Card for when the system is in doubt between multiple birds
 /// Card for when the system is in doubt between multiple birds
 class SystemInDoubtCard extends StatelessWidget {
   const SystemInDoubtCard({
