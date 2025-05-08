@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:urban_echoes/services/location_service.dart';
 import 'package:urban_echoes/services/speach_regognition/speech_coordinator.dart';
 import 'package:urban_echoes/wigdets/manual_bird_inputcard.dart';
 
@@ -22,11 +25,77 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
     super.dispose();
   }
 
-  @override
-  void initState() {
-    super.initState();
-    _setupAnimations();
+@override
+void initState() {
+  super.initState();
+  _setupAnimations();
+  
+  // Add audio initialization
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    if (mounted) {
+      debugPrint('🔊 BirdHomePage post-frame callback - initializing audio services');
+      
+      try {
+        // Get LocationService from provider
+        final locationService = Provider.of<LocationService>(context, listen: false);
+        
+        // First ensure service is initialized
+        if (!locationService.isInitialized) {
+          await locationService.initialize(context);
+          debugPrint('🔊 LocationService initialized');
+        }
+        
+        // Then explicitly enable location tracking
+        if (!locationService.isLocationTrackingEnabled) {
+          await locationService.toggleLocationTracking(true);
+          debugPrint('🔊 Location tracking enabled');
+        }
+        
+        // The key fix: Toggle audio off and on to ensure a clean restart
+        debugPrint('🔊 Restarting audio system to ensure proper initialization');
+        await locationService.toggleAudio(false);
+        await Future.delayed(Duration(milliseconds: 300));
+        await locationService.toggleAudio(true);
+        
+        // Force update state after all services are enabled
+        if (mounted) {
+          setState(() {});
+          debugPrint('🔊 BirdHomePage state updated after audio initialization');
+        }
+        
+      } catch (e) {
+        debugPrint('❌ Error in BirdHomePage audio initialization: $e');
+      }
+    }
+  });
+}
+
+// Add this helper method to diagnose the current state
+void _debugAudioState(LocationService locationService) {
+  debugPrint('===== AUDIO SYSTEM DIAGNOSTIC =====');
+  debugPrint('🔊 isInitialized: ${locationService.isInitialized}');
+  debugPrint('🔊 isLocationTrackingEnabled: ${locationService.isLocationTrackingEnabled}');
+  debugPrint('🔊 isAudioEnabled: ${locationService.isAudioEnabled}');
+  
+  final position = locationService.currentPosition;
+  if (position != null) {
+    debugPrint('🔊 Position: lat=${position.latitude}, lng=${position.longitude}');
+  } else {
+    debugPrint('❌ Position is NULL!');
   }
+  
+  final activeObservations = locationService.activeObservations;
+  debugPrint('🔊 Active observations: ${activeObservations.length}');
+  
+  if (activeObservations.isEmpty) {
+    debugPrint('❌ NO ACTIVE OBSERVATIONS IN RANGE!');
+  } else {
+    for (var obs in activeObservations) {
+      debugPrint('🔊 - ${obs["bird_name"]} (Directory: ${obs["sound_directory"]})');
+    }
+  }
+  debugPrint('===================================');
+}
 
   void _setupAnimations() {
     _animationController = AnimationController(
