@@ -314,52 +314,82 @@ void _addNewObservationsToMap(List<Map<String, dynamic>> newObservations) {
   }
 
   @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
+void initState() {
+  super.initState();
+  WidgetsBinding.instance.addObserver(this);
 
-    // Initialize services
-    _seasonService = SeasonService();
+  // Initialize services
+  _seasonService = SeasonService();
 
-    // Initialize zoom level from config
-    _zoomLevel = _config.defaultZoom;
+  // Initialize zoom level from config
+  _zoomLevel = _config.defaultZoom;
 
-    // Create map controller once
-    _mapController = MapController();
+  // Create map controller once
+  _mapController = MapController();
 
-    // Initialize state manager
-    _stateManager = MapStateManager();
-    _stateManager.initialize();
+  // Initialize state manager
+  _stateManager = MapStateManager();
+  _stateManager.initialize();
 
-    // Set a timeout for loading
-    _loadingTimeoutTimer = Timer(Duration(seconds: 15), () {
-      if (mounted) {
-        _stateManager.forceReady();
-      }
-    });
+  // Set a timeout for loading
+  _loadingTimeoutTimer = Timer(Duration(seconds: 15), () {
+    if (mounted) {
+      _stateManager.forceReady();
+    }
+  });
 
-    // Add periodic check to ensure UI components stay visible
-    _periodicStateCheck = Timer.periodic(Duration(seconds: 5), (_) {
-      if (mounted &&
-          _stateManager.state != MapState.ready &&
-          _locationService?.currentPosition != null) {
-        _stateManager.forceReady();
-      }
-    });
+  // Add periodic check to ensure UI components stay visible
+  _periodicStateCheck = Timer.periodic(Duration(seconds: 5), (_) {
+    if (mounted &&
+        _stateManager.state != MapState.ready &&
+        _locationService?.currentPosition != null) {
+      _stateManager.forceReady();
+    }
+  });
 
-    // Start position update timer
-    _positionUpdateTimer = Timer.periodic(Duration(milliseconds: 500), (_) {
-      _processPendingPositionUpdate();
-    });
+  // Start position update timer
+  _positionUpdateTimer = Timer.periodic(Duration(milliseconds: 500), (_) {
+    _processPendingPositionUpdate();
+  });
 
-    // Defer initialization until after the widget is properly built
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
+  WidgetsBinding.instance.addPostFrameCallback((_) async {
+    if (mounted) {
+      debugPrint('🔊 MapPage post-frame callback - initializing services');
+      
+      // Get LocationService from provider
+      try {
+        final locationService = Provider.of<LocationService>(context, listen: false);
+        _locationService = locationService;
+        
+        // First ensure service is initialized
+        if (!locationService.isInitialized) {
+          await locationService.initialize(context);
+        }
+        
+        // Then explicitly enable location tracking
+        if (!locationService.isLocationTrackingEnabled) {
+          await locationService.toggleLocationTracking(true);
+          debugPrint('🔊 MapPage explicitly enabled location tracking');
+        }
+        
+        // Finally enable audio (this is key for sounds)
+        if (!locationService.isAudioEnabled) {
+          locationService.toggleAudio(true);
+          debugPrint('🔊 MapPage explicitly enabled audio playback');
+        }
+        
+        // Force update state after all services are enabled
+        if (mounted) {
+          setState(() {});
+        }
+        
         _initializeAfterBuild();
+      } catch (e) {
+        debugPrint('❌ Error in MapPage post-frame initialization: $e');
       }
-    });
-  }
-
+    }
+  });
+}
   void _processPendingPositionUpdate() {
     if (_pendingPositionUpdate != null && mounted) {
       try {
