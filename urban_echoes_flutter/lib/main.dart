@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:urban_echoes/pages/nav_bars_page.dart';
 import 'package:urban_echoes/pages/intro_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:urban_echoes/services/app_startup_service.dart';
@@ -437,13 +436,19 @@ class InitialScreenState extends State<InitialScreen>
     return Scaffold(
       body: Stack(
         children: [
-          const NavBarsPage(),
+          // Get the current page directly from PageStateManager
+          Consumer<PageStateManager>(
+            builder: (context, pageStateManager, child) {
+              return pageStateManager.getCurrentPage(context);
+            },
+          ),
           
           // Add the notification widget at the bottom of the screen
           const UploadNotificationWidget(),
         ],
       ),
-      // Add a debug FAB only in debug mode
+      // No bottomNavigationBar or navigation rail here
+      // Add debug FAB only in debug mode
       floatingActionButton: debugMode ? FloatingActionButton(
         onPressed: () {
           // Add debug functionality here

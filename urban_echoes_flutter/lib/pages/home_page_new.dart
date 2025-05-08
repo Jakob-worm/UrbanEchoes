@@ -42,10 +42,13 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
   Widget build(BuildContext context) {
     return Consumer<SpeechCoordinator>(
       builder: (context, coordinator, child) {
+        // Hide FAB when SystemInDoubtCard is visible
+        final bool shouldShowFAB = !(coordinator.isSystemInDoubt && coordinator.possibleBirds.isNotEmpty);
+        
         return Scaffold(
           appBar: _buildAppBar(),
           body: _buildBody(context, coordinator),
-          floatingActionButton: _buildFloatingActionButton(context, coordinator),
+          floatingActionButton: shouldShowFAB ? _buildFloatingActionButton(context, coordinator) : null,
           floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
         );
       },
@@ -117,6 +120,10 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
   }
 
   Widget _buildMainContent(SpeechCoordinator coordinator) {
+    // Adjust bottom padding based on whether FAB is showing
+    final bool shouldShowFAB = !(coordinator.isSystemInDoubt && coordinator.possibleBirds.isNotEmpty);
+    final double bottomPadding = shouldShowFAB ? 150.0 : 20.0;
+    
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
       child: ListView(
@@ -141,7 +148,7 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
                 }
               },
             ),
-          const SizedBox(height: 100), // Extra space for the FAB
+          SizedBox(height: bottomPadding), // Dynamic space based on FAB visibility
         ],
       ),
     );
@@ -371,7 +378,6 @@ class ConfirmationCard extends StatelessWidget {
 }
 
 /// Card for when the system is in doubt between multiple birds
-// Updated SystemInDoubtCard class with the fixed "Ingen af dem" button
 class SystemInDoubtCard extends StatelessWidget {
   final List<String> possibleBirds;
   final Function(String) onBirdSelected;
@@ -447,38 +453,6 @@ class SystemInDoubtCard extends StatelessWidget {
       ),
     );
   }
-}
-
-// Update to the _buildMainContent method to ensure proper spacing
-Widget _buildMainContent(SpeechCoordinator coordinator) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    child: ListView(
-      children: [
-        const SizedBox(height: 30),
-        SpeechRecognitionCard(coordinator: coordinator),
-        const SizedBox(height: 20),
-        if (coordinator.isWaitingForConfirmation)
-          ConfirmationCard(
-            birdName: coordinator.currentBirdInQuestion,
-            onConfirm: () => coordinator.handleConfirmationResponse(true),
-            onDeny: () => coordinator.handleConfirmationResponse(false),
-          ),
-        if (coordinator.isSystemInDoubt && coordinator.possibleBirds.isNotEmpty)
-          SystemInDoubtCard(
-            possibleBirds: coordinator.possibleBirds,
-            onBirdSelected: coordinator.handleBirdSelection,
-            onDismiss: () {
-              coordinator.resetConfirmationState();
-              if (!coordinator.isListening) {
-                coordinator.startListening();
-              }
-            },
-          ),
-        const SizedBox(height: 150), // Increased extra space for the FAB
-      ],
-    ),
-  );
 }
 
 /// Centralized styles for the app
