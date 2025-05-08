@@ -27,7 +27,7 @@ class ServiceConfig {
   int maxSoundDelayMs = 1000; // Maximum base delay for sounds
   int minSoundIntervalMs = 500; // Minimum interval between sounds
   int maxSoundIntervalMs = 20000; // Maximum interval between sounds
-  int maxActivePlayers = 5; // Max number of active players
+  int maxActivePlayers = 7; // Max number of active players
   
   // Service timers
   int watchdogIntervalMinutes = 2; // Watchdog check interval
