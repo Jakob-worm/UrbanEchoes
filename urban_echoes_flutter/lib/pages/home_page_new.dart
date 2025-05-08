@@ -371,6 +371,7 @@ class ConfirmationCard extends StatelessWidget {
 }
 
 /// Card for when the system is in doubt between multiple birds
+// Updated SystemInDoubtCard class with the fixed "Ingen af dem" button
 class SystemInDoubtCard extends StatelessWidget {
   final List<String> possibleBirds;
   final Function(String) onBirdSelected;
@@ -400,10 +401,24 @@ class SystemInDoubtCard extends StatelessWidget {
             const SizedBox(height: 16),
             ...possibleBirds.map((bird) => _buildBirdOption(bird)),
             const SizedBox(height: 10),
-            TextButton.icon(
-              icon: const Icon(Icons.cancel),
-              label: const Text('Ingen af dem'),
-              onPressed: onDismiss,
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.cancel, color: Colors.white),
+                label: const Text(
+                  'Ingen af dem',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red[600],
+                  minimumSize: const Size(double.infinity, 50),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                onPressed: onDismiss,
+              ),
             ),
           ],
         ),
@@ -432,6 +447,38 @@ class SystemInDoubtCard extends StatelessWidget {
       ),
     );
   }
+}
+
+// Update to the _buildMainContent method to ensure proper spacing
+Widget _buildMainContent(SpeechCoordinator coordinator) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: ListView(
+      children: [
+        const SizedBox(height: 30),
+        SpeechRecognitionCard(coordinator: coordinator),
+        const SizedBox(height: 20),
+        if (coordinator.isWaitingForConfirmation)
+          ConfirmationCard(
+            birdName: coordinator.currentBirdInQuestion,
+            onConfirm: () => coordinator.handleConfirmationResponse(true),
+            onDeny: () => coordinator.handleConfirmationResponse(false),
+          ),
+        if (coordinator.isSystemInDoubt && coordinator.possibleBirds.isNotEmpty)
+          SystemInDoubtCard(
+            possibleBirds: coordinator.possibleBirds,
+            onBirdSelected: coordinator.handleBirdSelection,
+            onDismiss: () {
+              coordinator.resetConfirmationState();
+              if (!coordinator.isListening) {
+                coordinator.startListening();
+              }
+            },
+          ),
+        const SizedBox(height: 150), // Increased extra space for the FAB
+      ],
+    ),
+  );
 }
 
 /// Centralized styles for the app
