@@ -4,6 +4,7 @@ import 'package:urban_echoes/models/bird_observation.dart';
 import 'package:urban_echoes/services/observation/observation_uploader.dart';
 import 'package:urban_echoes/services/recording_player_service.dart';
 import 'package:urban_echoes/services/service_config.dart';
+import 'package:urban_echoes/services/speach_regognition/bird_data_loader.dart';
 import 'package:urban_echoes/services/speach_regognition/bird_regognition_service.dart';
 import 'package:urban_echoes/services/speach_regognition/speech_recognition_service.dart';
 import 'package:urban_echoes/services/speach_regognition/word_recognition.dart';
@@ -65,6 +66,9 @@ class SpeechCoordinator extends ChangeNotifier {
     super.dispose();
   }
 
+  bool _isManualInputActive = false;
+  final BirdDataLoader birdDataLoader = BirdDataLoader();
+
   // Getters
   RecognitionState get currentState => _currentState;
 
@@ -73,6 +77,8 @@ class SpeechCoordinator extends ChangeNotifier {
   String get recognizedText => _speechService.recognizedText;
 
   double get confidence => _speechService.confidence;
+
+  bool get isManualInputActive => _isManualInputActive;
 
   String? get errorMessage => _speechService.errorMessage ?? _birdService.errorMessage;
 
@@ -618,6 +624,42 @@ void _onWordUpdate() {
     }
     // Add other special word handlers here
   }
+
+  void activateManualInput() {
+  _isManualInputActive = true;
+  notifyListeners();
+}
+
+void deactivateManualInput() {
+  _isManualInputActive = false;
+  notifyListeners();
+}
+
+void handleManualBirdSelection(String birdName) {
+  if (birdName.isNotEmpty) {
+    // Clear any previous recognition state
+    _birdService.reset();
+    
+    // Process the exact bird name to set it as the matched bird
+    // This will set _matchedBird and confidence in the bird service
+    _birdService.processText(birdName);
+    
+    // Set the current bird in question for confirmation
+    _currentBirdInQuestion = birdName;
+    
+    // Turn off manual input mode
+    _isManualInputActive = false;
+    
+    // Start confirmation timeout
+    _startConfirmationTimeout();
+    
+    // Transition to waiting for confirmation
+    _transitionToState(RecognitionState.waitingForConfirmation);
+    
+    // Optionally play the confirmation audio
+    _audioService.playBirdQuestion(birdName);
+  }
+}
 
   /// Handle different types of audio completion
   void _handleAudioCompletion(String playbackType) {

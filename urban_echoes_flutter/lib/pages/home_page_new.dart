@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:urban_echoes/services/speach_regognition/speech_coordinator.dart';
+import 'package:urban_echoes/wigdets/manual_bird_inputcard.dart';
 
 /// Main screen for the bird observation app
 class BirdHomePage extends StatefulWidget {
@@ -35,23 +36,6 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
 
     _pulseAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<SpeechCoordinator>(
-      builder: (context, coordinator, child) {
-        // Hide FAB when SystemInDoubtCard is visible
-        final bool shouldShowFAB = !(coordinator.isSystemInDoubt && coordinator.possibleBirds.isNotEmpty);
-        
-        return Scaffold(
-          appBar: _buildAppBar(),
-          body: _buildBody(context, coordinator),
-          floatingActionButton: shouldShowFAB ? _buildFloatingActionButton(context, coordinator) : null,
-          floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-        );
-      },
     );
   }
 
@@ -119,40 +103,53 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
     );
   }
 
-  Widget _buildMainContent(SpeechCoordinator coordinator) {
-    // Adjust bottom padding based on whether FAB is showing
-    final bool shouldShowFAB = !(coordinator.isSystemInDoubt && coordinator.possibleBirds.isNotEmpty);
-    final double bottomPadding = shouldShowFAB ? 150.0 : 20.0;
-    
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: ListView(
-        children: [
-          const SizedBox(height: 30),
-          SpeechRecognitionCard(coordinator: coordinator),
-          const SizedBox(height: 20),
-          if (coordinator.isWaitingForConfirmation)
-            ConfirmationCard(
-              birdName: coordinator.currentBirdInQuestion,
-              onConfirm: () => coordinator.handleConfirmationResponse(true),
-              onDeny: () => coordinator.handleConfirmationResponse(false),
-            ),
-          if (coordinator.isSystemInDoubt && coordinator.possibleBirds.isNotEmpty)
-            SystemInDoubtCard(
-              possibleBirds: coordinator.possibleBirds,
-              onBirdSelected: coordinator.handleBirdSelection,
-              onDismiss: () {
-                coordinator.resetConfirmationState();
-                if (!coordinator.isListening) {
-                  coordinator.startListening();
-                }
-              },
-            ),
-          SizedBox(height: bottomPadding), // Dynamic space based on FAB visibility
-        ],
-      ),
-    );
-  }
+ Widget _buildMainContent(SpeechCoordinator coordinator) {
+  // Adjust bottom padding based on whether FAB is showing
+  final bool shouldShowFAB = !(coordinator.isSystemInDoubt && coordinator.possibleBirds.isNotEmpty) && 
+                            !coordinator.isManualInputActive;
+  final double bottomPadding = shouldShowFAB ? 150.0 : 20.0;
+  
+  return Padding(
+    padding: const EdgeInsets.symmetric(horizontal: 20),
+    child: ListView(
+      children: [
+        const SizedBox(height: 30),
+        SpeechRecognitionCard(coordinator: coordinator),
+        const SizedBox(height: 20),
+        if (coordinator.isWaitingForConfirmation)
+          ConfirmationCard(
+            birdName: coordinator.currentBirdInQuestion,
+            onConfirm: () => coordinator.handleConfirmationResponse(true),
+            onDeny: () => coordinator.handleConfirmationResponse(false),
+          ),
+        if (coordinator.isSystemInDoubt && coordinator.possibleBirds.isNotEmpty)
+          SystemInDoubtCard(
+            possibleBirds: coordinator.possibleBirds,
+            onBirdSelected: coordinator.handleBirdSelection,
+            onDismiss: () {
+              coordinator.resetConfirmationState();
+              // Manual input is now activated in the SystemInDoubtCard widget
+            },
+          ),
+        // Add the new ManualBirdInputCard
+        if (coordinator.isManualInputActive)
+          ManualBirdInputCard(
+            coordinator: coordinator,
+            onCancel: () {
+              coordinator.deactivateManualInput();
+              if (!coordinator.isListening) {
+                coordinator.startListening();
+              }
+            },
+            onBirdSelected: (birdName) {
+              coordinator.handleManualBirdSelection(birdName);
+            },
+          ),
+        SizedBox(height: bottomPadding), // Dynamic space based on FAB visibility
+      ],
+    ),
+  );
+}
 
   Widget _buildFloatingActionButton(BuildContext context, SpeechCoordinator coordinator) {
     return Center(
@@ -200,38 +197,31 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
       });
     }
   }
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<SpeechCoordinator>(
+      builder: (context, coordinator, child) {
+        // Hide FAB when SystemInDoubtCard is visible or ManualBirdInputCard is visible
+        final bool shouldShowFAB = !(coordinator.isSystemInDoubt && coordinator.possibleBirds.isNotEmpty) && 
+                                !coordinator.isManualInputActive;
+        
+        return Scaffold(
+          appBar: _buildAppBar(),
+          body: _buildBody(context, coordinator),
+          floatingActionButton: shouldShowFAB ? _buildFloatingActionButton(context, coordinator) : null,
+          floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+        );
+      },
+    );
+  }
 }
 
 /// Card for displaying recognized speech and matched bird
 class SpeechRecognitionCard extends StatelessWidget {
-  final SpeechCoordinator coordinator;
-
   const SpeechRecognitionCard({super.key, required this.coordinator});
 
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 4,
-      shape: AppStyles.cardShape,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildRecognizedTextHeader(),
-            const SizedBox(height: 10),
-            _buildRecognizedTextContent(),
-            if (coordinator.birdService.matchedBird.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              _buildMatchedBirdHeader(),
-              const SizedBox(height: 10),
-              _buildMatchedBirdContent(),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
+  final SpeechCoordinator coordinator;
 
   Widget _buildRecognizedTextHeader() {
     return Row(
@@ -308,20 +298,45 @@ class SpeechRecognitionCard extends StatelessWidget {
       ),
     );
   }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 4,
+      shape: AppStyles.cardShape,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildRecognizedTextHeader(),
+            const SizedBox(height: 10),
+            _buildRecognizedTextContent(),
+            if (coordinator.birdService.matchedBird.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _buildMatchedBirdHeader(),
+              const SizedBox(height: 10),
+              _buildMatchedBirdContent(),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 /// Card for confirming bird observations
 class ConfirmationCard extends StatelessWidget {
-  final String birdName;
-  final VoidCallback onConfirm;
-  final VoidCallback onDeny;
-
   const ConfirmationCard({
     super.key,
     required this.birdName,
     required this.onConfirm,
     required this.onDeny,
   });
+
+  final String birdName;
+  final VoidCallback onConfirm;
+  final VoidCallback onDeny;
 
   @override
   Widget build(BuildContext context) {
@@ -378,11 +393,8 @@ class ConfirmationCard extends StatelessWidget {
 }
 
 /// Card for when the system is in doubt between multiple birds
+/// Card for when the system is in doubt between multiple birds
 class SystemInDoubtCard extends StatelessWidget {
-  final List<String> possibleBirds;
-  final Function(String) onBirdSelected;
-  final VoidCallback onDismiss;
-
   const SystemInDoubtCard({
     super.key,
     required this.possibleBirds,
@@ -390,8 +402,37 @@ class SystemInDoubtCard extends StatelessWidget {
     required this.onDismiss,
   });
 
+  final Function(String) onBirdSelected;
+  final VoidCallback onDismiss;
+  final List<String> possibleBirds;
+
+  Widget _buildBirdOption(String bird) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: ElevatedButton.icon(
+        icon: const Icon(Icons.pets, color: Colors.white),
+        label: Text(
+          bird,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+          ),
+        ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.purple[600],
+          minimumSize: const Size(double.infinity, 50),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        ),
+        onPressed: () => onBirdSelected(bird),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Get coordinator from Provider to activate manual input
+    final coordinator = Provider.of<SpeechCoordinator>(context, listen: false);
+    
     return Card(
       elevation: 6,
       color: Colors.purple[50],
@@ -423,7 +464,13 @@ class SystemInDoubtCard extends StatelessWidget {
                   minimumSize: const Size(double.infinity, 50),
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 ),
-                onPressed: onDismiss,
+                onPressed: () {
+                  // Call the provided onDismiss callback
+                  onDismiss();
+                  
+                  // Also activate manual input
+                  coordinator.activateManualInput();
+                },
               ),
             ),
           ],
@@ -431,42 +478,10 @@ class SystemInDoubtCard extends StatelessWidget {
       ),
     );
   }
-
-  Widget _buildBirdOption(String bird) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: ElevatedButton.icon(
-        icon: const Icon(Icons.pets, color: Colors.white),
-        label: Text(
-          bird,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 18,
-          ),
-        ),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.purple[600],
-          minimumSize: const Size(double.infinity, 50),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-        ),
-        onPressed: () => onBirdSelected(bird),
-      ),
-    );
-  }
 }
 
 /// Centralized styles for the app
 class AppStyles {
-  // Colors
-  static final Color primaryColor = Colors.green[700]!;
-  static final Color secondaryColor = Colors.green[100]!;
-  static final Color primaryTextColor = Colors.green[800]!;
-  
-  // Shapes
-  static final cardShape = RoundedRectangleBorder(
-    borderRadius: BorderRadius.circular(15),
-  );
-  
   // Text Styles
   static const buttonLabelStyle = TextStyle(
     color: Colors.white,
@@ -480,4 +495,15 @@ class AppStyles {
       ),
     ],
   );
+
+  // Shapes
+  static final cardShape = RoundedRectangleBorder(
+    borderRadius: BorderRadius.circular(15),
+  );
+
+  // Colors
+  static final Color primaryColor = Colors.green[700]!;
+
+  static final Color primaryTextColor = Colors.green[800]!;
+  static final Color secondaryColor = Colors.green[100]!;
 }
