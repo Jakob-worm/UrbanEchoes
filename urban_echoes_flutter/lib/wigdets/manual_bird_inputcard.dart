@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:urban_echoes/services/speach_regognition/bird_data_loader.dart';
 import 'package:urban_echoes/services/speach_regognition/speech_coordinator.dart';
 
 /// Card for manual bird name input with auto-suggestions
@@ -28,6 +27,19 @@ class ManualBirdInputCardState extends State<ManualBirdInputCard> {
   void initState() {
     super.initState();
     _loadBirdNames();
+    
+    // Play the audio prompt when the card appears
+    _playInputPrompt();
+  }
+  
+  // Play the audio prompt for manual input
+  void _playInputPrompt() {
+    // Access the audio service through the coordinator
+    final audioService = widget.coordinator.audioService;
+    
+    // Play the specified prompt
+    // Using playPrompt assumes you have this file in your prompts directory
+    audioService.playPrompt('indtast_den_fulg_du_så');
   }
 
   @override

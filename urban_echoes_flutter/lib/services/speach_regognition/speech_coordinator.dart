@@ -625,8 +625,13 @@ void _onWordUpdate() {
     // Add other special word handlers here
   }
 
-  void activateManualInput() {
+void activateManualInput() {
+  _logDebug('Activating manual input mode');
   _isManualInputActive = true;
+  
+  // Play the audio prompt for manual bird input
+  _audioService.playPrompt('indtast_den_fulg_du_så');
+  
   notifyListeners();
 }
 

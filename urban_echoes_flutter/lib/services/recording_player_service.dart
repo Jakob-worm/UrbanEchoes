@@ -213,6 +213,9 @@ class RecordingPlayerService extends ChangeNotifier {
         case 'systemet_er_i_tvil':
           path = 'audio/recorded/var_det_en_af_disse.mp3';
           break;
+        case 'indtast_den_fulg_du_så':
+          path = 'audio/recorded/indtast_den_fulg_du_så.mp3';
+          break;
         default:
           path = 'audio/silent.mp3';
       }
