@@ -211,7 +211,7 @@ class RecordingPlayerService extends ChangeNotifier {
           path = 'audio/recorded/bird_denied.mp3';
           break;
         case 'systemet_er_i_tvil':
-          path = 'audio/recorded/systemet_er_i_tvil.mp3';
+          path = 'audio/recorded/var_det_en_af_disse.mp3';
           break;
         default:
           path = 'audio/silent.mp3';
