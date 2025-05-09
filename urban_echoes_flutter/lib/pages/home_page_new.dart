@@ -15,9 +15,20 @@ class BirdHomePage extends StatefulWidget {
 }
 
 class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderStateMixin {
+  // ===== PROPERTIES =====
+  
   late AnimationController _animationController;
-  bool _isProcessing = false;
   late Animation<double> _pulseAnimation;
+  bool _isProcessing = false;
+
+  // ===== LIFECYCLE METHODS =====
+  
+  @override
+  void initState() {
+    super.initState();
+    _setupAnimations();
+    _initializeServices();
+  }
 
   @override
   void dispose() {
@@ -25,78 +36,9 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
     super.dispose();
   }
 
-@override
-void initState() {
-  super.initState();
-  _setupAnimations();
+  // ===== INITIALIZATION =====
   
-  // Add audio initialization
-  WidgetsBinding.instance.addPostFrameCallback((_) async {
-    if (mounted) {
-      debugPrint('🔊 BirdHomePage post-frame callback - initializing audio services');
-      
-      try {
-        // Get LocationService from provider
-        final locationService = Provider.of<LocationService>(context, listen: false);
-        
-        // First ensure service is initialized
-        if (!locationService.isInitialized) {
-          await locationService.initialize(context);
-          debugPrint('🔊 LocationService initialized');
-        }
-        
-        // Then explicitly enable location tracking
-        if (!locationService.isLocationTrackingEnabled) {
-          await locationService.toggleLocationTracking(true);
-          debugPrint('🔊 Location tracking enabled');
-        }
-        
-        // The key fix: Toggle audio off and on to ensure a clean restart
-        debugPrint('🔊 Restarting audio system to ensure proper initialization');
-        await locationService.toggleAudio(false);
-        await Future.delayed(Duration(milliseconds: 300));
-        await locationService.toggleAudio(true);
-        
-        // Force update state after all services are enabled
-        if (mounted) {
-          setState(() {});
-          debugPrint('🔊 BirdHomePage state updated after audio initialization');
-        }
-        
-      } catch (e) {
-        debugPrint('❌ Error in BirdHomePage audio initialization: $e');
-      }
-    }
-  });
-}
-
-// Add this helper method to diagnose the current state
-void _debugAudioState(LocationService locationService) {
-  debugPrint('===== AUDIO SYSTEM DIAGNOSTIC =====');
-  debugPrint('🔊 isInitialized: ${locationService.isInitialized}');
-  debugPrint('🔊 isLocationTrackingEnabled: ${locationService.isLocationTrackingEnabled}');
-  debugPrint('🔊 isAudioEnabled: ${locationService.isAudioEnabled}');
-  
-  final position = locationService.currentPosition;
-  if (position != null) {
-    debugPrint('🔊 Position: lat=${position.latitude}, lng=${position.longitude}');
-  } else {
-    debugPrint('❌ Position is NULL!');
-  }
-  
-  final activeObservations = locationService.activeObservations;
-  debugPrint('🔊 Active observations: ${activeObservations.length}');
-  
-  if (activeObservations.isEmpty) {
-    debugPrint('❌ NO ACTIVE OBSERVATIONS IN RANGE!');
-  } else {
-    for (var obs in activeObservations) {
-      debugPrint('🔊 - ${obs["bird_name"]} (Directory: ${obs["sound_directory"]})');
-    }
-  }
-  debugPrint('===================================');
-}
-
+  /// Set up the pulse animation for the microphone button
   void _setupAnimations() {
     _animationController = AnimationController(
       vsync: this,
@@ -108,6 +50,90 @@ void _debugAudioState(LocationService locationService) {
     );
   }
 
+  /// Initialize location and audio services after the widget is built
+  void _initializeServices() {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      
+      debugPrint('🔊 BirdHomePage post-frame callback - initializing audio services');
+      
+      try {
+        final locationService = Provider.of<LocationService>(context, listen: false);
+        await _initializeLocationService(locationService);
+        await _restartAudioSystem(locationService);
+        
+        if (mounted) {
+          setState(() {});
+          debugPrint('🔊 BirdHomePage state updated after audio initialization');
+        }
+      } catch (e) {
+        debugPrint('❌ Error in BirdHomePage audio initialization: $e');
+      }
+    });
+  }
+  
+  /// Initialize the location service if needed
+  Future<void> _initializeLocationService(LocationService locationService) async {
+    if (!locationService.isInitialized) {
+      await locationService.initialize(context);
+      debugPrint('🔊 LocationService initialized');
+    }
+    
+    if (!locationService.isLocationTrackingEnabled) {
+      await locationService.toggleLocationTracking(true);
+      debugPrint('🔊 Location tracking enabled');
+    }
+  }
+  
+  /// Restart the audio system to ensure proper initialization
+  Future<void> _restartAudioSystem(LocationService locationService) async {
+    debugPrint('🔊 Restarting audio system to ensure proper initialization');
+    await locationService.toggleAudio(false);
+    await Future.delayed(const Duration(milliseconds: 300));
+    await locationService.toggleAudio(true);
+  }
+
+  // ===== EVENT HANDLERS =====
+  
+  /// Handle microphone button press
+  void _handleMicButtonPressed(BuildContext context, SpeechCoordinator coordinator) {
+    if (coordinator.isListening) {
+      coordinator.stopListening();
+      return;
+    }
+    
+    if (_isProcessing) return;
+    
+    setState(() => _isProcessing = true);
+    coordinator.startListening();
+    
+    // Reset processing flag after a delay
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (mounted) setState(() => _isProcessing = false);
+    });
+  }
+
+  // ===== UI BUILDERS =====
+  
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<SpeechCoordinator>(
+      builder: (context, coordinator, child) {
+        final bool shouldShowFAB = _shouldShowFloatingButton(coordinator);
+        
+        return Scaffold(
+          appBar: _buildAppBar(),
+          body: _buildBody(context, coordinator),
+          floatingActionButton: shouldShowFAB 
+              ? _buildFloatingActionButton(context, coordinator) 
+              : null,
+          floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+        );
+      },
+    );
+  }
+
+  /// Build the app bar for the home page
   AppBar _buildAppBar() {
     return AppBar(
       backgroundColor: AppStyles.primaryColor,
@@ -119,6 +145,7 @@ void _debugAudioState(LocationService locationService) {
     );
   }
 
+  /// Build the main body of the home page
   Widget _buildBody(BuildContext context, SpeechCoordinator coordinator) {
     return Container(
       decoration: BoxDecoration(
@@ -142,27 +169,30 @@ void _debugAudioState(LocationService locationService) {
     );
   }
 
+  /// Build the status bar showing listening state
   Widget _buildStatusBar(SpeechCoordinator coordinator) {
+    final bool isListening = coordinator.isListening;
+    
     return Container(
-      color: coordinator.isListening
+      color: isListening
           ? Colors.red.withAlpha((0.8 * 255).toInt())
           : Colors.transparent,
       padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
       child: Row(
         children: [
           Icon(
-            coordinator.isListening ? Icons.mic : Icons.mic_off,
-            color: coordinator.isListening ? Colors.white : Colors.white70,
+            isListening ? Icons.mic : Icons.mic_off,
+            color: isListening ? Colors.white : Colors.white70,
           ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              coordinator.isListening
+              isListening
                   ? 'Lytter efter tale...'
                   : 'Tryk på mikrofonen for at starte',
               style: TextStyle(
                 color: Colors.white,
-                fontWeight: coordinator.isListening ? FontWeight.bold : FontWeight.normal,
+                fontWeight: isListening ? FontWeight.bold : FontWeight.normal,
                 fontSize: 16,
               ),
             ),
@@ -172,55 +202,68 @@ void _debugAudioState(LocationService locationService) {
     );
   }
 
- Widget _buildMainContent(SpeechCoordinator coordinator) {
-  // Adjust bottom padding based on whether FAB is showing
-  final bool shouldShowFAB = !(coordinator.isSystemInDoubt && coordinator.possibleBirds.isNotEmpty) && 
-                            !coordinator.isManualInputActive;
-  final double bottomPadding = shouldShowFAB ? 150.0 : 20.0;
-  
-  return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 20),
-    child: ListView(
-      children: [
-        const SizedBox(height: 30),
-        SpeechRecognitionCard(coordinator: coordinator),
-        const SizedBox(height: 20),
-        if (coordinator.isWaitingForConfirmation)
-          ConfirmationCard(
-            birdName: coordinator.currentBirdInQuestion,
-            onConfirm: () => coordinator.handleConfirmationResponse(true),
-            onDeny: () => coordinator.handleConfirmationResponse(false),
-          ),
-        if (coordinator.isSystemInDoubt && coordinator.possibleBirds.isNotEmpty)
-          SystemInDoubtCard(
-            possibleBirds: coordinator.possibleBirds,
-            onBirdSelected: coordinator.handleBirdSelection,
-            onDismiss: () {
-              coordinator.resetConfirmationState();
-              // Manual input is now activated in the SystemInDoubtCard widget
-            },
-          ),
-        // Add the new ManualBirdInputCard
-        if (coordinator.isManualInputActive)
-          ManualBirdInputCard(
-            coordinator: coordinator,
-            onCancel: () {
-              coordinator.deactivateManualInput();
-              if (!coordinator.isListening) {
-                coordinator.startListening();
-              }
-            },
-            onBirdSelected: (birdName) {
-              coordinator.handleManualBirdSelection(birdName);
-            },
-          ),
-        SizedBox(height: bottomPadding), // Dynamic space based on FAB visibility
-      ],
-    ),
-  );
-}
+  /// Build the main content area with cards
+  Widget _buildMainContent(SpeechCoordinator coordinator) {
+    // Determine appropriate bottom padding based on FAB visibility
+    final bool shouldShowFAB = _shouldShowFloatingButton(coordinator);
+    final double bottomPadding = shouldShowFAB ? 150.0 : 20.0;
+    
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: ListView(
+        children: [
+          const SizedBox(height: 30),
+          SpeechRecognitionCard(coordinator: coordinator),
+          const SizedBox(height: 20),
+          _buildStateSpecificCards(coordinator),
+          SizedBox(height: bottomPadding),
+        ],
+      ),
+    );
+  }
 
+  /// Build cards based on the current recognition state
+  Widget _buildStateSpecificCards(SpeechCoordinator coordinator) {
+    if (coordinator.isWaitingForConfirmation) {
+      return ConfirmationCard(
+        birdName: coordinator.currentBirdInQuestion,
+        onConfirm: () => coordinator.handleConfirmationResponse(true),
+        onDeny: () => coordinator.handleConfirmationResponse(false),
+      );
+    }
+    
+    if (coordinator.isSystemInDoubt && coordinator.possibleBirds.isNotEmpty) {
+      return SystemInDoubtCard(
+        possibleBirds: coordinator.possibleBirds,
+        onBirdSelected: coordinator.handleBirdSelection,
+        onDismiss: () {
+          coordinator.resetConfirmationState();
+        },
+      );
+    }
+    
+    if (coordinator.isManualInputActive) {
+      return ManualBirdInputCard(
+        coordinator: coordinator,
+        onCancel: () {
+          coordinator.deactivateManualInput();
+          if (!coordinator.isListening) {
+            coordinator.startListening();
+          }
+        },
+        onBirdSelected: (birdName) {
+          coordinator.handleManualBirdSelection(birdName);
+        },
+      );
+    }
+    
+    return const SizedBox.shrink(); // Empty widget if no special state
+  }
+
+  /// Build the floating action button for starting/stopping listening
   Widget _buildFloatingActionButton(BuildContext context, SpeechCoordinator coordinator) {
+    final bool isListening = coordinator.isListening;
+    
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.end,
@@ -233,10 +276,10 @@ void _debugAudioState(LocationService locationService) {
               margin: const EdgeInsets.only(bottom: 30),
               child: FloatingActionButton(
                 onPressed: () => _handleMicButtonPressed(context, coordinator),
-                backgroundColor: coordinator.isListening ? Colors.red : AppStyles.primaryColor,
+                backgroundColor: isListening ? Colors.red : AppStyles.primaryColor,
                 elevation: 8,
                 child: Icon(
-                  coordinator.isListening ? Icons.mic_off : Icons.mic,
+                  isListening ? Icons.mic_off : Icons.mic,
                   size: 50,
                   color: Colors.white,
                 ),
@@ -244,7 +287,7 @@ void _debugAudioState(LocationService locationService) {
             ),
           ),
           Text(
-            coordinator.isListening ? 'Stop observation' : 'Start observation',
+            isListening ? 'Stop observation' : 'Start observation',
             style: AppStyles.buttonLabelStyle,
           ),
         ],
@@ -252,45 +295,43 @@ void _debugAudioState(LocationService locationService) {
     );
   }
 
-  void _handleMicButtonPressed(BuildContext context, SpeechCoordinator coordinator) {
-    if (coordinator.isListening) {
-      coordinator.stopListening();
-    } else {
-      if (_isProcessing) return;
-      setState(() => _isProcessing = true);
-
-      coordinator.startListening();
-
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) setState(() => _isProcessing = false);
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Consumer<SpeechCoordinator>(
-      builder: (context, coordinator, child) {
-        // Hide FAB when SystemInDoubtCard is visible or ManualBirdInputCard is visible
-        final bool shouldShowFAB = !(coordinator.isSystemInDoubt && coordinator.possibleBirds.isNotEmpty) && 
-                                !coordinator.isManualInputActive;
-        
-        return Scaffold(
-          appBar: _buildAppBar(),
-          body: _buildBody(context, coordinator),
-          floatingActionButton: shouldShowFAB ? _buildFloatingActionButton(context, coordinator) : null,
-          floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-        );
-      },
-    );
+  /// Determine if the floating action button should be shown
+  bool _shouldShowFloatingButton(SpeechCoordinator coordinator) {
+    return !(coordinator.isSystemInDoubt && coordinator.possibleBirds.isNotEmpty) && 
+           !coordinator.isManualInputActive;
   }
 }
 
 /// Card for displaying recognized speech and matched bird
 class SpeechRecognitionCard extends StatelessWidget {
+  final SpeechCoordinator coordinator;
+
   const SpeechRecognitionCard({super.key, required this.coordinator});
 
-  final SpeechCoordinator coordinator;
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 4,
+      shape: AppStyles.cardShape,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildRecognizedTextHeader(),
+            const SizedBox(height: 10),
+            _buildRecognizedTextContent(),
+            if (coordinator.birdService.matchedBird.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _buildMatchedBirdHeader(),
+              const SizedBox(height: 10),
+              _buildMatchedBirdContent(),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildRecognizedTextHeader() {
     return Row(
@@ -307,9 +348,7 @@ class SpeechRecognitionCard extends StatelessWidget {
         if (coordinator.recognizedText.isNotEmpty)
           IconButton(
             icon: const Icon(Icons.clear, size: 18),
-            onPressed: () {
-              coordinator.clearRecognizedText();
-            },
+            onPressed: coordinator.clearRecognizedText,
             tooltip: 'Ryd tekst',
           ),
       ],
@@ -317,6 +356,10 @@ class SpeechRecognitionCard extends StatelessWidget {
   }
 
   Widget _buildRecognizedTextContent() {
+    final String displayText = coordinator.recognizedText.isNotEmpty
+        ? coordinator.recognizedText
+        : 'Intet genkendt endnu';
+    
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -325,9 +368,7 @@ class SpeechRecognitionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(10),
       ),
       child: Text(
-        coordinator.recognizedText.isNotEmpty
-            ? coordinator.recognizedText
-            : 'Intet genkendt endnu',
+        displayText,
         style: const TextStyle(
           fontSize: 20,
           height: 1.3,
@@ -367,31 +408,6 @@ class SpeechRecognitionCard extends StatelessWidget {
       ),
     );
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 4,
-      shape: AppStyles.cardShape,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildRecognizedTextHeader(),
-            const SizedBox(height: 10),
-            _buildRecognizedTextContent(),
-            if (coordinator.birdService.matchedBird.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              _buildMatchedBirdHeader(),
-              const SizedBox(height: 10),
-              _buildMatchedBirdContent(),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 }
 
 /// Card for confirming bird observations
@@ -421,82 +437,97 @@ class ConfirmationCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(
-              'Er det en $birdName?',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.amber[800],
-              ),
-              textAlign: TextAlign.center,
-            ),
+            _buildTitle(),
             const SizedBox(height: 10),
-            
-            // Add a subtitle to indicate voice confirmation is possible
-            Text(
-              'Sig "ja" eller "nej", eller tryk på knapperne',
-              style: TextStyle(
-                fontSize: 14,
-                fontStyle: FontStyle.italic,
-                color: Colors.amber[800],
-              ),
-              textAlign: TextAlign.center,
-            ),
-            
+            _buildSubtitle(),
             const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.check_circle, color: Colors.white),
-                  label: const Text('Ja', style: TextStyle(color: Colors.white)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green[600],
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  ),
-                  onPressed: onConfirm,
-                ),
-                ElevatedButton.icon(
-                  icon: const Icon(Icons.cancel, color: Colors.white),
-                  label: const Text('Nej', style: TextStyle(color: Colors.white)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red[600],
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  ),
-                  onPressed: onDeny,
-                ),
-              ],
-            ),
-            
-            // Visual indicator that microphone is active
+            _buildActionButtons(),
             const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.mic, 
-                  color: Colors.amber[700],
-                  size: 16,
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  'Lytter efter svar...',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors.amber[700],
-                  ),
-                ),
-              ],
-            ),
+            _buildMicIndicator(),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildTitle() {
+    return Text(
+      'Er det en $birdName?',
+      style: TextStyle(
+        fontSize: 20,
+        fontWeight: FontWeight.bold,
+        color: Colors.amber[800],
+      ),
+      textAlign: TextAlign.center,
+    );
+  }
+
+  Widget _buildSubtitle() {
+    return Text(
+      'Sig "ja" eller "nej", eller tryk på knapperne',
+      style: TextStyle(
+        fontSize: 14,
+        fontStyle: FontStyle.italic,
+        color: Colors.amber[800],
+      ),
+      textAlign: TextAlign.center,
+    );
+  }
+
+  Widget _buildActionButtons() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        ElevatedButton.icon(
+          icon: const Icon(Icons.check_circle, color: Colors.white),
+          label: const Text('Ja', style: TextStyle(color: Colors.white)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.green[600],
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ),
+          onPressed: onConfirm,
+        ),
+        ElevatedButton.icon(
+          icon: const Icon(Icons.cancel, color: Colors.white),
+          label: const Text('Nej', style: TextStyle(color: Colors.white)),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red[600],
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          ),
+          onPressed: onDeny,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMicIndicator() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Icon(
+          Icons.mic, 
+          color: Colors.amber[700],
+          size: 16,
+        ),
+        const SizedBox(width: 6),
+        Text(
+          'Lytter efter svar...',
+          style: TextStyle(
+            fontSize: 12,
+            color: Colors.amber[700],
+          ),
+        ),
+      ],
     );
   }
 }
 
 /// Card for when the system is in doubt between multiple birds
 class SystemInDoubtCard extends StatelessWidget {
+  final List<String> possibleBirds;
+  final Function(String) onBirdSelected;
+  final VoidCallback onDismiss;
+
   const SystemInDoubtCard({
     super.key,
     required this.possibleBirds,
@@ -504,10 +535,38 @@ class SystemInDoubtCard extends StatelessWidget {
     required this.onDismiss,
   });
 
-  final Function(String) onBirdSelected;
-  final VoidCallback onDismiss;
-  final List<String> possibleBirds;
+  @override
+  Widget build(BuildContext context) {
+    final coordinator = Provider.of<SpeechCoordinator>(context, listen: false);
+    
+    return Card(
+      elevation: 6,
+      color: Colors.purple[50],
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(15),
+        side: BorderSide(color: Colors.purple, width: 2),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            const SizedBox(height: 16),
+            ..._buildBirdOptions(),
+            const SizedBox(height: 10),
+            _buildDismissButton(coordinator),
+          ],
+        ),
+      ),
+    );
+  }
 
+  /// Build a list of bird option buttons
+  List<Widget> _buildBirdOptions() {
+    return possibleBirds.map((bird) => _buildBirdOption(bird)).toList();
+  }
+
+  /// Build a single bird option button
   Widget _buildBirdOption(String bird) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -530,53 +589,28 @@ class SystemInDoubtCard extends StatelessWidget {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    // Get coordinator from Provider to activate manual input
-    final coordinator = Provider.of<SpeechCoordinator>(context, listen: false);
-    
-    return Card(
-      elevation: 6,
-      color: Colors.purple[50],
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-        side: BorderSide(color: Colors.purple, width: 2),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            const SizedBox(height: 16),
-            ...possibleBirds.map((bird) => _buildBirdOption(bird)),
-            const SizedBox(height: 10),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.cancel, color: Colors.white),
-                label: const Text(
-                  'Ingen af dem',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                  ),
-                ),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red[600],
-                  minimumSize: const Size(double.infinity, 50),
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                ),
-                onPressed: () {
-                  // Call the provided onDismiss callback
-                  onDismiss();
-                  
-                  // Also activate manual input
-                  coordinator.activateManualInput();
-                },
-              ),
-            ),
-          ],
+  /// Build the dismiss button
+  Widget _buildDismissButton(SpeechCoordinator coordinator) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: ElevatedButton.icon(
+        icon: const Icon(Icons.cancel, color: Colors.white),
+        label: const Text(
+          'Ingen af dem',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 18,
+          ),
         ),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.red[600],
+          minimumSize: const Size(double.infinity, 50),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        ),
+        onPressed: () {
+          onDismiss();
+          coordinator.activateManualInput();
+        },
       ),
     );
   }
@@ -605,7 +639,6 @@ class AppStyles {
 
   // Colors
   static final Color primaryColor = Colors.green[700]!;
-
   static final Color primaryTextColor = Colors.green[800]!;
   static final Color secondaryColor = Colors.green[100]!;
 }
