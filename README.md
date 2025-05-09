@@ -47,4 +47,3 @@ https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsite
 
 Test: curl https://UrbanEchoes-fastapi-backend.azurewebsites.net/birds
 Or open https://UrbanEchoes-fastapi-backend.azurewebsites.net/birds in a browser.
-

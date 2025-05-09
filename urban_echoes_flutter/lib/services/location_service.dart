@@ -4,13 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:urban_echoes/services/manegers/location_manager.dart';
+import 'package:urban_echoes/services/observation/observation_service.dart';
 import 'package:urban_echoes/services/service_config.dart';
 import 'package:urban_echoes/services/sound/background_audio_service.dart';
 import 'package:urban_echoes/services/sound/bird_sound_player.dart';
 import 'package:urban_echoes/services/storage&database/azure_storage_service.dart';
 import 'package:urban_echoes/services/season_service.dart';
 import 'package:urban_echoes/models/season.dart';
-import 'observation_service.dart';
 
 /// A service that manages location-based bird sound observations.
 ///
@@ -20,34 +20,6 @@ import 'observation_service.dart';
 /// - Playing bird sounds based on proximity to observation points
 /// - Managing audio settings and playback
 class LocationService extends ChangeNotifier {
-  // Constants
-  static final double maxRange = ServiceConfig().maxRange; // 50.0; // Maximum range in meters for observation detection
-  static final int batchUpdateMs = ServiceConfig().batchUpdateMs;
-  static final bool debugMode = ServiceConfig().debugMode; // Enable debug logging
-
-  // Audio settings
-  static final double minVolume = ServiceConfig().minVolume; // Minimum volume for distant sounds
-  static final double maxVolume = ServiceConfig().maxVolume; // Maximum volume for nearby sounds
-  static final double closeProximityThreashold = ServiceConfig().closeProximityThreshold; // Meters
-  static final double closeProximityBoost = ServiceConfig().closeProximityBoost; // Volume boost for very close sounds
-
-  // Services
-  final BirdSoundPlayer _soundPlayer;
-  final AzureStorageService _storageService;
-  final BackgroundAudioService _backgroundAudioService;
-  final SeasonService _seasonService;
-  late final LocationManager _locationManager;
-
-  // State
-  bool _isInitialized = false;
-  List<Map<String, dynamic>> _observations = [];
-  final Map<String, Map<String, dynamic>> _activeObservations = {};
-  Timer? _batchUpdateTimer;
-  bool _isAudioEnabled = true;
-
-  // Listen for season changes
-  StreamSubscription? _seasonSubscription;
-
   /// Constructor with optional dependency injection for testing
   LocationService({
     BirdSoundPlayer? soundPlayer,
@@ -68,6 +40,152 @@ class LocationService extends ChangeNotifier {
     _seasonService.addListener(_onSeasonChanged);
   }
 
+  static final int batchUpdateMs = ServiceConfig().batchUpdateMs;
+  static final double closeProximityBoost = ServiceConfig().closeProximityBoost; // Volume boost for very close sounds
+  static final double closeProximityThreashold = ServiceConfig().closeProximityThreshold; // Meters
+  static final bool debugMode = ServiceConfig().debugMode; // Enable debug logging
+  // Constants
+  static final double maxRange = ServiceConfig().maxRange; // 50.0; // Maximum range in meters for observation detection
+
+  static final double maxVolume = ServiceConfig().maxVolume; // Maximum volume for nearby sounds
+  // Audio settings
+  static final double minVolume = ServiceConfig().minVolume; // Minimum volume for distant sounds
+
+  final Map<String, Map<String, dynamic>> _activeObservations = {};
+  final BackgroundAudioService _backgroundAudioService;
+  Timer? _batchUpdateTimer;
+  bool _isAudioEnabled = true;
+  // State
+  bool _isInitialized = false;
+
+  late final LocationManager _locationManager;
+  List<Map<String, dynamic>> _observations = [];
+  final SeasonService _seasonService;
+  // Services
+  final BirdSoundPlayer _soundPlayer;
+
+  final AzureStorageService _storageService;
+
+  @override
+  void dispose() {
+    _batchUpdateTimer?.cancel();
+    _seasonService.removeListener(_onSeasonChanged);
+    _locationManager.dispose();
+    _soundPlayer.dispose();
+    _activeObservations.clear();
+    super.dispose();
+  }
+
+  // Public getters
+  bool get isInitialized => _isInitialized;
+
+  Position? get currentPosition => _locationManager.currentPosition;
+
+  bool get isLocationTrackingEnabled =>
+      _locationManager.isLocationTrackingEnabled;
+
+  bool get isAudioEnabled => _isAudioEnabled;
+
+  List<Map<String, dynamic>> get activeObservations =>
+      _activeObservations.values.toList();
+
+  /// Initialize the service
+  Future<void> initialize(BuildContext context) async {
+    if (_isInitialized) {
+      return;
+    }
+
+    // Get API URL and debug mode from context
+    final apiUrl = _getApiUrl(context);
+    final scaffoldMessenger = _getScaffoldMessenger(context);
+
+    try {
+      await _initializeServices();
+      await _fetchAndFilterObservations(apiUrl);
+
+      _isInitialized = true;
+      notifyListeners();
+    } catch (e) {
+      _log('Error initializing LocationService: $e');
+      _showInitializationError(scaffoldMessenger);
+    }
+  }
+
+  /// Toggle location tracking
+  Future<void> toggleLocationTracking(bool enabled) async {
+    if (_locationManager.isLocationTrackingEnabled == enabled) {
+      return;
+    }
+
+    if (enabled) {
+      await _startLocationTracking();
+    } else {
+      await _stopLocationTracking();
+    }
+
+    notifyListeners();
+  }
+
+/// Toggle audio playback with improved service initialization
+Future<void> toggleAudio(bool enabled) async {
+  // Add extra logging
+  debugPrint('🔊 toggleAudio called with enabled=$enabled, current state=$_isAudioEnabled');
+  
+  // If state isn't changing, do nothing
+  if (_isAudioEnabled == enabled) {
+    debugPrint('🔊 Audio state already matches requested state, no change needed');
+    return;
+  }
+
+  debugPrint('🔊 Audio playback toggling to: $enabled');
+
+  if (!enabled) {
+    // Just stop sounds if disabling
+    _stopAllSounds();
+    _isAudioEnabled = false;
+    notifyListeners();
+    return;
+  }
+
+  // For enabling audio, we need to ensure all services are properly initialized
+  try {
+    // 1. First ensure background audio service is running
+    await _backgroundAudioService.startService();
+    debugPrint('🔊 Background audio service started successfully');
+    
+    // 2. Give audio service time to initialize
+    await Future.delayed(Duration(milliseconds: 500));
+    
+    // 3. Make sure location tracking is enabled
+    if (!_locationManager.isLocationTrackingEnabled) {
+      debugPrint('🔊 Enabling location tracking as part of audio activation');
+      await _locationManager.setLocationTrackingEnabled(true);
+      
+      // Allow a moment for the location manager to update
+      await Future.delayed(Duration(milliseconds: 300));
+    }
+    
+    // 4. Now set audio enabled state
+    _isAudioEnabled = true;
+    
+    // 5. Start sounds if we have a position
+    if (_locationManager.currentPosition != null) {
+      debugPrint('🔊 Restarting sounds with position data: ${_locationManager.currentPosition}');
+      _updateActiveObservations(_locationManager.currentPosition!);
+      _restartSoundsWithDelays();
+    } else {
+      debugPrint('⚠️ No position available yet, sounds will start when position is available');
+    }
+    
+    notifyListeners();
+  } catch (e) {
+    debugPrint('❌ Error enabling audio: $e');
+    // Try to recover
+    _isAudioEnabled = true; // Still mark as enabled despite error
+    notifyListeners();
+  }
+}
+
   /// Handles position updates from location manager
   void _handlePositionUpdate(Position position) {
     // Schedule a batch update
@@ -77,15 +195,6 @@ class LocationService extends ChangeNotifier {
       notifyListeners();
     });
   }
-
-  // Public getters
-  bool get isInitialized => _isInitialized;
-  Position? get currentPosition => _locationManager.currentPosition;
-  bool get isLocationTrackingEnabled =>
-      _locationManager.isLocationTrackingEnabled;
-  bool get isAudioEnabled => _isAudioEnabled;
-  List<Map<String, dynamic>> get activeObservations =>
-      _activeObservations.values.toList();
 
   /// Debug logging
   void _log(String message) {
@@ -117,28 +226,6 @@ class LocationService extends ChangeNotifier {
   void _stopAllSounds() {
     for (var id in _activeObservations.keys) {
       _soundPlayer.stopSounds(id);
-    }
-  }
-
-  /// Initialize the service
-  Future<void> initialize(BuildContext context) async {
-    if (_isInitialized) {
-      return;
-    }
-
-    // Get API URL and debug mode from context
-    final apiUrl = _getApiUrl(context);
-    final scaffoldMessenger = _getScaffoldMessenger(context);
-
-    try {
-      await _initializeServices();
-      await _fetchAndFilterObservations(apiUrl);
-
-      _isInitialized = true;
-      notifyListeners();
-    } catch (e) {
-      _log('Error initializing LocationService: $e');
-      _showInitializationError(scaffoldMessenger);
     }
   }
 
@@ -508,33 +595,40 @@ class LocationService extends ChangeNotifier {
     }
   }
 
-  /// Toggle location tracking
-  Future<void> toggleLocationTracking(bool enabled) async {
-    if (_locationManager.isLocationTrackingEnabled == enabled) {
-      return;
-    }
-
-    if (enabled) {
-      await _startLocationTracking();
-    } else {
-      await _stopLocationTracking();
-    }
-
-    notifyListeners();
-  }
-
   /// Start location tracking and background audio service
   Future<void> _startLocationTracking() async {
-    // Start background service first and ensure it's fully initialized
+  try {
+    _log('Starting location tracking and audio services');
+    
+    // First initialize the background audio service
     await _backgroundAudioService.startService();
-
+    
     // Give audio service time to initialize
     await Future.delayed(Duration(milliseconds: 500));
-
+    
     // Then start location tracking
     await _locationManager.setLocationTrackingEnabled(true);
+    
+    // If audio was enabled, make sure sounds are playing
+    if (_isAudioEnabled && _locationManager.currentPosition != null) {
+      _log('Restarting sounds after tracking enabled');
+      // Update active observations with the current position
+      _updateActiveObservations(_locationManager.currentPosition!);
+      // Then restart sounds with delays
+      _restartSoundsWithDelays();
+    }
+    
+    _log('Location tracking successfully started');
+  } catch (e) {
+    _log('Error starting location tracking: $e');
+    // Try to recover by at least enabling location tracking
+    try {
+      await _locationManager.setLocationTrackingEnabled(true);
+    } catch (e2) {
+      _log('Recovery attempt also failed: $e2');
+    }
   }
-
+}
   /// Stop location tracking and background audio service
   Future<void> _stopLocationTracking() async {
     // Stop all sounds
@@ -549,23 +643,6 @@ class LocationService extends ChangeNotifier {
 
     // Cancel any pending updates
     _batchUpdateTimer?.cancel();
-  }
-
-  /// Toggle audio playback
-  void toggleAudio(bool enabled) {
-    if (_isAudioEnabled == enabled) {
-      return;
-    }
-
-    _isAudioEnabled = enabled;
-
-    if (!enabled) {
-      _stopAllSounds();
-    } else if (_locationManager.currentPosition != null) {
-      _restartSoundsWithDelays();
-    }
-
-    notifyListeners();
   }
 
   /// Restart sounds with staggered delays
@@ -594,15 +671,5 @@ class LocationService extends ChangeNotifier {
         }
       });
     }
-  }
-
-  @override
-  void dispose() {
-    _batchUpdateTimer?.cancel();
-    _seasonService.removeListener(_onSeasonChanged);
-    _locationManager.dispose();
-    _soundPlayer.dispose();
-    _activeObservations.clear();
-    super.dispose();
   }
 }

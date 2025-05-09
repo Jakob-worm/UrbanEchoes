@@ -29,6 +29,39 @@ class BirdObservation {
     this.sourceId, // Optional for compatibility with existing code
   });
 
+  // Create a copy of this BirdObservation with the given fields replaced
+  BirdObservation copyWith({
+    int? id,
+    String? birdName,
+    String? scientificName,
+    String? soundDirectory,
+    double? latitude,
+    double? longitude,
+    DateTime? observationDate,
+    String? observationTime,
+    int? observerId,
+    int? quantity,
+    bool? isTestData,
+    int? testBatchId,
+    String? sourceId,
+  }) {
+    return BirdObservation(
+      id: id ?? this.id,
+      birdName: birdName ?? this.birdName,
+      scientificName: scientificName ?? this.scientificName,
+      soundDirectory: soundDirectory ?? this.soundDirectory,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      observationDate: observationDate ?? this.observationDate,
+      observationTime: observationTime ?? this.observationTime,
+      observerId: observerId ?? this.observerId,
+      quantity: quantity ?? this.quantity,
+      isTestData: isTestData ?? this.isTestData,
+      testBatchId: testBatchId ?? this.testBatchId,
+      sourceId: sourceId ?? this.sourceId,
+    );
+  }
+
   Map<String, dynamic> toMap() {
     return {
       'id': id,
@@ -63,5 +96,10 @@ class BirdObservation {
       testBatchId: map['test_batch_id'],
       sourceId: map['source_id'],
     );
+  }
+  
+  @override
+  String toString() {
+    return 'BirdObservation(id: $id, birdName: $birdName, location: $latitude, $longitude, date: $observationDate)';
   }
 }

@@ -10,10 +10,10 @@ import 'package:urban_echoes/controllers/bird_observation_controller.dart';
 import 'package:urban_echoes/pages/make_observation/make_observation_state.dart';
 
 // Import services
-import 'package:urban_echoes/services/bird_search_service.dart';
 
 // Import exceptions
 import 'package:urban_echoes/exceptions/api_exceptions.dart';
+import 'package:urban_echoes/services/deprecated/bird_search_service.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 
 // Import screen-specific widgets

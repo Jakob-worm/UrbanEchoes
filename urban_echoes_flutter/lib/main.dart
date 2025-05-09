@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:urban_echoes/pages/nav_bars_page.dart';
 import 'package:urban_echoes/pages/intro_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:urban_echoes/services/app_startup_service.dart';
@@ -13,11 +12,16 @@ import 'package:urban_echoes/services/speach_regognition/bird_regognition_servic
 import 'package:urban_echoes/services/speach_regognition/speech_recognition_service.dart';
 import 'package:urban_echoes/services/speach_regognition/word_recognition.dart';
 import 'package:urban_echoes/services/speach_regognition/speech_coordinator.dart';
+import 'package:urban_echoes/services/observation/upload_notification_service.dart';
 import 'package:urban_echoes/state%20manegers/map_state_manager.dart';
 import 'package:urban_echoes/state%20manegers/page_state_maneger.dart';
 import 'package:urban_echoes/utils/navigation_provider.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:urban_echoes/services/service_config.dart';
+import 'package:urban_echoes/services/storage&database/database_service.dart';
+
+import 'services/observation/observation_service.dart';
+import 'services/observation/observation_uploader.dart';
 
 
 Future<void> main() async {
@@ -98,90 +102,138 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
-  providers: [
-    // State managers
-    ChangeNotifierProvider<PageStateManager>(
-      create: (context) => PageStateManager(),
-    ),
-    ChangeNotifierProvider<MapStateManager>(
-      create: (context) => MapStateManager(),
-    ),
-    ChangeNotifierProvider<NavigationProvider>(
-      create: (context) => NavigationProvider(),
-    ),
-
-    ChangeNotifierProvider<RecordingPlayerService>(
-      create: (_) => RecordingPlayerService(debugMode: debugMode),
-      lazy: true,
-    ),
-    
-    // Base speech recognition service
-    ChangeNotifierProvider<SpeechRecognitionService>(
-      create: (_) => SpeechRecognitionService(debugMode: debugMode),
-      lazy: true,
-    ),
-
-    // Bird recognition service (bird-specific processing)
-    ChangeNotifierProvider<BirdRecognitionService>(
-      create: (_) => BirdRecognitionService(debugMode: debugMode),
-      lazy: true,
-    ),
-
-    // Word recognition service (special words)
-    ChangeNotifierProvider<WordRecognitionService>(
-      create: (_) => WordRecognitionService(debugMode: debugMode),
-      lazy: true,
-    ),
-
-    // Speech coordinator that manages the above services
-    ChangeNotifierProxyProvider4<
-        SpeechRecognitionService,
-        BirdRecognitionService,
-        WordRecognitionService,
-        RecordingPlayerService,
-        SpeechCoordinator>(
-      create: (context) => SpeechCoordinator(
-        speechService: Provider.of<SpeechRecognitionService>(context, listen: false),
-        birdService: Provider.of<BirdRecognitionService>(context, listen: false),
-        wordService: Provider.of<WordRecognitionService>(context, listen: false),
-        audioService: Provider.of<RecordingPlayerService>(context, listen: false),
-        debugMode: debugMode,
-      ),
-      update: (context, speechService, birdService, wordService, audioService, previous) => 
-        SpeechCoordinator(
-          speechService: speechService,
-          birdService: birdService,
-          wordService: wordService,
-          audioService: audioService,
-          debugMode: debugMode,
+      providers: [
+        // State managers
+        ChangeNotifierProvider<PageStateManager>(
+          create: (context) => PageStateManager(),
         ),
-    ),
+        ChangeNotifierProvider<MapStateManager>(
+          create: (context) => MapStateManager(),
+        ),
+        ChangeNotifierProvider<NavigationProvider>(
+          create: (context) => NavigationProvider(),
+        ),
 
-    // Services
-    ChangeNotifierProvider<SeasonService>(
-      create: (_) => SeasonService(),
-    ),
-    Provider<AppStartupService>(
-      create: (_) => AppStartupService(),
-    ),
+        // Add notification service
+        ChangeNotifierProvider<UploadNotificationService>(
+          create: (context) => UploadNotificationService(),
+        ),
 
-    // Pre-created instances
-    Provider<bool>.value(value: debugMode),
-    ChangeNotifierProvider<LocationService>.value(value: locationService),
-  ],
-  child: MaterialApp(
-    title: 'Urban Echoes',
-    theme: ThemeData(
-      primarySwatch: Colors.blue,
-      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-        backgroundColor: Colors.black,
-        selectedItemColor: Colors.white,
-        unselectedItemColor: Colors.grey,
-      ),
-    ),
-    home: const InitialScreen(),
+        // Database and API services
+        Provider<DatabaseService>(
+          create: (context) => DatabaseService(),
+          lazy: false, // Initialize immediately
+        ),
+        Provider<ObservationService>(
+          create: (context) => ObservationService(
+            apiUrl: dotenv.env['API_URL'] ?? 'https://api.urbanechoes.org',
+          ),
+        ),
+        
+        // Add ObservationUploader with notification service
+        ListenableProvider<ObservationUploader>(
+          create: (context) => ObservationUploader(
+            databaseService: Provider.of<DatabaseService>(context, listen: false),
+            observationService: Provider.of<ObservationService>(context, listen: false),
+            notificationService: Provider.of<UploadNotificationService>(context, listen: false),
+          ),
+          // Custom dispose function that preserves functionality
+          dispose: (context, uploader) {
+            // Minimal cleanup that doesn't fully disable the uploader
+            // Do not call uploader.dispose() here as that would set the _isDisposed flag
+            // Instead, just do minimal cleanup if needed
+            debugPrint('ObservationUploader provider dispose called - keeping uploader active');
+          },
+        ),
+
+        ChangeNotifierProvider<RecordingPlayerService>(
+          create: (_) => RecordingPlayerService(debugMode: debugMode),
+          lazy: true,
+        ),
+        
+        // Base speech recognition service
+        ChangeNotifierProvider<SpeechRecognitionService>(
+          create: (_) => SpeechRecognitionService(debugMode: debugMode),
+          lazy: true,
+        ),
+
+        // Bird recognition service (bird-specific processing)
+        ChangeNotifierProvider<BirdRecognitionService>(
+          create: (_) => BirdRecognitionService(debugMode: debugMode),
+          lazy: true,
+        ),
+
+        // Word recognition service (special words)
+        ChangeNotifierProvider<WordRecognitionService>(
+          create: (_) => WordRecognitionService(debugMode: debugMode),
+          lazy: true,
+        ),
+
+        // Speech coordinator that manages the above services
+        ChangeNotifierProxyProvider4<
+    SpeechRecognitionService,
+    BirdRecognitionService,
+    WordRecognitionService,
+    RecordingPlayerService,
+    SpeechCoordinator>(
+  create: (context) => SpeechCoordinator(
+    speechService: Provider.of<SpeechRecognitionService>(context, listen: false),
+    birdService: Provider.of<BirdRecognitionService>(context, listen: false),
+    wordService: Provider.of<WordRecognitionService>(context, listen: false),
+    audioService: Provider.of<RecordingPlayerService>(context, listen: false),
+    observationUploader: Provider.of<ObservationUploader>(context, listen: false),
+    debugMode: debugMode,
   ),
-);
+  update: (context, speechService, birdService, wordService, audioService, previous) {
+    if (previous == null) {
+      return SpeechCoordinator(
+        speechService: speechService,
+        birdService: birdService,
+        wordService: wordService,
+        audioService: audioService,
+        observationUploader: Provider.of<ObservationUploader>(context, listen: false),
+        debugMode: debugMode,
+      );
+    }
+    
+    // Update only the services that change, not the uploader
+    previous.updateServices(
+      speechService: speechService,
+      birdService: birdService,
+      wordService: wordService,
+      audioService: audioService
+    );
+    
+    return previous;
+  },
+),
+
+
+        // Services
+        ChangeNotifierProvider<SeasonService>(
+          create: (_) => SeasonService(),
+        ),
+        Provider<AppStartupService>(
+          create: (_) => AppStartupService(),
+        ),
+
+        // Pre-created instances
+        Provider<bool>.value(value: debugMode),
+        ChangeNotifierProvider<LocationService>.value(value: locationService),
+      ],
+      child: MaterialApp(
+        title: 'Urban Echoes',
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+          bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+            backgroundColor: Colors.black,
+            selectedItemColor: Colors.white,
+            unselectedItemColor: Colors.grey,
+          ),
+        ),
+        home: const InitialScreen(),
+      ),
+    );
   }
 }
 
@@ -323,7 +375,6 @@ class InitialScreenState extends State<InitialScreen>
     // Get debug mode from Provider
     final bool debugMode = Provider.of<bool>(context);
     
-    
     // Show error state if initialization failed
     if (_initializationError) {
       return Scaffold(
@@ -383,14 +434,31 @@ class InitialScreenState extends State<InitialScreen>
 
     // Show main app UI with debug options if in debug mode
     return Scaffold(
-      body: const NavBarsPage(),
-      // Add a debug FAB only in debug mode
+      body: Stack(
+        children: [
+          // Get the current page directly from PageStateManager
+          Consumer<PageStateManager>(
+            builder: (context, pageStateManager, child) {
+              return pageStateManager.getCurrentPage(context);
+            },
+          ),
+          
+          // Add the notification widget at the bottom of the screen
+          const UploadNotificationWidget(),
+        ],
+      ),
+      // No bottomNavigationBar or navigation rail here
+      // Add debug FAB only in debug mode
       floatingActionButton: debugMode ? FloatingActionButton(
         onPressed: () {
+          // Add debug functionality here
+          // For testing uploads, you can trigger a test upload:
+          final uploader = Provider.of<ObservationUploader>(context, listen: false);
+          uploader.saveAndUploadObservation('Test Bird', quantity: 1, observerId: 1);
         },
         backgroundColor: Colors.purple,
         mini: true,
-        tooltip: 'Bird Recognition Test Mode',
+        tooltip: 'Test Upload',
         child: const Text('T', style: TextStyle(fontWeight: FontWeight.bold)),
       ) : null,
     );
