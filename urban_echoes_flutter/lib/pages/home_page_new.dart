@@ -93,35 +93,6 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
     await locationService.toggleAudio(true);
   }
 
-  // ===== DIAGNOSTIC =====
-  
-  /// Log diagnostics about the audio system state
-  void _debugAudioState(LocationService locationService) {
-    debugPrint('===== AUDIO SYSTEM DIAGNOSTIC =====');
-    debugPrint('🔊 isInitialized: ${locationService.isInitialized}');
-    debugPrint('🔊 isLocationTrackingEnabled: ${locationService.isLocationTrackingEnabled}');
-    debugPrint('🔊 isAudioEnabled: ${locationService.isAudioEnabled}');
-    
-    final position = locationService.currentPosition;
-    if (position != null) {
-      debugPrint('🔊 Position: lat=${position.latitude}, lng=${position.longitude}');
-    } else {
-      debugPrint('❌ Position is NULL!');
-    }
-    
-    final activeObservations = locationService.activeObservations;
-    debugPrint('🔊 Active observations: ${activeObservations.length}');
-    
-    if (activeObservations.isEmpty) {
-      debugPrint('❌ NO ACTIVE OBSERVATIONS IN RANGE!');
-    } else {
-      for (var obs in activeObservations) {
-        debugPrint('🔊 - ${obs["bird_name"]} (Directory: ${obs["sound_directory"]})');
-      }
-    }
-    debugPrint('===================================');
-  }
-
   // ===== EVENT HANDLERS =====
   
   /// Handle microphone button press
