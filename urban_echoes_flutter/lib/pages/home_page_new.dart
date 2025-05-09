@@ -93,6 +93,35 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
     await locationService.toggleAudio(true);
   }
 
+  // ===== DIAGNOSTIC =====
+  
+  /// Log diagnostics about the audio system state
+  void _debugAudioState(LocationService locationService) {
+    debugPrint('===== AUDIO SYSTEM DIAGNOSTIC =====');
+    debugPrint('🔊 isInitialized: ${locationService.isInitialized}');
+    debugPrint('🔊 isLocationTrackingEnabled: ${locationService.isLocationTrackingEnabled}');
+    debugPrint('🔊 isAudioEnabled: ${locationService.isAudioEnabled}');
+    
+    final position = locationService.currentPosition;
+    if (position != null) {
+      debugPrint('🔊 Position: lat=${position.latitude}, lng=${position.longitude}');
+    } else {
+      debugPrint('❌ Position is NULL!');
+    }
+    
+    final activeObservations = locationService.activeObservations;
+    debugPrint('🔊 Active observations: ${activeObservations.length}');
+    
+    if (activeObservations.isEmpty) {
+      debugPrint('❌ NO ACTIVE OBSERVATIONS IN RANGE!');
+    } else {
+      for (var obs in activeObservations) {
+        debugPrint('🔊 - ${obs["bird_name"]} (Directory: ${obs["sound_directory"]})');
+      }
+    }
+    debugPrint('===================================');
+  }
+
   // ===== EVENT HANDLERS =====
   
   /// Handle microphone button press
@@ -232,9 +261,16 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
       );
     }
     
-    if (coordinator.isSystemInDoubt && coordinator.possibleBirds.isNotEmpty) {
+    // Important: We now check only the isSystemInDoubt flag, not the possibleBirds list
+    // This ensures the card is shown even if the list is empty initially
+    if (coordinator.isSystemInDoubt) {
+      // Use safe access with empty fallback list if possibleBirds is empty
+      final List<String> birds = coordinator.possibleBirds.isNotEmpty 
+          ? coordinator.possibleBirds 
+          : ['Ingen fugle fundet']; // Fallback text
+      
       return SystemInDoubtCard(
-        possibleBirds: coordinator.possibleBirds,
+        possibleBirds: birds,
         onBirdSelected: coordinator.handleBirdSelection,
         onDismiss: () {
           coordinator.resetConfirmationState();
@@ -297,8 +333,8 @@ class BirdHomePageState extends State<BirdHomePage> with SingleTickerProviderSta
 
   /// Determine if the floating action button should be shown
   bool _shouldShowFloatingButton(SpeechCoordinator coordinator) {
-    return !(coordinator.isSystemInDoubt && coordinator.possibleBirds.isNotEmpty) && 
-           !coordinator.isManualInputActive;
+    // Updated condition: only check the state, not the possibleBirds list
+    return !coordinator.isSystemInDoubt && !coordinator.isManualInputActive;
   }
 }
 
