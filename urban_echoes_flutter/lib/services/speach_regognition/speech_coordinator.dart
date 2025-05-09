@@ -181,9 +181,21 @@ class SpeechCoordinator extends ChangeNotifier {
     _currentBirdInQuestion = birdName;
     _pauseListeningForAudio();
     _startConfirmationTimeout();
+    
+    // Play the bird question audio
     _audioService.playBirdQuestion(birdName);
+    
+    // Add a safety timer to ensure we transition to confirmation state
+    // even if the audio playback fails or doesn't exist
+    // We use 3 seconds since that's enough time for the intro + bird name to play if they exist
+    Timer(Duration(seconds: 3), () {
+      if (_currentState == RecognitionState.processingBirdRecognition) {
+        _logDebug('Audio completion may have failed - forcing transition to confirmation state');
+        _transitionToState(RecognitionState.waitingForConfirmation);
+        _resumeListeningForConfirmation();
+      }
+    });
   }
-
   /// Handle when the system is in doubt between multiple birds
   void handleSystemInDoubt(List<String> birds) {
     if (_currentState == RecognitionState.processingBirdRecognition || 
