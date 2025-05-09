@@ -48,3 +48,4 @@ https://urbanechoes-fastapi-backend-g5asg9hbaqfvaga9.northeurope-01.azurewebsite
 Test: curl https://UrbanEchoes-fastapi-backend.azurewebsites.net/birds
 Or open https://UrbanEchoes-fastapi-backend.azurewebsites.net/birds in a browser.
 
+I think i fugred it out. When the system listens for nej then it heards thaty and tries to find birds simlar to that sintead of the bird that was originaly said. We may need to find simlar birds and save them already up there and then use it when we show the systemindoubt card. 
