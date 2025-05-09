@@ -181,21 +181,9 @@ class SpeechCoordinator extends ChangeNotifier {
     _currentBirdInQuestion = birdName;
     _pauseListeningForAudio();
     _startConfirmationTimeout();
-    
-    // Play the bird question audio
     _audioService.playBirdQuestion(birdName);
-    
-    // Add a safety timer to ensure we transition to confirmation state
-    // even if the audio playback fails or doesn't exist
-    // We use 3 seconds since that's enough time for the intro + bird name to play if they exist
-    Timer(Duration(seconds: 3), () {
-      if (_currentState == RecognitionState.processingBirdRecognition) {
-        _logDebug('Audio completion may have failed - forcing transition to confirmation state');
-        _transitionToState(RecognitionState.waitingForConfirmation);
-        _resumeListeningForConfirmation();
-      }
-    });
   }
+
   /// Handle when the system is in doubt between multiple birds
   void handleSystemInDoubt(List<String> birds) {
     if (_currentState == RecognitionState.processingBirdRecognition || 
@@ -240,14 +228,29 @@ class SpeechCoordinator extends ChangeNotifier {
     
     _confirmationTimer?.cancel();
     _logDebug('Handling confirmation response: ${confirmed ? "Yes" : "No"}');
+    
+    // Save the current bird name before making any changes
+    final String originalBirdName = _currentBirdInQuestion;
+    
+    // Stop listening if still active
     _pauseListeningForAudio();
     
     if (confirmed) {
       _transitionToState(RecognitionState.processingConfirmation);
-      _audioService.playBirdConfirmation(_currentBirdInQuestion);
+      _audioService.playBirdConfirmation(originalBirdName);
       await _createAndUploadObservation();
     } else {
-      _findAlternativeBirds();
+      // Critical fix: Set the current text to the original bird, not "nej"
+      // This prevents "nej" from being used as input to _birdService
+      _speechService.clearRecognizedText();
+      
+      // Pre-populate possible matches with birds similar to the original bird
+      _logDebug('Finding alternatives to original bird: $originalBirdName');
+      _birdService.processText(originalBirdName);
+      
+      // Now find alternatives using the original bird name
+      _findAlternativeBirds(originalBirdName);
+      
       _transitionToState(RecognitionState.systemInDoubt);
       notifyListeners();
       _audioService.playPrompt('systemet_er_i_tvil');
@@ -422,6 +425,13 @@ class SpeechCoordinator extends ChangeNotifier {
     }
     else if (_directCheckForNegativeResponse(lowerText)) {
       _logDebug('Direct negative response detected in speech update');
+      
+      // Important: Stop listening first to prevent further processing of "nej" as input
+      if (_speechService.isListening) {
+        _speechService.stopListening();
+      }
+      
+      // Now handle the negative response
       handleConfirmationResponse(false);
     }
   }
@@ -516,70 +526,101 @@ class SpeechCoordinator extends ChangeNotifier {
   }
 
   /// Find alternative birds when user responds negatively
-  void _findAlternativeBirds() {
-    _logDebug('Processing negative response - preparing to show alternatives');
+  void _findAlternativeBirds([String? forcedOriginalBird]) {
+    final String birdToUse = forcedOriginalBird ?? _currentBirdInQuestion;
+    _logDebug('Processing negative response - preparing to show alternatives for: $birdToUse');
     
+    // Reset possible birds list to ensure clean state
+    _possibleBirds = [];
+    
+    // First try to use existing matches from the bird service
     if (_birdService.possibleMatches.length > 1) {
       _possibleBirds = _birdService.possibleMatches
-          .where((bird) => bird != _currentBirdInQuestion)
+          .where((bird) => bird != birdToUse)
           .take(3)
           .toList();
       _logDebug('Using existing matches sorted by confidence: ${_possibleBirds.join(", ")}');
     } else {
-      // Find phonetically similar birds
-      _birdService.processText(_currentBirdInQuestion);
+      // Find phonetically similar birds (explicitly use the original bird name)
+      _birdService.processText(birdToUse);
       
       if (_birdService.possibleMatches.length > 1) {
         _possibleBirds = _birdService.possibleMatches
-            .where((bird) => bird != _currentBirdInQuestion)
+            .where((bird) => bird != birdToUse)
             .take(3)
             .toList();
         _logDebug('Using phonetic matches: ${_possibleBirds.join(", ")}');
       } else {
-        // Process the entire recognized text
-        _birdService.processText(_speechService.recognizedText);
+        // Use any available recognized text as a last resort
+        String textToProcess = _speechService.recognizedText.isNotEmpty ? 
+            _speechService.recognizedText : birdToUse;
+        
+        // Skip processing if the text is just a "no" response
+        if (_directCheckForNegativeResponse(textToProcess.toLowerCase())) {
+          textToProcess = birdToUse;
+          _logDebug('Text contains negative response, using original bird name instead: $birdToUse');
+        }
+        
+        _birdService.processText(textToProcess);
         
         _possibleBirds = _birdService.possibleMatches
-            .where((bird) => bird != _currentBirdInQuestion)
+            .where((bird) => bird != birdToUse)
             .take(3)
             .toList();
         _logDebug('Using text processing matches: ${_possibleBirds.join(", ")}');
       }
     }
     
-    // Add fallback birds if needed
-    if (_possibleBirds.length < 3) {
-      _addFallbackBirds();
-    }
+    // ALWAYS add fallback birds - this ensures we have at least some options
+    _addFallbackBirds(birdToUse);
     
     _logDebug('Final possible birds by confidence: ${_possibleBirds.join(", ")}');
   }
 
   /// Add fallback birds if we don't have enough options
-  void _addFallbackBirds() {
-    List<String> fallbackBirds = _getFallbackBirdsBasedOnPhonetics(_currentBirdInQuestion);
+  void _addFallbackBirds([String? birdToExclude]) {
+    final String excludeBird = birdToExclude ?? _currentBirdInQuestion;
+    _logDebug('Adding fallback birds, current count: ${_possibleBirds.length}, excluding: $excludeBird');
+    
+    // First try phonetically similar birds
+    List<String> fallbackBirds = _getFallbackBirdsBasedOnPhonetics(excludeBird);
     
     for (String bird in fallbackBirds) {
-      if (!_possibleBirds.contains(bird) && bird != _currentBirdInQuestion) {
+      if (!_possibleBirds.contains(bird) && bird != excludeBird) {
         _possibleBirds.add(bird);
+        _logDebug('Added fallback bird: $bird');
         if (_possibleBirds.length >= 3) break;
       }
     }
     
-    // Ensure we have at least one bird
+    // Ensure we have at least one bird - this is critical
     if (_possibleBirds.isEmpty) {
-      _logDebug('No alternative birds found, adding defaults');
+      _logDebug('No alternative birds found, adding defaults from all birds');
       List<String> allBirds = _birdService.birdNames;
-      if (allBirds.isNotEmpty) {
-        allBirds.shuffle();
-        for (String bird in allBirds) {
-          if (bird != _currentBirdInQuestion) {
-            _possibleBirds.add(bird);
-            if (_possibleBirds.length >= 3) break;
-          }
+      
+      // If for some reason birdNames is empty, create a hard-coded fallback list
+      if (allBirds.isEmpty) {
+        _logDebug('WARNING: birdService.birdNames is empty! Using emergency fallback list');
+        allBirds = ['Solsort', 'Musvit', 'Gråspurv', 'Blåmejse', 'Husskade'];
+      }
+      
+      allBirds.shuffle();
+      for (String bird in allBirds) {
+        if (bird != excludeBird) {
+          _possibleBirds.add(bird);
+          _logDebug('Added default bird: $bird');
+          if (_possibleBirds.length >= 3) break;
         }
       }
+      
+      // Final emergency failsafe - if still empty, add a hard-coded bird
+      if (_possibleBirds.isEmpty) {
+        _logDebug('EMERGENCY: Adding hard-coded fallback bird');
+        _possibleBirds.add('Solsort');
+      }
     }
+    
+    _logDebug('Final fallback birds count: ${_possibleBirds.length}');
   }
 
   // ----- Audio Handlers -----
@@ -669,6 +710,13 @@ class SpeechCoordinator extends ChangeNotifier {
     } 
     else if (_directCheckForNegativeResponse(text)) {
       _logDebug('Negative response detected in final text processing');
+      
+      // Important: Save the original bird name before processing the response
+      final String originalBird = _currentBirdInQuestion;
+      
+      // Clear the text to prevent "nej" from being processed
+      _speechService.clearRecognizedText();
+      
       handleConfirmationResponse(false);
     } 
     else if (_isRepeatRequest(text)) {
@@ -739,7 +787,23 @@ class SpeechCoordinator extends ChangeNotifier {
   
   /// Get fallback birds based on phonetic similarity
   List<String> _getFallbackBirdsBasedOnPhonetics(String birdName) {
+    _logDebug('Getting phonetically similar birds to: $birdName');
+    
     List<String> allBirds = _birdService.birdNames;
+    if (allBirds.isEmpty) {
+      _logDebug('WARNING: No birds in birdService.birdNames, using emergency list');
+      return ['Solsort', 'Musvit', 'Gråspurv', 'Blåmejse', 'Husskade'];
+    }
+    
+    // Skip if bird name is empty or just a response word
+    if (birdName.isEmpty || 
+        _isPositiveResponse(birdName.toLowerCase()) || 
+        _isNegativeResponse(birdName.toLowerCase())) {
+      _logDebug('Bird name is empty or a response word, using random birds');
+      allBirds.shuffle();
+      return allBirds.take(5).toList();
+    }
+    
     String firstLetter = birdName.isNotEmpty ? birdName[0].toLowerCase() : '';
     
     // Birds that start with the same letter
@@ -762,6 +826,16 @@ class SpeechCoordinator extends ChangeNotifier {
       
       lengthSimilarBirds.shuffle();
       similarBirds.addAll(lengthSimilarBirds.take(5 - similarBirds.length));
+    }
+    
+    // If somehow we still don't have enough birds, add some random ones
+    if (similarBirds.length < 3) {
+      _logDebug('Not enough similar birds found, adding random ones');
+      List<String> randomBirds = allBirds
+          .where((bird) => bird != birdName && !similarBirds.contains(bird))
+          .toList();
+      randomBirds.shuffle();
+      similarBirds.addAll(randomBirds.take(5 - similarBirds.length));
     }
     
     similarBirds.shuffle();
@@ -826,6 +900,25 @@ class SpeechCoordinator extends ChangeNotifier {
   bool _isDismissalCommand(String text) {
     return text.contains('ingen') || text.contains('none') || 
            text.contains('annuller') || text.contains('cancel');
+  }
+
+  // ----- Debugging Utilities -----
+  
+  /// Debug the current state
+  void _debugCurrentState() {
+    _logDebug('===== SPEECH COORDINATOR STATE DIAGNOSTIC =====');
+    _logDebug('Current state: $_currentState');
+    _logDebug('Is listening: ${_speechService.isListening}');
+    _logDebug('Current bird in question: $_currentBirdInQuestion');
+    _logDebug('Possible birds: ${_possibleBirds.join(", ")}');
+    _logDebug('Recognized text: ${_speechService.recognizedText}');
+    _logDebug('WordService special word: ${_wordService.recognizedSpecialWord}');
+    _logDebug('BirdService matched bird: ${_birdService.matchedBird}');
+    _logDebug('BirdService possible matches: ${_birdService.possibleMatches.join(", ")}');
+    _logDebug('BirdService confidence: ${_birdService.confidence}');
+    _logDebug('Is confirmation timer active: ${_confirmationTimer?.isActive}');
+    _logDebug('Is manual input active: $_isManualInputActive');
+    _logDebug('=============================================');
   }
 
   /// Debug logging
