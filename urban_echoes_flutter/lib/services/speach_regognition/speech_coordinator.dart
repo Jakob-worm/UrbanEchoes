@@ -178,14 +178,27 @@ class SpeechCoordinator extends ChangeNotifier {
 
     _logDebug('Handling bird recognition: $birdName');
 
-    // CHANGE: Immediately transition to waitingForConfirmation instead of processingBirdRecognition
-    // This will make the confirmation card appear right away
+    // Immediately transition to waitingForConfirmation
     _transitionToState(RecognitionState.waitingForConfirmation);
 
     _currentBirdInQuestion = birdName;
-    _pauseListeningForAudio();
+
+    // CHANGE: Instead of pausing listening, clear recognized text
+    // This allows us to keep listening while playing the question
+    if (_speechService.isListening) {
+      _speechService.clearRecognizedText();
+    } else {
+      // If not already listening, start listening
+      _speechService.startListening();
+    }
+
     _startConfirmationTimeout();
+
+    // Play the bird question audio
     _audioService.playBirdQuestion(birdName);
+
+    // CHANGE: Add log to confirm we're now listening
+    _logDebug('Actively listening for confirmation while playing audio');
   }
 
   /// Handle when the system is in doubt between multiple birds
@@ -197,12 +210,25 @@ class SpeechCoordinator extends ChangeNotifier {
     }
 
     _logDebug('System is in doubt about: ${birds.join(", ")}');
-    _transitionToState(RecognitionState.processingBirdRecognition);
+
+    // Change: Immediately transition to systemInDoubt instead of processingBirdRecognition
+    _transitionToState(RecognitionState.systemInDoubt);
 
     _possibleBirds = birds.take(3).toList();
-    _pauseListeningForAudio();
+
+    // Change: Instead of pausing listening, clear recognized text
+    if (_speechService.isListening) {
+      _speechService.clearRecognizedText();
+    } else {
+      // If not already listening, start listening
+      _speechService.startListening();
+    }
+
     _startConfirmationTimeout();
     _audioService.playPrompt('systemet_er_i_tvil');
+
+    // Add log to confirm we're now listening
+    _logDebug('Actively listening for selection while playing audio');
   }
 
   /// Handle bird selection from the doubt UI
@@ -241,20 +267,34 @@ class SpeechCoordinator extends ChangeNotifier {
 
     if (confirmed) {
       _transitionToState(RecognitionState.processingConfirmation);
-      _audioService.playBirdConfirmation(originalBirdName);
-      await _createAndUploadObservation();
-    } else {
-      // Critical fix: Set the current text to the original bird, not "nej"
-      // This prevents "nej" from being used as input to _birdService
-      _speechService.clearRecognizedText();
 
-      // Pre-populate possible matches with birds similar to the original bird
+      // First upload the observation to the database
+      BirdObservation? observation = await _createAndUploadObservation();
+
+      // Only play the confirmation audio if the upload was successful
+      if (observation != null) {
+        _logDebug('Upload successful, playing confirmation audio');
+
+        // Since we might have Azure Storage issues, wrap this in try-catch
+        try {
+          await _audioService.playBirdConfirmation(originalBirdName);
+        } catch (e) {
+          _logDebug('Error playing bird confirmation audio: $e');
+          // Fall back to a local audio prompt if Azure Storage fails
+          await _audioService.playPrompt('bird_confirmed');
+        }
+      } else {
+        _logDebug('Upload failed, playing error sound instead');
+        // Play an error sound
+        await _audioService.playPrompt('bird_denied');
+        _transitionToState(RecognitionState.idle);
+      }
+    } else {
+      // No changes needed for negative response handling
+      _speechService.clearRecognizedText();
       _logDebug('Finding alternatives to original bird: $originalBirdName');
       _birdService.processText(originalBirdName);
-
-      // Now find alternatives using the original bird name
       _findAlternativeBirds(originalBirdName);
-
       _transitionToState(RecognitionState.systemInDoubt);
       notifyListeners();
       _audioService.playPrompt('systemet_er_i_tvil');
@@ -644,7 +684,13 @@ class SpeechCoordinator extends ChangeNotifier {
   void _handleAudioCompletion(String playbackType) {
     switch (playbackType) {
       case 'bird_question':
-        _resumeListeningForConfirmation();
+        if (_speechService.isListening) {
+          _speechService.clearRecognizedText();
+          _logDebug('Audio completed, continuing to listen for confirmation');
+        } else {
+          // Only resume if not already listening
+          _resumeListeningForConfirmation();
+        }
         break;
 
       case 'bird_confirmation':
@@ -670,8 +716,13 @@ class SpeechCoordinator extends ChangeNotifier {
         break;
 
       case 'systemet_er_i_tvil':
-        _transitionToState(RecognitionState.systemInDoubt);
-        _resumeListeningForConfirmation();
+        // We're already in the systemInDoubt state, just ensure we're listening
+        if (_speechService.isListening) {
+          _speechService.clearRecognizedText();
+          _logDebug('Audio completed, continuing to listen for selection');
+        } else {
+          _resumeListeningForConfirmation();
+        }
         break;
     }
   }
@@ -779,7 +830,7 @@ class SpeechCoordinator extends ChangeNotifier {
   }
 
   /// Create and upload an observation
-  Future<void> _createAndUploadObservation() async {
+  Future<BirdObservation?> _createAndUploadObservation() async {
     BirdObservation? createdObservation = await _observationUploader
         .saveAndUploadObservation(_currentBirdInQuestion,
             quantity: 1, // Default quantity
@@ -795,6 +846,8 @@ class SpeechCoordinator extends ChangeNotifier {
       _logDebug(
           'Failed to save/upload observation: ${_observationUploader.errorMessage}');
     }
+
+    return createdObservation; // Return the observation or null
   }
 
   // ----- Helper methods for phonetic similarity -----

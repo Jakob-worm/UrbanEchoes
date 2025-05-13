@@ -41,15 +41,21 @@ class LocationService extends ChangeNotifier {
   }
 
   static final int batchUpdateMs = ServiceConfig().batchUpdateMs;
-  static final double closeProximityBoost = ServiceConfig().closeProximityBoost; // Volume boost for very close sounds
-  static final double closeProximityThreashold = ServiceConfig().closeProximityThreshold; // Meters
-  static final bool debugMode = ServiceConfig().debugMode; // Enable debug logging
+  static final double closeProximityBoost =
+      ServiceConfig().closeProximityBoost; // Volume boost for very close sounds
+  static final double closeProximityThreashold =
+      ServiceConfig().closeProximityThreshold; // Meters
+  static final bool debugMode =
+      ServiceConfig().debugMode; // Enable debug logging
   // Constants
-  static final double maxRange = ServiceConfig().maxRange; // 50.0; // Maximum range in meters for observation detection
+  static final double maxRange = ServiceConfig()
+      .maxRange; // 50.0; // Maximum range in meters for observation detection
 
-  static final double maxVolume = ServiceConfig().maxVolume; // Maximum volume for nearby sounds
+  static final double maxVolume =
+      ServiceConfig().maxVolume; // Maximum volume for nearby sounds
   // Audio settings
-  static final double minVolume = ServiceConfig().minVolume; // Minimum volume for distant sounds
+  static final double minVolume =
+      ServiceConfig().minVolume; // Minimum volume for distant sounds
 
   final Map<String, Map<String, dynamic>> _activeObservations = {};
   final BackgroundAudioService _backgroundAudioService;
@@ -126,65 +132,69 @@ class LocationService extends ChangeNotifier {
     notifyListeners();
   }
 
-/// Toggle audio playback with improved service initialization
-Future<void> toggleAudio(bool enabled) async {
-  // Add extra logging
-  debugPrint('🔊 toggleAudio called with enabled=$enabled, current state=$_isAudioEnabled');
-  
-  // If state isn't changing, do nothing
-  if (_isAudioEnabled == enabled) {
-    debugPrint('🔊 Audio state already matches requested state, no change needed');
-    return;
-  }
+  /// Toggle audio playback with improved service initialization
+  Future<void> toggleAudio(bool enabled) async {
+    // Add extra logging
+    debugPrint(
+        '🔊 toggleAudio called with enabled=$enabled, current state=$_isAudioEnabled');
 
-  debugPrint('🔊 Audio playback toggling to: $enabled');
-
-  if (!enabled) {
-    // Just stop sounds if disabling
-    _stopAllSounds();
-    _isAudioEnabled = false;
-    notifyListeners();
-    return;
-  }
-
-  // For enabling audio, we need to ensure all services are properly initialized
-  try {
-    // 1. First ensure background audio service is running
-    await _backgroundAudioService.startService();
-    debugPrint('🔊 Background audio service started successfully');
-    
-    // 2. Give audio service time to initialize
-    await Future.delayed(Duration(milliseconds: 500));
-    
-    // 3. Make sure location tracking is enabled
-    if (!_locationManager.isLocationTrackingEnabled) {
-      debugPrint('🔊 Enabling location tracking as part of audio activation');
-      await _locationManager.setLocationTrackingEnabled(true);
-      
-      // Allow a moment for the location manager to update
-      await Future.delayed(Duration(milliseconds: 300));
+    // If state isn't changing, do nothing
+    if (_isAudioEnabled == enabled) {
+      debugPrint(
+          '🔊 Audio state already matches requested state, no change needed');
+      return;
     }
-    
-    // 4. Now set audio enabled state
-    _isAudioEnabled = true;
-    
-    // 5. Start sounds if we have a position
-    if (_locationManager.currentPosition != null) {
-      debugPrint('🔊 Restarting sounds with position data: ${_locationManager.currentPosition}');
-      _updateActiveObservations(_locationManager.currentPosition!);
-      _restartSoundsWithDelays();
-    } else {
-      debugPrint('⚠️ No position available yet, sounds will start when position is available');
+
+    debugPrint('🔊 Audio playback toggling to: $enabled');
+
+    if (!enabled) {
+      // Just stop sounds if disabling
+      _stopAllSounds();
+      _isAudioEnabled = false;
+      notifyListeners();
+      return;
     }
-    
-    notifyListeners();
-  } catch (e) {
-    debugPrint('❌ Error enabling audio: $e');
-    // Try to recover
-    _isAudioEnabled = true; // Still mark as enabled despite error
-    notifyListeners();
+
+    // For enabling audio, we need to ensure all services are properly initialized
+    try {
+      // 1. First ensure background audio service is running
+      await _backgroundAudioService.startService();
+      debugPrint('🔊 Background audio service started successfully');
+
+      // 2. Give audio service time to initialize
+      await Future.delayed(Duration(milliseconds: 500));
+
+      // 3. Make sure location tracking is enabled
+      if (!_locationManager.isLocationTrackingEnabled) {
+        debugPrint('🔊 Enabling location tracking as part of audio activation');
+        await _locationManager.setLocationTrackingEnabled(true);
+
+        // Allow a moment for the location manager to update
+        await Future.delayed(Duration(milliseconds: 300));
+      }
+
+      // 4. Now set audio enabled state
+      _isAudioEnabled = true;
+
+      // 5. Start sounds if we have a position
+      if (_locationManager.currentPosition != null) {
+        debugPrint(
+            '🔊 Restarting sounds with position data: ${_locationManager.currentPosition}');
+        _updateActiveObservations(_locationManager.currentPosition!);
+        _restartSoundsWithDelays();
+      } else {
+        debugPrint(
+            '⚠️ No position available yet, sounds will start when position is available');
+      }
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ Error enabling audio: $e');
+      // Try to recover
+      _isAudioEnabled = true; // Still mark as enabled despite error
+      notifyListeners();
+    }
   }
-}
 
   /// Handles position updates from location manager
   void _handlePositionUpdate(Position position) {
@@ -526,12 +536,11 @@ Future<void> toggleAudio(bool enabled) async {
     double volumeBoost = 0.0;
     if (distance < closeProximityThreashold) {
       // Extra boost when very close
-      volumeBoost = closeProximityBoost *
-          (1.0 - (distance / closeProximityThreashold));
+      volumeBoost =
+          closeProximityBoost * (1.0 - (distance / closeProximityThreashold));
     }
 
-    final volume =
-        minVolume + falloff * (maxVolume - minVolume) + volumeBoost;
+    final volume = minVolume + falloff * (maxVolume - minVolume) + volumeBoost;
     return volume.clamp(minVolume, maxVolume);
   }
 
@@ -597,38 +606,39 @@ Future<void> toggleAudio(bool enabled) async {
 
   /// Start location tracking and background audio service
   Future<void> _startLocationTracking() async {
-  try {
-    _log('Starting location tracking and audio services');
-    
-    // First initialize the background audio service
-    await _backgroundAudioService.startService();
-    
-    // Give audio service time to initialize
-    await Future.delayed(Duration(milliseconds: 500));
-    
-    // Then start location tracking
-    await _locationManager.setLocationTrackingEnabled(true);
-    
-    // If audio was enabled, make sure sounds are playing
-    if (_isAudioEnabled && _locationManager.currentPosition != null) {
-      _log('Restarting sounds after tracking enabled');
-      // Update active observations with the current position
-      _updateActiveObservations(_locationManager.currentPosition!);
-      // Then restart sounds with delays
-      _restartSoundsWithDelays();
-    }
-    
-    _log('Location tracking successfully started');
-  } catch (e) {
-    _log('Error starting location tracking: $e');
-    // Try to recover by at least enabling location tracking
     try {
+      _log('Starting location tracking and audio services');
+
+      // First initialize the background audio service
+      await _backgroundAudioService.startService();
+
+      // Give audio service time to initialize
+      await Future.delayed(Duration(milliseconds: 500));
+
+      // Then start location tracking
       await _locationManager.setLocationTrackingEnabled(true);
-    } catch (e2) {
-      _log('Recovery attempt also failed: $e2');
+
+      // If audio was enabled, make sure sounds are playing
+      if (_isAudioEnabled && _locationManager.currentPosition != null) {
+        _log('Restarting sounds after tracking enabled');
+        // Update active observations with the current position
+        _updateActiveObservations(_locationManager.currentPosition!);
+        // Then restart sounds with delays
+        _restartSoundsWithDelays();
+      }
+
+      _log('Location tracking successfully started');
+    } catch (e) {
+      _log('Error starting location tracking: $e');
+      // Try to recover by at least enabling location tracking
+      try {
+        await _locationManager.setLocationTrackingEnabled(true);
+      } catch (e2) {
+        _log('Recovery attempt also failed: $e2');
+      }
     }
   }
-}
+
   /// Stop location tracking and background audio service
   Future<void> _stopLocationTracking() async {
     // Stop all sounds
