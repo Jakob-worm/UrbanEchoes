@@ -697,7 +697,7 @@ class SpeechCoordinator extends ChangeNotifier {
       case 'bird_denied':
       case 'okay_observation_er_slettet':
         _transitionToState(RecognitionState.idle);
-        _resumeListeningAfterAudio();
+        //_resumeListeningAfterAudio();
         break;
 
       case 'start_listening':
@@ -712,7 +712,7 @@ class SpeechCoordinator extends ChangeNotifier {
         break;
 
       case 'confirmation_timeout':
-        _resumeListeningAfterAudio();
+        //_resumeListeningAfterAudio();
         break;
 
       case 'systemet_er_i_tvil':
@@ -721,7 +721,7 @@ class SpeechCoordinator extends ChangeNotifier {
           _speechService.clearRecognizedText();
           _logDebug('Audio completed, continuing to listen for selection');
         } else {
-          _resumeListeningForConfirmation();
+          //_resumeListeningForConfirmation();
         }
         break;
     }
