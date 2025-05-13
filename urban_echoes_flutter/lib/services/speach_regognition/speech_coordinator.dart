@@ -177,7 +177,10 @@ class SpeechCoordinator extends ChangeNotifier {
     }
 
     _logDebug('Handling bird recognition: $birdName');
-    _transitionToState(RecognitionState.processingBirdRecognition);
+
+    // CHANGE: Immediately transition to waitingForConfirmation instead of processingBirdRecognition
+    // This will make the confirmation card appear right away
+    _transitionToState(RecognitionState.waitingForConfirmation);
 
     _currentBirdInQuestion = birdName;
     _pauseListeningForAudio();
@@ -641,7 +644,6 @@ class SpeechCoordinator extends ChangeNotifier {
   void _handleAudioCompletion(String playbackType) {
     switch (playbackType) {
       case 'bird_question':
-        _transitionToState(RecognitionState.waitingForConfirmation);
         _resumeListeningForConfirmation();
         break;
 
