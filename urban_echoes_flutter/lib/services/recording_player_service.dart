@@ -30,7 +30,8 @@ class RecordingPlayerService extends ChangeNotifier {
   // Track what type of audio was last played
   String _lastPlaybackType = '';
 
-  final AudioPlayer _outroPlayer = AudioPlayer(); // New player for the third part
+  final AudioPlayer _outroPlayer =
+      AudioPlayer(); // New player for the third part
   StreamSubscription<void>? _outroPlayerSubscription;
   int _sequenceCompletedCount = 0;
 
@@ -56,44 +57,51 @@ class RecordingPlayerService extends ChangeNotifier {
 
   String get lastPlaybackType => _lastPlaybackType;
 
-  // Play bird question with callback-based timing
   Future<void> playBirdQuestion(String birdName) async {
     if (_isMuted) return;
-    
+
     _logDebug('Playing bird question for: $birdName with callbacks');
-    
+
     // Stop any current playback
     await stopAudio();
-    
+
     try {
       // Reset sequence counter and set type
       _sequenceCompletedCount = 0;
       _expectedCompletions = 2; // Intro + Bird Name
       _lastPlaybackType = 'bird_question';
-      
+
       // Cancel any existing subscriptions first
       _introCompleteSubscription?.cancel();
-      
+
+      // Prepare the bird name path
+      String simplifiedName = _simplifyName(birdName);
+      String birdPath = 'audio/recorded/birds/$simplifiedName.mp3';
+      String silentPath = 'audio/seilent.mp3'; // Path to silent audio file
+
       // 1. Set up the completion handler for the intro (one-time listener)
-      _introCompleteSubscription = _introPlayer.onPlayerComplete.listen((event) {
+      _introCompleteSubscription =
+          _introPlayer.onPlayerComplete.listen((event) {
         _logDebug('Intro completed, playing bird name immediately');
         if (!_isMuted) {
-          // Play bird name right after intro completes
-          String simplifiedName = _simplifyName(birdName);
-          String birdPath = 'audio/recorded/birds/$simplifiedName.mp3';
-          _birdPlayer.play(AssetSource(birdPath));
+          // Try to play bird name, catch any errors
+          _birdPlayer.play(AssetSource(birdPath)).catchError((error) {
+            _logDebug(
+                'Error playing bird file: $error, using silent file instead');
+            _birdPlayer.play(AssetSource(silentPath));
+          });
         }
-        
+
         // Cancel this subscription after it's used
         _introCompleteSubscription?.cancel();
         _introCompleteSubscription = null;
       }, cancelOnError: true);
-      
+
       // 2. Start playing intro
-      await _introPlayer.play(AssetSource('audio/recorded/har_du_observeret_en.mp3'));
+      await _introPlayer
+          .play(AssetSource('audio/recorded/har_du_observeret_en.mp3'));
       _isPlaying = true;
       notifyListeners();
-      
     } catch (e) {
       _logDebug('Error in playBirdQuestion: $e');
       _isPlaying = false;
@@ -102,39 +110,46 @@ class RecordingPlayerService extends ChangeNotifier {
     }
   }
 
-  // Play confirmation with the callback-based sequence
+// Play confirmation with the callback-based sequence
   Future<void> playBirdConfirmation(String birdName) async {
     if (_isMuted) return;
-    
+
     _logDebug('Playing bird confirmation for: $birdName with callbacks');
-    
+
     // Stop any current playback
     await stopAudio();
-    
+
     try {
       // Reset sequence counter and set type
       _sequenceCompletedCount = 0;
       _expectedCompletions = 3; // Part1 + Bird Name + Part3
       _lastPlaybackType = 'bird_confirmation';
-      
+
       // Prepare files
       String simplifiedName = _simplifyName(birdName);
       String birdPath = 'audio/recorded/birds/$simplifiedName.mp3';
-      
+      String silentPath = 'audio/seilent.mp3'; // Path to silent audio file
+
       // Cancel any existing subscriptions
       _introCompleteSubscription?.cancel();
       _birdCompleteSubscription?.cancel();
-      
+
       // Set up one-time completion handler for part 1
-      _introCompleteSubscription = _introPlayer.onPlayerComplete.listen((event) {
+      _introCompleteSubscription =
+          _introPlayer.onPlayerComplete.listen((event) {
         _logDebug('Part 1 completed, playing bird name immediately');
         if (!_isMuted) {
-          _birdPlayer.play(AssetSource(birdPath));
+          // Try to play bird name, catch any errors
+          _birdPlayer.play(AssetSource(birdPath)).catchError((error) {
+            _logDebug(
+                'Error playing bird file: $error, using silent file instead');
+            _birdPlayer.play(AssetSource(silentPath));
+          });
         }
         _introCompleteSubscription?.cancel();
         _introCompleteSubscription = null;
       }, cancelOnError: true);
-      
+
       // Set up one-time completion handler for bird name
       _birdCompleteSubscription = _birdPlayer.onPlayerComplete.listen((event) {
         _logDebug('Bird name completed, playing part 3 immediately');
@@ -144,12 +159,12 @@ class RecordingPlayerService extends ChangeNotifier {
         _birdCompleteSubscription?.cancel();
         _birdCompleteSubscription = null;
       }, cancelOnError: true);
-      
+
       // Start the sequence with part 1
       _isPlaying = true;
       notifyListeners();
-      await _introPlayer.play(AssetSource('audio/recorded/observation_for.mp3'));
-      
+      await _introPlayer
+          .play(AssetSource('audio/recorded/observation_for.mp3'));
     } catch (e) {
       _logDebug('Error in playBirdConfirmation: $e');
       _isPlaying = false;
@@ -161,28 +176,28 @@ class RecordingPlayerService extends ChangeNotifier {
   // Regular prompt playback
   Future<void> playPrompt(String promptKey) async {
     if (_isMuted) return;
-    
+
     try {
       _logDebug('Playing prompt: $promptKey');
-      
+
       // Reset counters and set the last playback type
       _sequenceCompletedCount = 0;
       _expectedCompletions = 1;
       _lastPlaybackType = promptKey;
-      
+
       // Special case for bird names
       if (promptKey.startsWith('bird_name:')) {
         final birdName = promptKey.substring('bird_name:'.length);
         String simplifiedName = _simplifyName(birdName);
         String path = 'audio/recorded/birds/$simplifiedName.mp3';
-        
+
         await stopAudio();
         await _birdPlayer.play(AssetSource(path));
         _isPlaying = true;
         notifyListeners();
         return;
       }
-      
+
       // Map standard prompts
       String path;
       switch (promptKey) {
@@ -217,9 +232,9 @@ class RecordingPlayerService extends ChangeNotifier {
           path = 'audio/recorded/indtast_den_fulg_du_så.mp3';
           break;
         default:
-          path = 'audio/silent.mp3';
+          path = 'audio/seilent.mp3';
       }
-      
+
       await stopAudio();
       await _introPlayer.play(AssetSource(path));
       _isPlaying = true;
@@ -235,18 +250,18 @@ class RecordingPlayerService extends ChangeNotifier {
   // Play a specific bird sound directly
   Future<void> playBirdSound(String birdName) async {
     if (_isMuted) return;
-    
+
     try {
       _logDebug('Playing bird sound: $birdName');
-      
+
       // Reset counters and set type
       _sequenceCompletedCount = 0;
       _expectedCompletions = 1;
       _lastPlaybackType = 'bird_sound';
-      
+
       String simplifiedName = _simplifyName(birdName);
       String path = 'audio/recorded/birds/$simplifiedName.mp3';
-      
+
       await stopAudio();
       await _birdPlayer.play(AssetSource(path));
       _isPlaying = true;
@@ -265,12 +280,12 @@ class RecordingPlayerService extends ChangeNotifier {
     await _introPlayer.stop();
     await _birdPlayer.stop();
     await _outroPlayer.stop();
-    
+
     // Reset state
     _isPlaying = false;
     _sequenceCompletedCount = 0;
     // We don't reset _lastPlaybackType here so that the coordinator can still respond to it
-    
+
     notifyListeners();
   }
 
@@ -278,11 +293,11 @@ class RecordingPlayerService extends ChangeNotifier {
   void toggleMute() {
     _isMuted = !_isMuted;
     _logDebug('Mute state changed: $_isMuted');
-    
+
     if (_isMuted && _isPlaying) {
       stopAudio();
     }
-    
+
     notifyListeners();
   }
 
@@ -296,26 +311,26 @@ class RecordingPlayerService extends ChangeNotifier {
     _introPlayerSubscription?.cancel();
     _birdPlayerSubscription?.cancel();
     _outroPlayerSubscription?.cancel();
-    
+
     // Setup completion listeners
     _introPlayerSubscription = _introPlayer.onPlayerComplete.listen((_) {
       _logDebug('Intro playback completed');
       _sequenceCompletedCount++;
       _checkSequenceCompletion();
     });
-    
+
     _birdPlayerSubscription = _birdPlayer.onPlayerComplete.listen((_) {
       _logDebug('Bird name playback completed');
       _sequenceCompletedCount++;
       _checkSequenceCompletion();
     });
-    
+
     _outroPlayerSubscription = _outroPlayer.onPlayerComplete.listen((_) {
       _logDebug('Outro playback completed');
       _sequenceCompletedCount++;
       _checkSequenceCompletion();
     });
-    
+
     _logDebug('Audio players initialized');
   }
 
