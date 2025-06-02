@@ -1,3 +1,6 @@
+#Important
+The backend has been closed and deleted as the project is over
+
 # UrbanEchoes
 To run the app in debug:
     CD urban_echoes_flutter
