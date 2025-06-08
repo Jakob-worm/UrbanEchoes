@@ -1,38 +1,67 @@
 @startuml
 
 class ObservationUploader {
-  - DatabaseService databaseService
-  - ObservationService observationService
-  - UploadNotificationService notificationService
-  + Future<void> saveAndUploadObservation(String bird, int quantity, int observerId)
-  + void retryFailedUploads()
-}
+  - DatabaseService _databaseService
+  - ObservationService _observationService
+  - UploadNotificationService? _notificationService
+  - bool _debugMode
+  - String? _errorMessage
+  - bool _isUploading
+  - String? _lastUploadBirdName
+  - DateTime? _lastUploadTime
+  - bool _processingUpload
+  - bool _isActive
 
-class ObservationService {
-  + Future<List<Map<String, dynamic>>> fetchObservations()
-  + Future<bool> uploadObservation(Map<String, dynamic> observation)
+  + bool get isUploading()
+  + String? get errorMessage()
+  + bool get isDisposed()
+  + saveAndUploadObservation(birdName, ...): Future<BirdObservation?>
+  + notifyListeners()
+  + dispose()
+
+  - _generateSoundDirectory(scientificName): String
+  - _getCurrentLocation(): Future<Position>
+  - _createBirdObservation(...): Future<BirdObservation>
+  - _uploadObservationToApi(observation): Future<void>
+  - _logDebug(message): void
 }
 
 class DatabaseService {
-  + Future<void> saveObservation(Map<String, dynamic> observation)
-  + Future<List<Map<String, dynamic>>> getPendingObservations()
-  + Future<void> markAsUploaded(int observationId)
+  + getBirdByCommonName(commonName): Future<Bird?>
+  + addBirdObservation(observation): Future<int>
+  + ...
+}
+
+class ObservationService {
+  + uploadObservation(apiData): Future<bool>
+  + ...
 }
 
 class UploadNotificationService {
-  - List<String> _notifications
-  + void showNotification(String message)
-  + List<String> get notifications
+  + showSuccessNotification(observation)
+  + showErrorNotification(errorMessage)
 }
 
-class UploadNotificationWidget {
-  + Widget build(BuildContext context)
-  + void show(String message)
+class BirdObservation {
+  + birdName: String
+  + scientificName: String
+  + soundDirectory: String
+  + latitude: double
+  + longitude: double
+  + observationDate: DateTime
+  + observationTime: String
+  + observerId: int
+  + quantity: int
+  + isTestData: bool
+  + testBatchId: int
+  + sourceId: String?
+  + copyWith(...): BirdObservation
 }
 
 ObservationUploader --> DatabaseService : uses
 ObservationUploader --> ObservationService : uses
 ObservationUploader --> UploadNotificationService : uses
-UploadNotificationWidget ..> UploadNotificationService : reads
+ObservationUploader ..> BirdObservation : creates
+UploadNotificationService ..> BirdObservation : notifies
 
 @enduml

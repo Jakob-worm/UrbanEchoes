@@ -1,42 +1,40 @@
 @startuml
 
 class FastAPIApp {
-  + app: FastAPI
   + add_middleware()
+  + app: FastAPI
 }
 
-class Database {
+class DBConnection {
   + get_db_connection()
-  - user: str
-  - password: str
-  - host: str
-  - port: int
-  - database: str
 }
 
-class ObservationEndpoint {
+class APIConstants {
+  + EBIRD_API_URL: str
+  + EBIRD_TAXONOMY_URL: str
+  + XENO_CANTO_API: str
+  + EBIRD_API_KEY: str
+  + DATABASE_URL: str
+  + LAT: float
+  + LON: float
+}
+
+class Endpoints {
   + get_observations(after_timestamp: str)
   + get_birds()
   + get_bird_sound(scientific_name: str)
   + search_birds(query: str)
   + get_bird_list()
   + health_check()
-  - logger
-  - EBIRD_API_KEY: str
-  - DATABASE_URL: str
-  - LAT: float
-  - LON: float
 }
 
-class ExternalAPIs {
-  - EBIRD_API_URL: str
-  - EBIRD_TAXONOMY_URL: str
-  - XENO_CANTO_API: str
+class HelperFunctions {
   + get_danish_taxonomy()
 }
 
-FastAPIApp --> ObservationEndpoint : routes
-ObservationEndpoint --> Database : uses
-ObservationEndpoint --> ExternalAPIs : uses
+FastAPIApp --> Endpoints : routes
+Endpoints --> DBConnection : uses
+Endpoints --> APIConstants : uses
+Endpoints --> HelperFunctions : uses
 
 @enduml

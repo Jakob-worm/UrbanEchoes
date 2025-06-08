@@ -34,11 +34,31 @@ class WordRecognitionService {
   + void recognizeWord(String text)
 }
 
+class ObservationUploader {
+  - DatabaseService _databaseService
+  - ObservationService _observationService
+  - UploadNotificationService? _notificationService
+  - bool _debugMode
+  - String? _errorMessage
+  - bool _isUploading
+  - String? _lastUploadBirdName
+  - DateTime? _lastUploadTime
+  - bool _processingUpload
+  - bool _isActive
+  + bool get isUploading()
+  + String? get errorMessage()
+  + bool get isDisposed()
+  + Future<BirdObservation?> saveAndUploadObservation(String birdName, {String? scientificName, String? soundDirectory, int quantity = 1, int observerId = 1, DateTime? observationDate, String? observationTime, int testBatchId = 0, bool isTestData = false, String? sourceId})
+  + void notifyListeners()
+  + void dispose()
+}
+
 class SpeechCoordinator {
-  - SpeechRecognitionService speechService
-  - BirdRecognitionService birdService
-  - WordRecognitionService wordService
-  - RecordingPlayerService audioService
+  - SpeechRecognitionService _speechService
+  - BirdRecognitionService _birdService
+  - WordRecognitionService _wordService
+  - RecordingPlayerService _audioService
+  - ObservationUploader _observationUploader
   - bool isWaitingForConfirmation
   - String currentBirdInQuestion
   + bool get isListening()
@@ -52,5 +72,6 @@ SpeechCoordinator --> SpeechRecognitionService : uses
 SpeechCoordinator --> BirdRecognitionService : uses
 SpeechCoordinator --> WordRecognitionService : uses
 SpeechCoordinator --> RecordingPlayerService : uses
+SpeechCoordinator --> ObservationUploader : uses
 
 @enduml
