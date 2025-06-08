@@ -51,4 +51,12 @@ ObservationUploader --> DatabaseService : uses
 ObservationUploader --> ObservationService : uses
 ObservationUploader --> UploadNotificationService : uses
 
+class MyApp {
+  +debugMode: bool
+  +locationService: LocationService
+  +MyApp({required bool debugMode, required LocationService locationService})
+  +build(context): Widget
+}
+
+
 @enduml
