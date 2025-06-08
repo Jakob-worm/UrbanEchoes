@@ -1,0 +1,38 @@
+@startuml
+
+class ObservationUploader {
+  - DatabaseService databaseService
+  - ObservationService observationService
+  - UploadNotificationService notificationService
+  + Future<void> saveAndUploadObservation(String bird, int quantity, int observerId)
+  + void retryFailedUploads()
+}
+
+class ObservationService {
+  + Future<List<Map<String, dynamic>>> fetchObservations()
+  + Future<bool> uploadObservation(Map<String, dynamic> observation)
+}
+
+class DatabaseService {
+  + Future<void> saveObservation(Map<String, dynamic> observation)
+  + Future<List<Map<String, dynamic>>> getPendingObservations()
+  + Future<void> markAsUploaded(int observationId)
+}
+
+class UploadNotificationService {
+  - List<String> _notifications
+  + void showNotification(String message)
+  + List<String> get notifications
+}
+
+class UploadNotificationWidget {
+  + Widget build(BuildContext context)
+  + void show(String message)
+}
+
+ObservationUploader --> DatabaseService : uses
+ObservationUploader --> ObservationService : uses
+ObservationUploader --> UploadNotificationService : uses
+UploadNotificationWidget ..> UploadNotificationService : reads
+
+@enduml

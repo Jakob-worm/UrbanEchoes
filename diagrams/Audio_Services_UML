@@ -1,0 +1,56 @@
+@startuml
+
+class RecordingPlayerService {
+  - bool _isPlaying
+  - String? _currentAudio
+  + bool get isPlaying()
+  + Future<void> playBirdQuestion(String birdName)
+  + Future<void> playBirdConfirmation(String birdName)
+  + Future<void> playPrompt(String promptKey)
+  + Future<void> stopAudio()
+}
+
+class SpeechRecognitionService {
+  - bool _isInitialized
+  - bool _isListening
+  - String _recognizedText
+  - double _confidence
+  - String? _errorMessage
+  + bool get isInitialized()
+  + bool get isListening()
+  + String get recognizedText()
+  + Future<bool> startListening()
+  + Future<bool> stopListening()
+  + void clearRecognizedText()
+}
+
+class BirdRecognitionService {
+  - String matchedBird
+  + String get matchedBird()
+  + void recognizeBird(String text)
+}
+
+class WordRecognitionService {
+  + void recognizeWord(String text)
+}
+
+class SpeechCoordinator {
+  - SpeechRecognitionService speechService
+  - BirdRecognitionService birdService
+  - WordRecognitionService wordService
+  - RecordingPlayerService audioService
+  - bool isListening
+  - bool isWaitingForConfirmation
+  - String currentBirdInQuestion
+  + void startListening()
+  + void stopListening()
+  + void handleBirdRecognition(String birdName)
+  + void handleConfirmationResponse(bool confirmed)
+}
+
+SpeechCoordinator --> SpeechRecognitionService : uses
+SpeechCoordinator --> BirdRecognitionService : uses
+SpeechCoordinator --> WordRecognitionService : uses
+SpeechCoordinator --> RecordingPlayerService : uses
+
+@enduml

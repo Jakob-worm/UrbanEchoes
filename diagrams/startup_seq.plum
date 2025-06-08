@@ -1,0 +1,14 @@
+@startuml
+actor User
+participant main.dart
+participant MyApp
+participant InitialScreen
+participant LocationService
+participant AppStartupService
+
+User -> main.dart : launch app
+main.dart -> MyApp : runApp()
+MyApp -> InitialScreen : home
+InitialScreen -> LocationService : initialize(context)
+InitialScreen -> AppStartupService : runStartupTasks()
+@enduml

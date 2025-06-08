@@ -1,0 +1,71 @@
+@startuml
+
+class LocationService {
+  - bool _isInitialized
+  - Position? _currentPosition
+  - List<Map<String, dynamic>> _observations
+  - Map<String, Map<String, dynamic>> _activeObservations
+  - bool _isLocationTrackingEnabled
+  - bool _isAudioEnabled
+  - double _maxRange
+  - double _distanceFilter
+  - bool _debugMode
+  + bool get isInitialized()
+  + Position? get currentPosition()
+  + bool get isLocationTrackingEnabled()
+  + bool get isAudioEnabled()
+  + List<Map<String, dynamic>> get activeObservations()
+  + Future<void> initialize(BuildContext context)
+  + void toggleLocationTracking(bool enabled)
+  + void toggleAudio(bool enabled)
+  + void dispose()
+}
+
+class BirdSoundPlayer {
+  - Map<String, dynamic> _activePlayers
+  - bool _isMuted
+  + void playSound(String observationId, double pan, double volume)
+  + void stopSounds(String observationId)
+  + void updatePanningAndVolume(String observationId, double pan, double volume)
+  + void dispose()
+}
+
+class AzureStorageService {
+  - String? _storageAccountName
+  - String? _storageAccountKey
+  + Future<void> initialize()
+  + Future<List<String>> listFiles(String container)
+  + Future<String> getFileUrl(String container, String fileName)
+}
+
+class BackgroundAudioService {
+  - bool _isRunning
+  + Future<void> startService()
+  + Future<void> stopService()
+  + bool get isRunning()
+}
+
+class LocationRepositoryInterface {
+  + Future<bool> requestLocationPermission()
+  + Future<Position?> getCurrentPosition()
+  + Future<Position?> getLastKnownPosition()
+  + Stream<Position> getPositionStream({required LocationSettings locationSettings})
+}
+
+class LocationManager {
+  - StreamSubscription<Position>? _positionStreamSubscription
+  + Future<bool> initialize()
+  + Future<void> setLocationTrackingEnabled(bool enabled)
+  + double calculateDistance(double lat1, double lon1, double lat2, double lon2)
+  + double calculatePan(double userLat, double userLng, double soundLat, double soundLng)
+  + void dispose()
+  + void Function(Position position)? onPositionUpdate
+}
+
+LocationService --> BirdSoundPlayer : uses
+LocationService --> AzureStorageService : uses
+LocationService --> BackgroundAudioService : uses
+LocationService --> LocationRepositoryInterface : uses
+LocationService --> LocationManager : uses
+
+@enduml
