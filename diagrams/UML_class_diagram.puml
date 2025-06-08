@@ -1,0 +1,98 @@
+@startuml UML_class_diagram
+
+!theme plain
+
+class MyApp {
+  - debugMode: bool
+  - locationService: LocationService
+  + build(context): Widget
+}
+
+class InitialScreen {
+  + createState(): InitialScreenState
+}
+
+class InitialScreenState {
+  - _errorMessage: String
+  - _initializationError: bool
+  - _isFirstTime: bool
+  - _isInitializing: bool
+  + initState()
+  + didChangeDependencies()
+  + dispose()
+  + build(context): Widget
+  - _initializeServices()
+  - _checkFirstTime()
+}
+
+class LocationService {
+  - _soundPlayer: BirdSoundPlayer
+  - _storageService: AzureStorageService
+  - _backgroundAudio: BackgroundAudioService
+  - _seasonService: SeasonService
+  - _locationManager: LocationManager
+  + initialize(context)
+  + toggleLocationTracking(bool)
+  + toggleAudio(bool)
+}
+
+class PageStateManager {
+  - selectedNavRailPage: NavRailPageType
+  - selectedButtonPage: ButtonPageType?
+  - newObservationData: Map<String, dynamic>?
+  - _needsMapRefresh: bool
+  + get needsMapRefresh: bool
+  + setNeedsMapRefresh(bool)
+  + getNavRailPage(context): Widget
+  + getButtonPage(context): Widget
+  + getCurrentPage(context): Widget
+  + setNavRailPage(NavRailPageType)
+  + setButtonPage(ButtonPageType)
+}
+
+class BirdSoundPlayer
+class AzureStorageService
+class BackgroundAudioService
+class SeasonService
+class LocationManager
+class UploadNotificationWidget
+class ObservationUploader
+class BirdHomePage
+class MapPage <<deprecated>>
+class MakeObservationPage <<deprecated>>
+class ObservationService {
+  - apiUrl: String
+  - _knownObservationIds: Set<int>
+  + fetchObservations(): Future<List<Map>>
+  + fetchNewObservations(): Future<List<Map>>
+  + uploadObservation(Map): Future<bool>
+}
+
+MyApp --> LocationService : uses
+MyApp --> PageStateManager : provider
+MyApp --> UploadNotificationWidget : embeds
+MyApp --> ObservationUploader : debug FAB triggers
+
+InitialScreen --> InitialScreenState : creates
+InitialScreenState --> LocationService : uses
+InitialScreenState --> ObservationUploader : uses
+InitialScreenState --> PageStateManager : uses
+InitialScreenState --> UploadNotificationWidget : includes
+
+LocationService --> BirdSoundPlayer : uses
+LocationService --> AzureStorageService : uses
+LocationService --> BackgroundAudioService : uses
+LocationService --> SeasonService : uses
+LocationService --> LocationManager : uses
+
+PageStateManager --> BirdHomePage : returns
+PageStateManager --> MapPage : returns
+PageStateManager --> MakeObservationPage : returns
+
+ObservationUploader --> DatabaseService : uses
+ObservationUploader --> ObservationService : uses
+ObservationUploader --> UploadNotificationService : optional
+
+InitialScreenState --> ObservationUploader : uses
+
+@enduml

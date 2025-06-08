@@ -1,0 +1,58 @@
+@startuml UML_core_architecture
+
+!theme plain
+
+class MyApp {
+  - debugMode: bool
+  - locationService: LocationService
+  + build(context): Widget
+}
+
+class InitialScreen {
+  + createState(): InitialScreenState
+}
+
+class InitialScreenState {
+  - _errorMessage: String
+  - _initializationError: bool
+  - _isFirstTime: bool
+  - _isInitializing: bool
+  + initState()
+  + didChangeDependencies()
+  + dispose()
+  + build(context): Widget
+  - _initializeServices()
+  - _checkFirstTime()
+}
+
+class LocationService {
+  + initialize(context)
+  + toggleLocationTracking(bool)
+  + toggleAudio(bool)
+}
+
+class PageStateManager {
+  + get needsMapRefresh: bool
+  + setNeedsMapRefresh(bool)
+  + getNavRailPage(context): Widget
+  + getButtonPage(context): Widget
+  + getCurrentPage(context): Widget
+  + setNavRailPage(NavRailPageType)
+  + setButtonPage(ButtonPageType)
+}
+
+class UploadNotificationWidget
+class ObservationUploader
+
+MyApp --> LocationService : uses
+MyApp --> PageStateManager : provider
+MyApp --> UploadNotificationWidget : embeds
+MyApp --> ObservationUploader : debug FAB triggers
+
+InitialScreen --> InitialScreenState : creates
+InitialScreenState --> LocationService : uses
+InitialScreenState --> PageStateManager : uses
+InitialScreenState --> UploadNotificationWidget : includes
+InitialScreenState --> ObservationUploader : uses
+
+@enduml

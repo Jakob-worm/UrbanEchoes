@@ -48,7 +48,7 @@ class PageStateManager extends ChangeNotifier {
         return Placeholder();
       default:
         return Placeholder();
-    }
+    } 
   }
 
   void setNavRailPage(NavRailPageType page) {
