@@ -39,9 +39,9 @@ class SpeechCoordinator {
   - BirdRecognitionService birdService
   - WordRecognitionService wordService
   - RecordingPlayerService audioService
-  - bool isListening
   - bool isWaitingForConfirmation
   - String currentBirdInQuestion
+  + bool get isListening()
   + void startListening()
   + void stopListening()
   + void handleBirdRecognition(String birdName)
