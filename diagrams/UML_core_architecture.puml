@@ -1,58 +1,37 @@
-@startuml UML_core_architecture
+@startuml
 
-!theme plain
-
-class MyApp {
-  - debugMode: bool
-  - locationService: LocationService
-  + build(context): Widget
-}
-
-class InitialScreen {
-  + createState(): InitialScreenState
-}
-
-class InitialScreenState {
-  - _errorMessage: String
-  - _initializationError: bool
-  - _isFirstTime: bool
-  - _isInitializing: bool
-  + initState()
-  + didChangeDependencies()
-  + dispose()
-  + build(context): Widget
-  - _initializeServices()
-  - _checkFirstTime()
-}
-
-class LocationService {
-  + initialize(context)
-  + toggleLocationTracking(bool)
-  + toggleAudio(bool)
-}
-
-class PageStateManager {
-  + get needsMapRefresh: bool
-  + setNeedsMapRefresh(bool)
-  + getNavRailPage(context): Widget
-  + getButtonPage(context): Widget
-  + getCurrentPage(context): Widget
-  + setNavRailPage(NavRailPageType)
-  + setButtonPage(ButtonPageType)
-}
-
-class UploadNotificationWidget
+class LocationService
+class SpeechRecognitionService
+class BirdRecognitionService
+class WordRecognitionService
+class RecordingPlayerService
+class SpeechCoordinator
+class ObservationService
 class ObservationUploader
+class UploadNotificationService
+class PageStateManager
+class MapStateManager
+class NavigationProvider
+class AppStartupService
+class SeasonService
+class DatabaseService
 
-MyApp --> LocationService : uses
-MyApp --> PageStateManager : provider
-MyApp --> UploadNotificationWidget : embeds
-MyApp --> ObservationUploader : debug FAB triggers
+SpeechCoordinator --> SpeechRecognitionService : uses
+SpeechCoordinator --> BirdRecognitionService : uses
+SpeechCoordinator --> WordRecognitionService : uses
+SpeechCoordinator --> RecordingPlayerService : uses
+SpeechCoordinator --> ObservationUploader : uses
 
-InitialScreen --> InitialScreenState : creates
-InitialScreenState --> LocationService : uses
-InitialScreenState --> PageStateManager : uses
-InitialScreenState --> UploadNotificationWidget : includes
-InitialScreenState --> ObservationUploader : uses
+ObservationUploader --> DatabaseService : uses
+ObservationUploader --> ObservationService : uses
+ObservationUploader --> UploadNotificationService : uses
+
+PageStateManager ..> MapStateManager : manages
+PageStateManager ..> NavigationProvider : manages
+
+MyApp --> LocationService : provides
+MyApp --> SpeechCoordinator : provides
+MyApp --> ObservationUploader : provides
+MyApp --> PageStateManager : provides
 
 @enduml
