@@ -1,122 +1,45 @@
 @startuml
 
-class MyApp {
-  + bool debugMode
-  + LocationService locationService
-}
+class MyApp
+class InitialScreen
+class AppStartupService
+class SeasonService
+class PageStateManager
+class MapStateManager
+class NavigationProvider
+class UploadNotificationService
+class DatabaseService
+class ObservationService
+class ObservationUploader
+class RecordingPlayerService
+class SpeechRecognitionService
+class BirdRecognitionService
+class WordRecognitionService
+class SpeechCoordinator
+class LocationService
+class DebugMode
 
-class InitialScreen {
-  - String _errorMessage
-  - bool _initializationError
-  - bool _isFirstTime
-  - bool _isInitializing
-  + void _initializeServices()
-  + Future<void> _checkFirstTime()
-}
-
-class LocationService {
-  - bool _isInitialized
-  - Position? _currentPosition
-  - List<Map<String, dynamic>> _observations
-  - Map<String, Map<String, dynamic>> _activeObservations
-  - bool _isLocationTrackingEnabled
-  - bool _isAudioEnabled
-  - double _maxRange
-  - double _distanceFilter
-  - bool _debugMode
-  + bool get isInitialized()
-  + Position? get currentPosition()
-  + Future<void> initialize(BuildContext context)
-  + void toggleLocationTracking(bool enabled)
-}
-
-class SpeechRecognitionService {
-  - bool _isInitialized
-  - bool _isListening
-  - String _recognizedText
-  - double _confidence
-  - String? _errorMessage
-  + bool get isInitialized()
-  + bool get isListening()
-  + String get recognizedText()
-  + Future<bool> startListening()
-  + Future<bool> stopListening()
-  + void clearRecognizedText()
-}
-
-class BirdRecognitionService {
-  - String matchedBird
-  + String get matchedBird()
-  + void recognizeBird(String text)
-}
-
-class WordRecognitionService {
-  + void recognizeWord(String text)
-}
-
-class RecordingPlayerService {
-  - bool _isPlaying
-  + bool get isPlaying()
-  + Future<void> playBirdQuestion(String birdName)
-  + Future<void> playBirdConfirmation(String birdName)
-  + Future<void> stopAudio()
-}
-
-class SpeechCoordinator {
-  - SpeechRecognitionService speechService
-  - BirdRecognitionService birdService
-  - WordRecognitionService wordService
-  - RecordingPlayerService audioService
-  - ObservationUploader observationUploader
-  - bool isListening
-  - bool isWaitingForConfirmation
-  - String currentBirdInQuestion
-  + void startListening()
-  + void stopListening()
-  + void handleBirdRecognition(String birdName)
-  + void handleConfirmationResponse(bool confirmed)
-  + void updateServices(...)
-}
-
-class ObservationService {
-  + String apiUrl
-  + Future<List<Map<String, dynamic>>> fetchObservations()
-}
-
-class ObservationUploader {
-  - DatabaseService databaseService
-  - ObservationService observationService
-  - UploadNotificationService notificationService
-  + Future<void> saveAndUploadObservation(String bird, int quantity, int observerId)
-}
-
-class UploadNotificationService {
-  - List<String> _notifications
-  + void showNotification(String message)
-}
-
-class AppStartupService {
-  + Future<void> runStartupTasks()
-}
-
-class SeasonService {
-  + String getCurrentSeason()
-}
-
-class DatabaseService {
-  + Future<void> saveObservation(Map<String, dynamic> observation)
-}
-
-' Relationships
-MyApp --> LocationService : provides
-MyApp --> SpeechCoordinator : provides
+MyApp --> PageStateManager : provides
+MyApp --> MapStateManager : provides
+MyApp --> NavigationProvider : provides
+MyApp --> UploadNotificationService : provides
+MyApp --> DatabaseService : provides
+MyApp --> ObservationService : provides
 MyApp --> ObservationUploader : provides
-MyApp --> AppStartupService : provides
+MyApp --> RecordingPlayerService : provides
+MyApp --> SpeechRecognitionService : provides
+MyApp --> BirdRecognitionService : provides
+MyApp --> WordRecognitionService : provides
+MyApp --> SpeechCoordinator : provides
 MyApp --> SeasonService : provides
+MyApp --> AppStartupService : provides
+MyApp --> LocationService : provides
+MyApp --> DebugMode : provides
 
-InitialScreen --> AppStartupService : uses
-InitialScreen --> SeasonService : uses
 InitialScreen --> LocationService : uses
+InitialScreen --> AppStartupService : uses
+InitialScreen --> PageStateManager : uses
+InitialScreen --> ObservationUploader : uses
 
 SpeechCoordinator --> SpeechRecognitionService : uses
 SpeechCoordinator --> BirdRecognitionService : uses
