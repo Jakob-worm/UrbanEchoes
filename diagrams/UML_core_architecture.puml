@@ -1,0 +1,62 @@
+@startuml
+
+class MyApp
+class InitialScreen
+class AppStartupService
+class SeasonService
+class PageStateManager
+class MapStateManager
+class NavigationProvider
+class UploadNotificationService
+class DatabaseService
+class ObservationService
+class ObservationUploader
+class RecordingPlayerService
+class SpeechRecognitionService
+class BirdRecognitionService
+class WordRecognitionService
+class SpeechCoordinator
+class LocationService
+class DebugMode
+
+MyApp --> PageStateManager : provides
+MyApp --> MapStateManager : provides
+MyApp --> NavigationProvider : provides
+MyApp --> UploadNotificationService : provides
+MyApp --> DatabaseService : provides
+MyApp --> ObservationService : provides
+MyApp --> ObservationUploader : provides
+MyApp --> RecordingPlayerService : provides
+MyApp --> SpeechRecognitionService : provides
+MyApp --> BirdRecognitionService : provides
+MyApp --> WordRecognitionService : provides
+MyApp --> SpeechCoordinator : provides
+MyApp --> SeasonService : provides
+MyApp --> AppStartupService : provides
+MyApp --> LocationService : provides
+MyApp --> DebugMode : provides
+
+InitialScreen --> LocationService : uses
+InitialScreen --> AppStartupService : uses
+InitialScreen --> PageStateManager : uses
+InitialScreen --> ObservationUploader : uses
+
+SpeechCoordinator --> SpeechRecognitionService : uses
+SpeechCoordinator --> BirdRecognitionService : uses
+SpeechCoordinator --> WordRecognitionService : uses
+SpeechCoordinator --> RecordingPlayerService : uses
+SpeechCoordinator --> ObservationUploader : uses
+
+ObservationUploader --> DatabaseService : uses
+ObservationUploader --> ObservationService : uses
+ObservationUploader --> UploadNotificationService : uses
+
+class MyApp {
+  +debugMode: bool
+  +locationService: LocationService
+  +MyApp({required bool debugMode, required LocationService locationService})
+  +build(context): Widget
+}
+
+
+@enduml

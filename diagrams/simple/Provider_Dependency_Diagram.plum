@@ -1,0 +1,24 @@
+@startuml
+class MyApp
+class LocationService
+class SpeechCoordinator
+class SpeechRecognitionService
+class BirdRecognitionService
+class WordRecognitionService
+class RecordingPlayerService
+class ObservationUploader
+class DatabaseService
+class ObservationService
+class UploadNotificationService
+
+MyApp --> LocationService
+MyApp --> SpeechCoordinator
+SpeechCoordinator --> SpeechRecognitionService
+SpeechCoordinator --> BirdRecognitionService
+SpeechCoordinator --> WordRecognitionService
+SpeechCoordinator --> RecordingPlayerService
+SpeechCoordinator --> ObservationUploader
+ObservationUploader --> DatabaseService
+ObservationUploader --> ObservationService
+ObservationUploader --> UploadNotificationService
+@enduml

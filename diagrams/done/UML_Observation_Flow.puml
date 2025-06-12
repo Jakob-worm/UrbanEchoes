@@ -1,0 +1,67 @@
+@startuml
+
+class ObservationUploader {
+  - DatabaseService _databaseService
+  - ObservationService _observationService
+  - UploadNotificationService? _notificationService
+  - bool _debugMode
+  - String? _errorMessage
+  - bool _isUploading
+  - String? _lastUploadBirdName
+  - DateTime? _lastUploadTime
+  - bool _processingUpload
+  - bool _isActive
+
+  + bool get isUploading()
+  + String? get errorMessage()
+  + bool get isDisposed()
+  + saveAndUploadObservation(birdName, ...): Future<BirdObservation?>
+  + notifyListeners()
+  + dispose()
+
+  - _generateSoundDirectory(scientificName): String
+  - _getCurrentLocation(): Future<Position>
+  - _createBirdObservation(...): Future<BirdObservation>
+  - _uploadObservationToApi(observation): Future<void>
+  - _logDebug(message): void
+}
+
+class DatabaseService {
+  + getBirdByCommonName(commonName): Future<Bird?>
+  + addBirdObservation(observation): Future<int>
+  + ...
+}
+
+class ObservationService {
+  + uploadObservation(apiData): Future<bool>
+  + ...
+}
+
+class UploadNotificationService {
+  + showSuccessNotification(observation)
+  + showErrorNotification(errorMessage)
+}
+
+class BirdObservation {
+  + birdName: String
+  + scientificName: String
+  + soundDirectory: String
+  + latitude: double
+  + longitude: double
+  + observationDate: DateTime
+  + observationTime: String
+  + observerId: int
+  + quantity: int
+  + isTestData: bool
+  + testBatchId: int
+  + sourceId: String?
+  + copyWith(...): BirdObservation
+}
+
+ObservationUploader --> DatabaseService : uses
+ObservationUploader --> ObservationService : uses
+ObservationUploader --> UploadNotificationService : uses
+ObservationUploader ..> BirdObservation : creates
+UploadNotificationService ..> BirdObservation : notifies
+
+@enduml

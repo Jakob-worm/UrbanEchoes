@@ -1,0 +1,18 @@
+@startuml
+start
+:main();
+:_initializeApp();
+:await dotenv.load();
+:await WakelockPlus.enable();
+:_configureDebugPrint();
+:_configureAudioSession();
+:_initializeServices();
+:runApp(MyApp);
+:InitialScreen checks first time?;
+if (first time) then (yes)
+  :Show IntroScreen;
+else (no)
+  :Show Main App UI;
+endif
+stop
+@enduml

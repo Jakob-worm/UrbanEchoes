@@ -1,0 +1,77 @@
+@startuml
+
+class RecordingPlayerService {
+  - bool _isPlaying
+  - String? _currentAudio
+  + bool get isPlaying()
+  + Future<void> playBirdQuestion(String birdName)
+  + Future<void> playBirdConfirmation(String birdName)
+  + Future<void> playPrompt(String promptKey)
+  + Future<void> stopAudio()
+}
+
+class SpeechRecognitionService {
+  - bool _isInitialized
+  - bool _isListening
+  - String _recognizedText
+  - double _confidence
+  - String? _errorMessage
+  + bool get isInitialized()
+  + bool get isListening()
+  + String get recognizedText()
+  + Future<bool> startListening()
+  + Future<bool> stopListening()
+  + void clearRecognizedText()
+}
+
+class BirdRecognitionService {
+  - String matchedBird
+  + String get matchedBird()
+  + void recognizeBird(String text)
+}
+
+class WordRecognitionService {
+  + void recognizeWord(String text)
+}
+
+class ObservationUploader {
+  - DatabaseService _databaseService
+  - ObservationService _observationService
+  - UploadNotificationService? _notificationService
+  - bool _debugMode
+  - String? _errorMessage
+  - bool _isUploading
+  - String? _lastUploadBirdName
+  - DateTime? _lastUploadTime
+  - bool _processingUpload
+  - bool _isActive
+  + bool get isUploading()
+  + String? get errorMessage()
+  + bool get isDisposed()
+  + Future<BirdObservation?> saveAndUploadObservation(String birdName, {String? scientificName, String? soundDirectory, int quantity = 1, int observerId = 1, DateTime? observationDate, String? observationTime, int testBatchId = 0, bool isTestData = false, String? sourceId})
+  + void notifyListeners()
+  + void dispose()
+}
+
+class SpeechCoordinator {
+  - SpeechRecognitionService _speechService
+  - BirdRecognitionService _birdService
+  - WordRecognitionService _wordService
+  - RecordingPlayerService _audioService
+  - ObservationUploader _observationUploader
+  - bool isWaitingForConfirmation
+  - String currentBirdInQuestion
+  + bool get isListening()
+  + void startListening()
+  + void stopListening()
+  + void handleBirdRecognition(String birdName)
+  + void handleConfirmationResponse(bool confirmed)
+}
+
+SpeechCoordinator --> SpeechRecognitionService : uses
+SpeechCoordinator --> BirdRecognitionService : uses
+SpeechCoordinator --> WordRecognitionService : uses
+SpeechCoordinator --> RecordingPlayerService : uses
+SpeechCoordinator --> ObservationUploader : uses
+
+@enduml
