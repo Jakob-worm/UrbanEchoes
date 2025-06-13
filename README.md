@@ -1,17 +1,14 @@
-#Important
-The backend has been closed and deleted as the project is over
-
 # UrbanEchoes
 To run the app in debug:
     CD urban_echoes_flutter
     flutter run
 
-# Venv Use it to create acurate requirements.txt
+# Venv Use it to create accurate requirements.txt
 venv\Scripts\activate
 pip freeze > requirements.txt
 
 # Debug mode
-Because i cant ffigure out how to just have on global varibale multiple varibles need to be set to false in order toouse azure backend these inlude
+Because I can't figure out how to have one global variable, multiple variables need to be set to false to use the Azure backend. These include
 main.dart debug = false
 bird_observer_controller debug also needs to be set to false
 
@@ -19,7 +16,7 @@ bird_observer_controller debug also needs to be set to false
 To start FastAPI app locally: uvicorn main:app --reload
 To test the /birds Endpoint: curl http://127.0.0.1:8000/birds
 
-# When debugging on chrome
+# When debugging on Chrome
 flutter run -d chrome --web-browser-flag "--disable-web-security"
 
 # .env update
@@ -28,7 +25,7 @@ AZURE_STORAGE_CONTAINER_NAME=bird-sounds  # or your preferred container name
 
 To get the Azure Storage connection string:
 
-Go to Azure Portal
+Go to the Azure Portal
 Navigate to your Storage Account
 Under "Security + networking", click "Access keys"
 Copy the connection string
